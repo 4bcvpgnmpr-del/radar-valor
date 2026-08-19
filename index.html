@@ -70,7 +70,7 @@
   <header>
     <div>
       <h1>Radar de valor</h1>
-      <div class="sub">Cuotas de bwin y Betfair comparadas contra el precio justo del mercado (calculado con Pinnacle y otras referencias por detrás). Solo informativo.</div>
+      <div class="sub">Cuotas de William Hill comparadas contra el precio justo del mercado (calculado con Pinnacle y otras referencias por detrás). Solo informativo.</div>
     </div>
     <div class="panel keys" style="padding:10px 14px;">
       <div><div class="muted" style="margin-bottom:4px;">Odds API key</div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:170px;" /></div>
@@ -152,7 +152,7 @@
   </div>
 </div>
 
-<script type="module" src="https://widgets.api-sports.io/2.0.3/widgets.js"></script>
+<script id="api-football-widgets-script" src="https://widgets.api-sports.io/2.0.3/widgets.js"></script>
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
@@ -163,8 +163,8 @@ const CLV_LOG_KEY = "radar-valor-clv-log";
 const VALUE_LOG_KEY = "radar-valor-value-log";
 const VALUE_THRESHOLD = 0.02;
 const ERROR_THRESHOLD = 0.15;
-const DISPLAY_BOOKMAKER_MATCH = ["bwin", "betfair"]; // coincide con cualquier clave que contenga estos textos
-const REFERENCE_BOOKMAKERS = ["pinnacle", "williamhill", "unibet_eu"];
+const DISPLAY_BOOKMAKER_MATCH = ["williamhill"];
+const REFERENCE_BOOKMAKERS = ["pinnacle", "unibet_eu"];
 const FEATURED_MARKETS = "h2h,spreads,totals";
 const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
 const MARKET_LABELS = { h2h:"Resultado final (1X2)", spreads:"Hándicap", totals:"Más/Menos goles", btts:"Ambos anotan", double_chance:"Doble oportunidad", draw_no_bet:"Empate anula apuesta" };
@@ -289,7 +289,7 @@ function buildMarketTable(market, matchMeta) {
         marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best };
       regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button>`;
     }
-    const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — bwin/Betfair sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
+    const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — William Hill sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
     return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td>${regBtn}</td></tr>`;
   }).filter(Boolean);
   return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Cuota</th><th>Edge</th><th>Stake Kelly</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
@@ -510,14 +510,21 @@ function loadWidgets() {
   container.innerHTML = `
     <div style="margin-bottom:20px;">
       <div class="muted" style="margin-bottom:6px;">Clasificación</div>
-      <div id="standings-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-league="${league}" data-season="${season}" data-theme="dark" class="wg-standings"></div>
+      <div id="standings-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-league="${league}" data-season="${season}" data-theme="dark" class="wg-api-football-standings"></div>
     </div>
     <div>
       <div class="muted" style="margin-bottom:6px;">Partidos de hoy (goles, tarjetas y estadísticas en vivo al hacer clic)</div>
-      <div id="games-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-date="${new Date().toISOString().slice(0,10)}" data-league="${league}" data-season="${season}" data-theme="dark" data-show-toolbar="true" data-show-errors="false" data-show-logos="true" data-modal-game="true" data-modal-standings="true" data-modal-show-logos="true" class="wg-games"></div>
+      <div id="games-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-date="${new Date().toISOString().slice(0,10)}" data-league="${league}" data-season="${season}" data-theme="dark" data-show-toolbar="true" data-show-errors="true" data-show-logos="true" data-modal-game="true" data-modal-standings="true" data-modal-show-logos="true" class="wg-api-football-games"></div>
     </div>
   `;
-  if (window.FootballWidgets) window.FootballWidgets.init();
+  // El script de widgets solo escanea el DOM al cargar la página, así que lo
+  // volvemos a inyectar para forzar que detecte los widgets recién insertados.
+  const oldScript = document.getElementById("api-football-widgets-script");
+  if (oldScript) oldScript.remove();
+  const newScript = document.createElement("script");
+  newScript.id = "api-football-widgets-script";
+  newScript.src = "https://widgets.api-sports.io/2.0.3/widgets.js";
+  document.body.appendChild(newScript);
 }
 
 loadOdds();
