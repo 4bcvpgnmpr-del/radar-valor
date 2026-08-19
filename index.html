@@ -416,7 +416,11 @@ async function loadH2H(cardId, homeName, awayName) {
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Buscando el último enfrentamiento directo...</div>`;
   try {
     const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
-    if (!homeId || !awayId) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se identificaron ambos equipos.</div>`; return; }
+    if (!homeId || !awayId) {
+      const missing = [!homeId ? homeName : null, !awayId ? awayName : null].filter(Boolean).join(" y ");
+      target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">API-Football no encontró: <b>${missing}</b>. Puede que el nombre no coincida exactamente entre ambas fuentes de datos.</div>`;
+      return;
+    }
     const h2hAll = await apiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, footballKey);
     const played = h2hAll.filter(f => f.fixture.status && (f.fixture.status.short === "FT" || f.fixture.status.short === "AET" || f.fixture.status.short === "PEN"));
     const h2h = played.sort((a,b) => new Date(b.fixture.date) - new Date(a.fixture.date));
