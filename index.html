@@ -9,24 +9,24 @@
   * { box-sizing: border-box; }
   body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#0B0E11; color:#E6E9ED; }
   .mono { font-family:'IBM Plex Mono',monospace; }
-  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 60px; }
-  header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
   h1 { font-size:20px; font-weight:600; margin:0; }
-  .sub { font-size:12px; color:#7C8797; margin-top:2px; }
+  .sub { font-size:12px; color:#7C8797; margin-top:2px; max-width:520px; }
   .panel { background:#12161C; border:1px solid #232A33; border-radius:10px; padding:16px; margin-bottom:16px; }
   select, input, textarea, button { font-family:inherit; font-size:13px; }
   select, input, textarea { background:#12161C; border:1px solid #232A33; color:#E6E9ED; padding:8px 10px; border-radius:6px; }
-  textarea { width:100%; min-height:60px; resize:vertical; }
+  textarea { width:100%; min-height:50px; resize:vertical; }
   button { background:#3ECF8E; color:#06231A; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; border:1px solid #232A33; color:#E6E9ED; }
+  button.small { padding:5px 10px; font-size:12px; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
   th { text-align:left; color:#7C8797; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid #232A33; }
-  td { padding:10px; border-bottom:1px solid #1A1F26; vertical-align:top; }
-  .badge { font-size:11px; font-weight:600; padding:3px 8px; border-radius:4px; }
-  .val-high { color:#F0B429; background:rgba(240,180,41,.12); border:1px solid #F0B429; }
+  td { padding:9px 10px; border-bottom:1px solid #1A1F26; vertical-align:top; }
+  .val-high { color:#F0B429; }
   .val-mid { color:#3ECF8E; }
   .val-low { color:#7C8797; }
-  .bet365 { color:#F0B429; }
+  .pinnacle { color:#7F77DD; }
   .match-card { border-left:3px solid #232A33; padding-left:12px; margin-bottom:18px; }
   .match-card.has-value { border-left-color:#F0B429; }
   .row { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:center; }
@@ -34,6 +34,15 @@
   a { color:#3ECF8E; }
   .setup { text-align:center; padding:40px 20px; }
   .link-btn { display:inline-block; margin-top:6px; font-size:12px; }
+  .mkt-tabs { display:flex; gap:6px; margin:12px 0 8px; flex-wrap:wrap; }
+  .mkt-tab { background:transparent; border:1px solid #232A33; color:#7C8797; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer; }
+  .mkt-tab.active { color:#E6E9ED; border-color:#3ECF8E; }
+  .mkt-body { display:none; }
+  .mkt-body.active { display:block; }
+  .alert-box { background:#171C23; border:1px solid #232A33; border-left:3px solid #E5484D; border-radius:8px; padding:10px 12px; margin-top:8px; font-size:13px; }
+  .alert-box.ok { border-left-color:#3ECF8E; }
+  .alert-item { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px solid #1A1F26; }
+  .keys { display:flex; gap:8px; flex-wrap:wrap; }
 </style>
 </head>
 <body>
@@ -41,11 +50,18 @@
   <header>
     <div>
       <h1>Radar de valor</h1>
-      <div class="sub">Cuotas reales (incluye Bet365), probabilidad justa y valor esperado — solo informativo, no procesa apuestas</div>
+      <div class="sub">Cuotas reales de varias casas (Pinnacle como referencia de precio justo), múltiples mercados y alertas automáticas de bajas por lesión o sanción. Solo informativo, no procesa apuestas.</div>
     </div>
-    <div class="panel" id="key-box" style="padding:10px 14px; display:flex; gap:8px; align-items:center;">
-      <input id="apiKey" type="password" placeholder="Tu API key de the-odds-api.com" style="width:220px;" />
-      <button onclick="saveKey()">Guardar</button>
+    <div class="panel keys" style="padding:10px 14px;">
+      <div>
+        <div class="muted" style="margin-bottom:4px;">API key de cuotas (the-odds-api.com)</div>
+        <input id="apiKey" type="password" placeholder="Odds API key" style="width:200px;" />
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:4px;">API key de plantillas (api-football.com, opcional)</div>
+        <input id="footballKey" type="password" placeholder="API-Football key" style="width:200px;" />
+      </div>
+      <div style="display:flex; align-items:flex-end;"><button onclick="saveKeys()">Guardar</button></div>
     </div>
   </header>
 
@@ -66,26 +82,34 @@
 </div>
 
 <script>
-const STORAGE_KEY = "radar-valor-oddsapi-key";
+const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
+const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
 const NOTES_KEY = "radar-valor-notes";
 const VALUE_THRESHOLD = 0.02;
-const BOOKMAKERS = "bet365,williamhill,pinnacle,unibet_eu";
+const BOOKMAKERS = "pinnacle,williamhill,unibet_eu,bwin";
+const FEATURED_MARKETS = "h2h,spreads,totals";
+const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
+const MARKET_LABELS = {
+  h2h: "Resultado final (1X2)",
+  spreads: "Hándicap",
+  totals: "Más/Menos goles",
+  btts: "Ambos anotan",
+  double_chance: "Doble oportunidad",
+  draw_no_bet: "Empate anula apuesta",
+};
 
-function saveKey() {
-  const k = document.getElementById("apiKey").value.trim();
-  if (!k) return;
-  localStorage.setItem(STORAGE_KEY, k);
-  document.getElementById("status").textContent = "API key guardada.";
+function saveKeys() {
+  const k1 = document.getElementById("apiKey").value.trim();
+  const k2 = document.getElementById("footballKey").value.trim();
+  if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
+  if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
+  document.getElementById("status").textContent = "Claves guardadas.";
   loadOdds();
 }
-
-function getKey() { return localStorage.getItem(STORAGE_KEY) || ""; }
+function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
+function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
-function saveNote(id, text) {
-  const notes = getNotes();
-  notes[id] = text;
-  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-}
+function saveNote(id, text) { const n = getNotes(); n[id] = text; localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
 
 function impliedProbs(oddsObj) {
   const probs = {}; let sum = 0;
@@ -93,18 +117,27 @@ function impliedProbs(oddsObj) {
   for (const k in probs) probs[k] /= sum;
   return probs;
 }
-
 function pct(n) { return (n*100).toFixed(1) + "%"; }
+function outcomeKey(o) { return o.point != null ? `${o.name} ${o.point > 0 ? "+" : ""}${o.point}` : o.name; }
+
+function currentSeason() {
+  const now = new Date();
+  const y = now.getFullYear();
+  return now.getMonth() + 1 >= 7 ? y : y - 1;
+}
 
 async function loadOdds() {
-  const key = getKey();
+  const key = getOddsKey();
   const statusEl = document.getElementById("status");
   const contentEl = document.getElementById("content");
-  if (document.getElementById("apiKey")) document.getElementById("apiKey").value = key;
+  const apiKeyInput = document.getElementById("apiKey");
+  const footballKeyInput = document.getElementById("footballKey");
+  if (apiKeyInput) apiKeyInput.value = key;
+  if (footballKeyInput) footballKeyInput.value = getFootballKey();
   if (!key) {
     contentEl.innerHTML = `<div class="panel setup">
       <div style="font-size:14px; margin-bottom:8px;">Necesitas una API key gratuita de The Odds API</div>
-      <div class="muted">Regístrate en the-odds-api.com (plan gratis: 500 peticiones/mes), pega tu key arriba y pulsa Guardar.</div>
+      <div class="muted">Regístrate en the-odds-api.com (plan gratis: 500 peticiones/mes), pega tu key arriba y pulsa Guardar.<br/>Opcional: para alertas de lesiones/sanciones, añade también una key gratis de api-football.com.</div>
       <a class="link-btn" href="https://the-odds-api.com" target="_blank">Ir a the-odds-api.com →</a>
     </div>`;
     return;
@@ -112,92 +145,185 @@ async function loadOdds() {
   const sport = document.getElementById("sport").value;
   statusEl.textContent = "Cargando cuotas...";
   try {
-    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=h2h&oddsFormat=decimal&bookmakers=${BOOKMAKERS}`;
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal&bookmakers=${BOOKMAKERS}`;
     const res = await fetch(url);
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`${res.status}: ${errText}`);
-    }
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
     const data = await res.json();
     statusEl.textContent = `${data.length} partidos cargados.`;
-    renderMatches(data);
+    renderMatches(data, sport);
   } catch (e) {
     statusEl.textContent = "";
-    contentEl.innerHTML = `<div class="panel" style="color:#E5484D;">Error al cargar cuotas: ${e.message}. Revisa tu API key o que la liga tenga partidos próximos.</div>`;
+    contentEl.innerHTML = `<div class="panel" style="color:#E5484D;">Error al cargar cuotas: ${e.message}</div>`;
   }
 }
 
-function renderMatches(matches) {
+function buildMarketTable(market) {
+  const groups = {};
+  market.selections.forEach(sel => {
+    if (!groups[sel.key]) groups[sel.key] = {};
+    groups[sel.key][sel.bookie] = sel.price;
+  });
+  const bookieKeys = [...new Set(market.selections.map(s => s.bookie))];
+  const probsByBookie = {};
+  bookieKeys.forEach(bk => {
+    const oddsObj = {};
+    Object.keys(groups).forEach(gk => { if (groups[gk][bk]) oddsObj[gk] = groups[gk][bk]; });
+    if (Object.keys(oddsObj).length > 1) probsByBookie[bk] = impliedProbs(oddsObj);
+  });
+  const fair = {};
+  Object.keys(groups).forEach(gk => {
+    let sum = 0, n = 0;
+    bookieKeys.forEach(bk => { if (probsByBookie[bk] && probsByBookie[bk][gk] != null) { sum += probsByBookie[bk][gk]; n++; } });
+    fair[gk] = n >= 2 ? sum/n : null;
+  });
+  let hasValue = false;
+  const rows = Object.keys(groups).map(gk => {
+    const odds = groups[gk];
+    let bestBk = null, best = -Infinity;
+    Object.keys(odds).forEach(bk => { if (odds[bk] > best) { best = odds[bk]; bestBk = bk; } });
+    const ev = fair[gk] != null ? best * fair[gk] - 1 : null;
+    if (ev != null && ev >= VALUE_THRESHOLD) hasValue = true;
+    const pinnacleOdds = odds["pinnacle"];
+    const evClass = ev == null ? "val-low" : ev >= VALUE_THRESHOLD ? "val-high" : ev > 0 ? "val-mid" : "val-low";
+    return { html: `<tr>
+      <td>${gk}</td>
+      <td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td>
+      <td class="mono pinnacle">${pinnacleOdds ? pinnacleOdds.toFixed(2) : "—"}</td>
+      <td class="mono">${best.toFixed(2)} <span class="muted">(${bestBk})</span></td>
+      <td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td>
+    </tr>`, hasValue: ev != null && ev >= VALUE_THRESHOLD };
+  });
+  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Pinnacle</th><th>Mejor cuota</th><th>Valor</th></tr></thead><tbody>${rows.map(r=>r.html).join("")}</tbody></table>`, hasValue };
+}
+
+function extractFeaturedMarkets(m) {
+  const byMarket = {};
+  m.bookmakers.forEach(bk => {
+    bk.markets.forEach(mk => {
+      if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
+      mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
+    });
+  });
+  return byMarket;
+}
+
+function renderMatches(matches, sport) {
   const contentEl = document.getElementById("content");
   const notes = getNotes();
   if (!matches.length) {
     contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`;
     return;
   }
-  contentEl.innerHTML = matches.map(m => {
-    const selections = {};
-    m.bookmakers.forEach(bk => {
-      const market = bk.markets.find(mk => mk.key === "h2h");
-      if (!market) return;
-      market.outcomes.forEach(o => {
-        if (!selections[o.name]) selections[o.name] = {};
-        selections[o.name][bk.key] = o.price;
-      });
-    });
-    const bookieKeys = m.bookmakers.map(b => b.key);
-    const bookieProbsByBookie = {};
-    bookieKeys.forEach(bk => {
-      const oddsObj = {};
-      Object.keys(selections).forEach(sel => { if (selections[sel][bk]) oddsObj[sel] = selections[sel][bk]; });
-      if (Object.keys(oddsObj).length) bookieProbsByBookie[bk] = impliedProbs(oddsObj);
-    });
-    const fair = {};
-    Object.keys(selections).forEach(sel => {
-      let sum = 0, n = 0;
-      bookieKeys.forEach(bk => { if (bookieProbsByBookie[bk] && bookieProbsByBookie[bk][sel] != null) { sum += bookieProbsByBookie[bk][sel]; n++; } });
-      fair[sel] = n ? sum/n : null;
-    });
-
+  contentEl.innerHTML = matches.map((m, idx) => {
+    const byMarket = extractFeaturedMarkets(m);
     let matchHasValue = false;
-    const rows = Object.keys(selections).map(sel => {
-      const odds = selections[sel];
-      let bestBk = null, best = -Infinity;
-      Object.keys(odds).forEach(bk => { if (odds[bk] > best) { best = odds[bk]; bestBk = bk; } });
-      const ev = fair[sel] != null ? best * fair[sel] - 1 : null;
-      if (ev != null && ev >= VALUE_THRESHOLD) matchHasValue = true;
-      const bet365odds = odds["bet365"];
-      const evClass = ev == null ? "val-low" : ev >= VALUE_THRESHOLD ? "val-high" : ev > 0 ? "val-mid" : "val-low";
-      return `<tr>
-        <td>${sel}</td>
-        <td class="mono">${fair[sel] != null ? pct(fair[sel]) : "—"}</td>
-        <td class="mono ${bet365odds ? 'bet365' : ''}">${bet365odds ? bet365odds.toFixed(2) : "—"}</td>
-        <td class="mono">${best.toFixed(2)} <span class="muted">(${bestBk})</span></td>
-        <td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td>
-      </tr>`;
-    }).join("");
-
+    const tabs = Object.keys(byMarket).map((mkKey, i) => {
+      const built = buildMarketTable(byMarket[mkKey]);
+      if (built.hasValue) matchHasValue = true;
+      return { key: mkKey, label: MARKET_LABELS[mkKey] || mkKey, html: built.table, i };
+    });
     const date = new Date(m.commence_time);
     const dateStr = date.toLocaleString("es-ES", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
     const searchQuery = encodeURIComponent(`${m.home_team} vs ${m.away_team} preview news injuries`);
+    const cardId = `m${idx}`;
 
-    return `<div class="panel match-card ${matchHasValue ? 'has-value' : ''}">
+    return `<div class="panel match-card ${matchHasValue ? 'has-value' : ''}" id="${cardId}">
       <div class="row">
         <div>
           <div style="font-weight:600;">${m.home_team} vs ${m.away_team}</div>
           <div class="muted">${dateStr}</div>
         </div>
-        <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Buscar noticias del partido →</a>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Cargar más mercados</button>
+          <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Ver bajas y sanciones</button>
+          <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Buscar noticias →</a>
+        </div>
       </div>
-      <table style="margin-top:10px;">
-        <thead><tr><th>Selección</th><th>Prob. justa</th><th>Bet365</th><th>Mejor cuota</th><th>Valor</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+
+      <div class="mkt-tabs">
+        ${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}
+      </div>
+      ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
+      <div id="${cardId}-extra"></div>
+
+      <div id="${cardId}-injuries"></div>
+
       <div style="margin-top:10px;">
-        <label class="muted">Notas / factores a tener en cuenta</label>
-        <textarea placeholder="Bajas, forma reciente, motivación, clima..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
+        <label class="muted">Notas propias</label>
+        <textarea placeholder="Cualquier otro factor a tener en cuenta..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
       </div>
     </div>`;
   }).join("");
+}
+
+function switchTab(cardId, idx) {
+  const card = document.getElementById(cardId);
+  card.querySelectorAll(".mkt-tab").forEach((b,i) => b.classList.toggle("active", i===idx));
+  card.querySelectorAll(".mkt-body").forEach(b => b.classList.toggle("active", Number(b.dataset.idx)===idx));
+}
+
+async function loadExtraMarkets(sport, eventId, cardId) {
+  const key = getOddsKey();
+  const target = document.getElementById(`${cardId}-extra`);
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Cargando mercados adicionales...</div>`;
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/events/${eventId}/odds/?apiKey=${key}&regions=uk,eu&markets=${ADDITIONAL_MARKETS}&oddsFormat=decimal&bookmakers=${BOOKMAKERS}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    const byMarket = {};
+    (data.bookmakers || []).forEach(bk => {
+      bk.markets.forEach(mk => {
+        if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
+        mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
+      });
+    });
+    const keys = Object.keys(byMarket);
+    if (!keys.length) { target.innerHTML = `<div class="muted" style="margin-top:8px;">No hay mercados adicionales disponibles para este partido todavía.</div>`; return; }
+    target.innerHTML = keys.map(k => `<div style="margin-top:12px;"><div class="muted" style="margin-bottom:6px;">${MARKET_LABELS[k]||k}</div>${buildMarketTable(byMarket[k]).table}</div>`).join("");
+  } catch (e) {
+    target.innerHTML = `<div style="color:#E5484D; margin-top:8px; font-size:12px;">No se pudieron cargar mercados adicionales: ${e.message}</div>`;
+  }
+}
+
+async function findTeamId(name, footballKey) {
+  const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(name)}`, {
+    headers: { "x-apisports-key": footballKey }
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const data = await res.json();
+  if (!data.response || !data.response.length) return null;
+  return data.response[0].team.id;
+}
+
+async function loadInjuries(cardId, homeName, awayName) {
+  const footballKey = getFootballKey();
+  const target = document.getElementById(`${cardId}-injuries`);
+  if (!footballKey) {
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Para ver bajas automáticas añade tu API key gratis de <a href="https://www.api-football.com" target="_blank">api-football.com</a> arriba.</div>`;
+    return;
+  }
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Buscando bajas...</div>`;
+  try {
+    const season = currentSeason();
+    const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
+    const fetchInjuries = async (teamId, teamName) => {
+      if (!teamId) return { teamName, list: [] };
+      const res = await fetch(`https://v3.football.api-sports.io/injuries?team=${teamId}&season=${season}`, { headers: { "x-apisports-key": footballKey } });
+      if (!res.ok) return { teamName, list: [] };
+      const data = await res.json();
+      return { teamName, list: (data.response || []).slice(0, 8) };
+    };
+    const [homeInj, awayInj] = await Promise.all([fetchInjuries(homeId, homeName), fetchInjuries(awayId, awayName)]);
+    const renderTeam = (teamData) => {
+      if (!teamData.list.length) return `<div class="alert-box ok">${teamData.teamName}: sin bajas registradas.</div>`;
+      const items = teamData.list.map(inj => `<div class="alert-item"><span>${inj.player.name}</span><span class="muted">${inj.player.reason || inj.player.type || "baja"}</span></div>`).join("");
+      return `<div class="alert-box"><div style="font-weight:500; margin-bottom:4px;">${teamData.teamName}</div>${items}</div>`;
+    };
+    target.innerHTML = renderTeam(homeInj) + renderTeam(awayInj);
+  } catch (e) {
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar bajas automáticamente (${e.message}). Prueba con las notas manuales.</div>`;
+  }
 }
 
 loadOdds();

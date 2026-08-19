@@ -38,8 +38,21 @@ git push -u origin main
 3. Guarda. En un par de minutos tu app estará disponible en:
    `https://TU-USUARIO.github.io/radar-valor/`
 
+## Mercados y casas incluidas
+
+- Casas: Pinnacle (referencia de precio justo, la más ajustada del mercado), William Hill, Unibet y bwin.
+- Bet365 no está incluida: no ofrece API pública ni licencia sus datos a terceros, así que ningún comparador legítimo puede mostrar sus cuotas en tiempo real.
+- Mercados principales (1X2, hándicap, más/menos goles) se cargan automáticamente. Mercados adicionales (ambos anotan, doble oportunidad, empate anula apuesta) se cargan bajo demanda con el botón "Cargar más mercados" de cada partido, porque consumen más cuota de la API.
+
+## Bajas por lesión o sanción (opcional)
+
+1. Regístrate gratis en https://www.api-football.com (plan gratuito: 100 peticiones/día).
+2. Pega esa segunda API key en el campo correspondiente de la app.
+3. En cada partido, pulsa "Ver bajas y sanciones" para consultar automáticamente las bajas registradas de ambos equipos.
+
+Esta consulta depende de que los nombres de equipo coincidan entre ambas APIs; en ligas o equipos poco comunes puede no encontrar coincidencia exacta.
+
 ## Notas
 
 - Los mercados y ligas disponibles dependen de tu plan en The Odds API; el plan gratis cubre las principales ligas de fútbol.
-- Bet365 no siempre ofrece precio para todos los partidos/mercados vía la API — cuando falta, la tabla muestra "—" en esa columna.
-- Las notas de cada partido se guardan en tu navegador (localStorage), no se comparten ni se suben a ningún sitio.
+- Las notas manuales de cada partido se guardan en tu navegador (localStorage), no se comparten ni se suben a ningún sitio.
