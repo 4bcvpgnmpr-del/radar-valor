@@ -152,7 +152,7 @@
   </div>
 </div>
 
-<script src="https://widgets.api-sports.io/2.0.3/widgets.js"></script>
+<script type="module" src="https://widgets.api-sports.io/2.0.3/widgets.js"></script>
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
@@ -163,9 +163,8 @@ const CLV_LOG_KEY = "radar-valor-clv-log";
 const VALUE_LOG_KEY = "radar-valor-value-log";
 const VALUE_THRESHOLD = 0.02;
 const ERROR_THRESHOLD = 0.15;
-const DISPLAY_BOOKMAKERS = ["bwin", "betfair"];
-const REFERENCE_BOOKMAKERS = ["pinnacle", "williamhill"];
-const ALL_BOOKMAKERS = [...DISPLAY_BOOKMAKERS, ...REFERENCE_BOOKMAKERS].join(",");
+const DISPLAY_BOOKMAKER_MATCH = ["bwin", "betfair"]; // coincide con cualquier clave que contenga estos textos
+const REFERENCE_BOOKMAKERS = ["pinnacle", "williamhill", "unibet_eu"];
 const FEATURED_MARKETS = "h2h,spreads,totals";
 const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
 const MARKET_LABELS = { h2h:"Resultado final (1X2)", spreads:"Hándicap", totals:"Más/Menos goles", btts:"Ambos anotan", double_chance:"Doble oportunidad", draw_no_bet:"Empate anula apuesta" };
@@ -224,11 +223,13 @@ async function loadOdds() {
   const sport = document.getElementById("sport").value;
   statusEl.textContent = "Cargando cuotas...";
   try {
-    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal&bookmakers=${ALL_BOOKMAKERS}`;
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
     const data = await res.json();
-    statusEl.textContent = `${data.length} partidos cargados.`;
+    const seenBookies = new Set();
+    data.forEach(m => m.bookmakers.forEach(bk => seenBookies.add(bk.key)));
+    statusEl.textContent = `${data.length} partidos cargados. Casas detectadas: ${[...seenBookies].join(", ") || "ninguna"}.`;
     renderMatches(data, sport);
   } catch (e) {
     statusEl.textContent = "";
@@ -258,8 +259,14 @@ function buildMarketTable(market, matchMeta) {
   const bankroll = getBankroll(), kf = getKellyFraction();
   const rows = Object.keys(groups).map(gk => {
     const allOdds = groups[gk];
-    const displayOdds = {}; DISPLAY_BOOKMAKERS.forEach(b => { if (allOdds[b]) displayOdds[b] = allOdds[b]; });
-    if (!Object.keys(displayOdds).length) return "";
+    const displayOdds = {};
+    Object.keys(allOdds).forEach(bk => { if (DISPLAY_BOOKMAKER_MATCH.some(m => bk.toLowerCase().includes(m))) displayOdds[bk] = allOdds[bk]; });
+    let usingFallback = false;
+    if (!Object.keys(displayOdds).length) {
+      REFERENCE_BOOKMAKERS.forEach(b => { if (allOdds[b] && !Object.keys(displayOdds).length) displayOdds[b] = allOdds[b]; });
+      usingFallback = true;
+      if (!Object.keys(displayOdds).length) return "";
+    }
     let bestBk = null, best = -Infinity;
     Object.keys(displayOdds).forEach(bk => { if (displayOdds[bk] > best) { best = displayOdds[bk]; bestBk = bk; } });
     const ev = fair[gk] != null ? best * fair[gk] - 1 : null;
@@ -282,7 +289,8 @@ function buildMarketTable(market, matchMeta) {
         marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best };
       regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button>`;
     }
-    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} <span class="muted">(${bestBk})</span></td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td>${regBtn}</td></tr>`;
+    const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — bwin/Betfair sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
+    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td>${regBtn}</td></tr>`;
   }).filter(Boolean);
   return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Cuota</th><th>Edge</th><th>Stake Kelly</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
 }
@@ -345,7 +353,7 @@ async function loadExtraMarkets(sport, eventId, cardId) {
   const target = document.getElementById(`${cardId}-extra`);
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Cargando...</div>`;
   try {
-    const url = `https://api.the-odds-api.com/v4/sports/${sport}/events/${eventId}/odds/?apiKey=${key}&regions=uk,eu&markets=${ADDITIONAL_MARKETS}&oddsFormat=decimal&bookmakers=${ALL_BOOKMAKERS}`;
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/events/${eventId}/odds/?apiKey=${key}&regions=uk,eu&markets=${ADDITIONAL_MARKETS}&oddsFormat=decimal`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
