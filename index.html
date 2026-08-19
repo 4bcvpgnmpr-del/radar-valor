@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Radar de valor — análisis de cuotas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#0B0E11; color:#E6E9ED; }
+  .mono { font-family:'IBM Plex Mono',monospace; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+  h1 { font-size:20px; font-weight:600; margin:0; }
+  .sub { font-size:12px; color:#7C8797; margin-top:2px; }
+  .panel { background:#12161C; border:1px solid #232A33; border-radius:10px; padding:16px; margin-bottom:16px; }
+  select, input, textarea, button { font-family:inherit; font-size:13px; }
+  select, input, textarea { background:#12161C; border:1px solid #232A33; color:#E6E9ED; padding:8px 10px; border-radius:6px; }
+  textarea { width:100%; min-height:60px; resize:vertical; }
+  button { background:#3ECF8E; color:#06231A; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; border:1px solid #232A33; color:#E6E9ED; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:#7C8797; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:8px 10px; border-bottom:1px solid #232A33; }
+  td { padding:10px; border-bottom:1px solid #1A1F26; vertical-align:top; }
+  .badge { font-size:11px; font-weight:600; padding:3px 8px; border-radius:4px; }
+  .val-high { color:#F0B429; background:rgba(240,180,41,.12); border:1px solid #F0B429; }
+  .val-mid { color:#3ECF8E; }
+  .val-low { color:#7C8797; }
+  .bet365 { color:#F0B429; }
+  .match-card { border-left:3px solid #232A33; padding-left:12px; margin-bottom:18px; }
+  .match-card.has-value { border-left-color:#F0B429; }
+  .row { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:center; }
+  .muted { color:#7C8797; font-size:12px; }
+  a { color:#3ECF8E; }
+  .setup { text-align:center; padding:40px 20px; }
+  .link-btn { display:inline-block; margin-top:6px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Radar de valor</h1>
+      <div class="sub">Cuotas reales (incluye Bet365), probabilidad justa y valor esperado — solo informativo, no procesa apuestas</div>
+    </div>
+    <div class="panel" id="key-box" style="padding:10px 14px; display:flex; gap:8px; align-items:center;">
+      <input id="apiKey" type="password" placeholder="Tu API key de the-odds-api.com" style="width:220px;" />
+      <button onclick="saveKey()">Guardar</button>
+    </div>
+  </header>
+
+  <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <label class="muted">Liga</label>
+    <select id="sport" onchange="loadOdds()">
+      <option value="soccer_epl">Premier League</option>
+      <option value="soccer_spain_la_liga">La Liga</option>
+      <option value="soccer_italy_serie_a">Serie A</option>
+      <option value="soccer_germany_bundesliga">Bundesliga</option>
+      <option value="soccer_uefa_champs_league">Champions League</option>
+    </select>
+    <button onclick="loadOdds()">Actualizar cuotas</button>
+    <span id="status" class="muted"></span>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const STORAGE_KEY = "radar-valor-oddsapi-key";
+const NOTES_KEY = "radar-valor-notes";
+const VALUE_THRESHOLD = 0.02;
+const BOOKMAKERS = "bet365,williamhill,pinnacle,unibet_eu";
+
+function saveKey() {
+  const k = document.getElementById("apiKey").value.trim();
+  if (!k) return;
+  localStorage.setItem(STORAGE_KEY, k);
+  document.getElementById("status").textContent = "API key guardada.";
+  loadOdds();
+}
+
+function getKey() { return localStorage.getItem(STORAGE_KEY) || ""; }
+function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
+function saveNote(id, text) {
+  const notes = getNotes();
+  notes[id] = text;
+  localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+}
+
+function impliedProbs(oddsObj) {
+  const probs = {}; let sum = 0;
+  for (const k in oddsObj) { probs[k] = 1/oddsObj[k]; sum += probs[k]; }
+  for (const k in probs) probs[k] /= sum;
+  return probs;
+}
+
+function pct(n) { return (n*100).toFixed(1) + "%"; }
+
+async function loadOdds() {
+  const key = getKey();
+  const statusEl = document.getElementById("status");
+  const contentEl = document.getElementById("content");
+  if (document.getElementById("apiKey")) document.getElementById("apiKey").value = key;
+  if (!key) {
+    contentEl.innerHTML = `<div class="panel setup">
+      <div style="font-size:14px; margin-bottom:8px;">Necesitas una API key gratuita de The Odds API</div>
+      <div class="muted">Regístrate en the-odds-api.com (plan gratis: 500 peticiones/mes), pega tu key arriba y pulsa Guardar.</div>
+      <a class="link-btn" href="https://the-odds-api.com" target="_blank">Ir a the-odds-api.com →</a>
+    </div>`;
+    return;
+  }
+  const sport = document.getElementById("sport").value;
+  statusEl.textContent = "Cargando cuotas...";
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=h2h&oddsFormat=decimal&bookmakers=${BOOKMAKERS}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`${res.status}: ${errText}`);
+    }
+    const data = await res.json();
+    statusEl.textContent = `${data.length} partidos cargados.`;
+    renderMatches(data);
+  } catch (e) {
+    statusEl.textContent = "";
+    contentEl.innerHTML = `<div class="panel" style="color:#E5484D;">Error al cargar cuotas: ${e.message}. Revisa tu API key o que la liga tenga partidos próximos.</div>`;
+  }
+}
+
+function renderMatches(matches) {
+  const contentEl = document.getElementById("content");
+  const notes = getNotes();
+  if (!matches.length) {
+    contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`;
+    return;
+  }
+  contentEl.innerHTML = matches.map(m => {
+    const selections = {};
+    m.bookmakers.forEach(bk => {
+      const market = bk.markets.find(mk => mk.key === "h2h");
+      if (!market) return;
+      market.outcomes.forEach(o => {
+        if (!selections[o.name]) selections[o.name] = {};
+        selections[o.name][bk.key] = o.price;
+      });
+    });
+    const bookieKeys = m.bookmakers.map(b => b.key);
+    const bookieProbsByBookie = {};
+    bookieKeys.forEach(bk => {
+      const oddsObj = {};
+      Object.keys(selections).forEach(sel => { if (selections[sel][bk]) oddsObj[sel] = selections[sel][bk]; });
+      if (Object.keys(oddsObj).length) bookieProbsByBookie[bk] = impliedProbs(oddsObj);
+    });
+    const fair = {};
+    Object.keys(selections).forEach(sel => {
+      let sum = 0, n = 0;
+      bookieKeys.forEach(bk => { if (bookieProbsByBookie[bk] && bookieProbsByBookie[bk][sel] != null) { sum += bookieProbsByBookie[bk][sel]; n++; } });
+      fair[sel] = n ? sum/n : null;
+    });
+
+    let matchHasValue = false;
+    const rows = Object.keys(selections).map(sel => {
+      const odds = selections[sel];
+      let bestBk = null, best = -Infinity;
+      Object.keys(odds).forEach(bk => { if (odds[bk] > best) { best = odds[bk]; bestBk = bk; } });
+      const ev = fair[sel] != null ? best * fair[sel] - 1 : null;
+      if (ev != null && ev >= VALUE_THRESHOLD) matchHasValue = true;
+      const bet365odds = odds["bet365"];
+      const evClass = ev == null ? "val-low" : ev >= VALUE_THRESHOLD ? "val-high" : ev > 0 ? "val-mid" : "val-low";
+      return `<tr>
+        <td>${sel}</td>
+        <td class="mono">${fair[sel] != null ? pct(fair[sel]) : "—"}</td>
+        <td class="mono ${bet365odds ? 'bet365' : ''}">${bet365odds ? bet365odds.toFixed(2) : "—"}</td>
+        <td class="mono">${best.toFixed(2)} <span class="muted">(${bestBk})</span></td>
+        <td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td>
+      </tr>`;
+    }).join("");
+
+    const date = new Date(m.commence_time);
+    const dateStr = date.toLocaleString("es-ES", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
+    const searchQuery = encodeURIComponent(`${m.home_team} vs ${m.away_team} preview news injuries`);
+
+    return `<div class="panel match-card ${matchHasValue ? 'has-value' : ''}">
+      <div class="row">
+        <div>
+          <div style="font-weight:600;">${m.home_team} vs ${m.away_team}</div>
+          <div class="muted">${dateStr}</div>
+        </div>
+        <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Buscar noticias del partido →</a>
+      </div>
+      <table style="margin-top:10px;">
+        <thead><tr><th>Selección</th><th>Prob. justa</th><th>Bet365</th><th>Mejor cuota</th><th>Valor</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:10px;">
+        <label class="muted">Notas / factores a tener en cuenta</label>
+        <textarea placeholder="Bajas, forma reciente, motivación, clima..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+loadOdds();
+</script>
+</body>
+</html>
