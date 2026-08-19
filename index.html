@@ -417,8 +417,10 @@ async function loadH2H(cardId, homeName, awayName) {
   try {
     const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
     if (!homeId || !awayId) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se identificaron ambos equipos.</div>`; return; }
-    const h2h = await apiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}&last=1`, footballKey);
-    if (!h2h.length) { target.innerHTML = `<div class="alert-box ok">Sin enfrentamientos directos recientes registrados.</div>`; return; }
+    const h2hAll = await apiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, footballKey);
+    const played = h2hAll.filter(f => f.fixture.status && (f.fixture.status.short === "FT" || f.fixture.status.short === "AET" || f.fixture.status.short === "PEN"));
+    const h2h = played.sort((a,b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+    if (!h2h.length) { target.innerHTML = `<div class="alert-box ok">Sin enfrentamientos directos finalizados registrados.</div>`; return; }
     const fixtureId = h2h[0].fixture.id;
     const stats = await apiFootball(`/fixtures/statistics?fixture=${fixtureId}`, footballKey);
     if (!stats.length) { target.innerHTML = `<div class="alert-box ok">Último H2H: ${h2h[0].teams.home.name} ${h2h[0].goals.home}-${h2h[0].goals.away} ${h2h[0].teams.away.name} (${h2h[0].fixture.date.slice(0,10)}). Sin estadísticas detalladas disponibles.</div>`; return; }
