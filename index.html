@@ -134,8 +134,8 @@
 
   <div id="view-widgets" class="view">
     <div class="panel">
-      <div style="font-weight:600; margin-bottom:6px;">Widgets de API-Football</div>
-      <div class="muted" style="margin-bottom:10px;">Requieren tu API-Football key guardada arriba. Elige liga y temporada para ver la clasificación y los partidos del día con estadísticas oficiales (goles, faltas, tarjetas).</div>
+      <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
+      <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <select id="widgetLeague">
           <option value="39">Premier League</option>
@@ -145,14 +145,14 @@
           <option value="2">Champions League</option>
         </select>
         <input id="widgetSeason" type="number" placeholder="Temporada (ej: 2025)" style="width:150px;" />
-        <button onclick="loadWidgets()">Cargar widgets</button>
+        <button onclick="loadLeagueStats()">Cargar estadísticas</button>
       </div>
+      <div id="widgets-status" class="muted"></div>
       <div id="widgets-container"></div>
     </div>
   </div>
 </div>
 
-<script id="api-football-widgets-script" src="https://widgets.api-sports.io/2.0.3/widgets.js"></script>
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
@@ -328,6 +328,7 @@ function renderMatches(matches, sport) {
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
           <button class="small ghost" onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Forma reciente</button>
+          <button class="small ghost" onclick="loadH2H('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Faltas y tarjetas (H2H)</button>
           <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Noticias →</a>
         </div>
       </div>
@@ -336,6 +337,7 @@ function renderMatches(matches, sport) {
       <div id="${cardId}-extra"></div>
       <div id="${cardId}-injuries"></div>
       <div id="${cardId}-form"></div>
+      <div id="${cardId}-h2h"></div>
       <div style="margin-top:10px;"><label class="muted">Notas propias</label><textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea></div>
     </div>`;
   }).join("");
@@ -404,6 +406,28 @@ async function loadForm(cardId, homeName, awayName) {
       return `<div class="alert-box ok"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div><div class="form-box">${badges}<span class="muted">GF ${gf} · GC ${ga}</span></div></div>`;
     };
     target.innerHTML = renderTeam(homeForm) + renderTeam(awayForm);
+  } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
+}
+
+async function loadH2H(cardId, homeName, awayName) {
+  const footballKey = getFootballKey();
+  const target = document.getElementById(`${cardId}-h2h`);
+  if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba.</div>`; return; }
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Buscando el último enfrentamiento directo...</div>`;
+  try {
+    const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
+    if (!homeId || !awayId) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se identificaron ambos equipos.</div>`; return; }
+    const h2h = await apiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}&last=1`, footballKey);
+    if (!h2h.length) { target.innerHTML = `<div class="alert-box ok">Sin enfrentamientos directos recientes registrados.</div>`; return; }
+    const fixtureId = h2h[0].fixture.id;
+    const stats = await apiFootball(`/fixtures/statistics?fixture=${fixtureId}`, footballKey);
+    if (!stats.length) { target.innerHTML = `<div class="alert-box ok">Último H2H: ${h2h[0].teams.home.name} ${h2h[0].goals.home}-${h2h[0].goals.away} ${h2h[0].teams.away.name} (${h2h[0].fixture.date.slice(0,10)}). Sin estadísticas detalladas disponibles.</div>`; return; }
+    const pick = (arr, type) => arr.find(s => s.type === type)?.value ?? "—";
+    const rows = stats.map(s => `<tr><td>${s.team.name}</td><td class="mono">${pick(s.statistics, "Fouls")}</td><td class="mono">${pick(s.statistics, "Yellow Cards")}</td><td class="mono">${pick(s.statistics, "Red Cards")}</td><td class="mono">${pick(s.statistics, "Corner Kicks")}</td></tr>`).join("");
+    target.innerHTML = `<div class="alert-box ok">
+      <div style="font-weight:500; margin-bottom:6px;">Último H2H: ${h2h[0].teams.home.name} ${h2h[0].goals.home}-${h2h[0].goals.away} ${h2h[0].teams.away.name} (${h2h[0].fixture.date.slice(0,10)})</div>
+      <table><thead><tr><th>Equipo</th><th>Faltas</th><th>Amarillas</th><th>Rojas</th><th>Córners</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
 
@@ -501,31 +525,66 @@ function renderStats() {
     </tbody></table>`;
 }
 
-function loadWidgets() {
+async function apiFootball(path, footballKey) {
+  const res = await fetch(`https://v3.football.api-sports.io${path}`, { headers: { "x-apisports-key": footballKey } });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const data = await res.json();
+  if (data.errors && Object.keys(data.errors).length) throw new Error(JSON.stringify(data.errors));
+  return data.response || [];
+}
+
+async function loadLeagueStats() {
   const footballKey = getFootballKey();
+  const statusEl = document.getElementById("widgets-status");
   const container = document.getElementById("widgets-container");
-  if (!footballKey) { container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba primero.</div>`; return; }
+  if (!footballKey) { statusEl.textContent = ""; container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba primero.</div>`; return; }
   const league = document.getElementById("widgetLeague").value;
   const season = document.getElementById("widgetSeason").value || currentSeason();
-  container.innerHTML = `
-    <div style="margin-bottom:20px;">
-      <div class="muted" style="margin-bottom:6px;">Clasificación</div>
-      <div id="standings-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-league="${league}" data-season="${season}" data-theme="dark" class="wg-api-football-standings"></div>
-    </div>
-    <div>
-      <div class="muted" style="margin-bottom:6px;">Partidos de hoy (goles, tarjetas y estadísticas en vivo al hacer clic)</div>
-      <div id="games-widget" data-host="v3.football.api-sports.io" data-key="${footballKey}" data-date="${new Date().toISOString().slice(0,10)}" data-league="${league}" data-season="${season}" data-theme="dark" data-show-toolbar="true" data-show-errors="true" data-show-logos="true" data-modal-game="true" data-modal-standings="true" data-modal-show-logos="true" class="wg-api-football-games"></div>
-    </div>
-  `;
-  // El script de widgets solo escanea el DOM al cargar la página, así que lo
-  // volvemos a inyectar para forzar que detecte los widgets recién insertados.
-  const oldScript = document.getElementById("api-football-widgets-script");
-  if (oldScript) oldScript.remove();
-  const newScript = document.createElement("script");
-  newScript.id = "api-football-widgets-script";
-  newScript.src = "https://widgets.api-sports.io/2.0.3/widgets.js";
-  document.body.appendChild(newScript);
+  statusEl.textContent = "Cargando estadísticas...";
+  container.innerHTML = "";
+  try {
+    const [standings, scorers, yellows, reds] = await Promise.all([
+      apiFootball(`/standings?league=${league}&season=${season}`, footballKey).catch(() => []),
+      apiFootball(`/players/topscorers?league=${league}&season=${season}`, footballKey).catch(() => []),
+      apiFootball(`/players/topyellowcards?league=${league}&season=${season}`, footballKey).catch(() => []),
+      apiFootball(`/players/topredcards?league=${league}&season=${season}`, footballKey).catch(() => []),
+    ]);
+    statusEl.textContent = "";
+
+    const table = standings[0]?.league?.standings?.[0] || [];
+    const standingsHtml = !table.length ? `<div class="muted">Sin datos de clasificación para esta temporada/liga.</div>` : `
+      <table><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead><tbody>
+        ${table.map(r => `<tr><td class="mono">${r.rank}</td><td>${r.team.name}</td><td class="mono">${r.all.played}</td><td class="mono">${r.points}</td><td class="mono">${r.goalsDiff}</td></tr>`).join("")}
+      </tbody></table>`;
+
+    const scorersHtml = !scorers.length ? `<div class="muted">Sin datos de goleadores.</div>` : `
+      <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Goles</th><th>Asist.</th></tr></thead><tbody>
+        ${scorers.slice(0,10).map((p,i) => `<tr><td class="mono">${i+1}</td><td>${p.player.name}</td><td>${p.statistics[0].team.name}</td><td class="mono">${p.statistics[0].goals.total ?? 0}</td><td class="mono">${p.statistics[0].goals.assists ?? 0}</td></tr>`).join("")}
+      </tbody></table>`;
+
+    const yellowsHtml = !yellows.length ? `<div class="muted">Sin datos de amarillas.</div>` : `
+      <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Amarillas</th></tr></thead><tbody>
+        ${yellows.slice(0,10).map((p,i) => `<tr><td class="mono">${i+1}</td><td>${p.player.name}</td><td>${p.statistics[0].team.name}</td><td class="mono">${p.statistics[0].cards.yellow ?? 0}</td></tr>`).join("")}
+      </tbody></table>`;
+
+    const redsHtml = !reds.length ? `<div class="muted">Sin datos de rojas.</div>` : `
+      <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Rojas</th></tr></thead><tbody>
+        ${reds.slice(0,10).map((p,i) => `<tr><td class="mono">${i+1}</td><td>${p.player.name}</td><td>${p.statistics[0].team.name}</td><td class="mono">${p.statistics[0].cards.red ?? 0}</td></tr>`).join("")}
+      </tbody></table>`;
+
+    container.innerHTML = `
+      <div style="margin-bottom:20px;"><div class="muted" style="margin-bottom:6px;">Clasificación</div>${standingsHtml}</div>
+      <div style="margin-bottom:20px;"><div class="muted" style="margin-bottom:6px;">Máximos goleadores</div>${scorersHtml}</div>
+      <div style="margin-bottom:20px;"><div class="muted" style="margin-bottom:6px;">Más tarjetas amarillas</div>${yellowsHtml}</div>
+      <div><div class="muted" style="margin-bottom:6px;">Más tarjetas rojas</div>${redsHtml}</div>
+      <div class="muted" style="margin-top:16px;">Faltas cometidas por partido: no hay un ranking de temporada disponible en el plan gratuito de API-Football, pero puedes consultarlas partido a partido — dime si quieres que añada esa vista para un encuentro concreto.</div>
+    `;
+  } catch (e) {
+    statusEl.textContent = "";
+    container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudieron cargar las estadísticas: ${e.message}. En el plan gratuito, algunas ligas o temporadas pueden no estar disponibles.</div>`;
+  }
 }
+
 
 loadOdds();
 </script>
