@@ -63,3 +63,16 @@ Esta consulta depende de que los nombres de equipo coincidan entre ambas APIs; e
 
 - Los mercados y ligas disponibles dependen de tu plan en The Odds API; el plan gratis cubre las principales ligas de fútbol.
 - Las notas manuales de cada partido se guardan en tu navegador (localStorage), no se comparten ni se suben a ningún sitio.
+
+## Nuevas funciones (versión con menús)
+
+- **Casas mostradas:** solo ves cuotas de **bwin** y **Betfair**. Pinnacle y William Hill se siguen consultando por detrás únicamente para calcular la probabilidad justa del mercado (cuantas más casas de referencia, más fiable el cálculo).
+- **Alertas en dos niveles:**
+  - VALOR — edge entre 2% y 15%, lo normal en value betting.
+  - POSIBLE ERROR — edge por encima del 15%, señal de que la cuota puede ser un error de precio de la casa (suele corregirse rápido, conviene mirarlo cuanto antes).
+  Arriba de la lista de partidos aparece un resumen con cuántas alertas de cada tipo hay activas.
+- **Menús:** Partidos / Historial y CLV / Estadísticas / Widgets, en vez de todo junto.
+- **Estadísticas y backtesting:** en "Estadísticas" ves totales, tu CLV promedio, y puedes marcar como "Ganada" o "Perdida" cada value bet detectado para simular cómo te habría ido apostando siempre con stake fijo del 1% del bankroll, con una curva de bankroll simulada.
+- **Widgets de API-Football:** clasificación de la liga y partidos del día con estadísticas oficiales (goles, faltas, tarjetas), usando los widgets embebibles oficiales de api-football.com.
+
+**Nota sobre Betfair:** la clave exacta que usa The Odds API para Betfair puede variar (`betfair_ex_eu` para el exchange, u otra para el sportsbook). Si al cargar no ves cuotas de Betfair, dímelo y ajustamos la clave.
