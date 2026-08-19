@@ -52,6 +52,13 @@ git push -u origin main
 
 Esta consulta depende de que los nombres de equipo coincidan entre ambas APIs; en ligas o equipos poco comunes puede no encontrar coincidencia exacta.
 
+## Nuevas funciones
+
+- **Stake sugerido (Kelly):** define tu bankroll y una fracción de Kelly (100/50/25%) arriba a la derecha. Cada selección con valor muestra cuánto apostar según tu edge — el Kelly fraccionado (25-50%) es más conservador y lo que usan casi todos los apostadores serios, porque el Kelly completo es muy agresivo.
+- **Seguimiento de CLV:** pulsa "Registrar" junto a cualquier selección con valor para guardarla. Antes de que empiece el partido, entra en la pestaña "Historial y CLV" y pulsa "Actualizar cierre" para comparar tu cuota contra la cuota de cierre. Un CLV positivo sostenido en el tiempo es la métrica más fiable de que tu criterio realmente tiene edge — mucho más que si ganaste o perdiste una apuesta suelta.
+- **Forma reciente:** botón "Forma reciente" en cada partido, muestra los últimos 5 resultados y goles a favor/en contra de cada equipo (requiere la key de api-football.com).
+- **Historial de value bets:** cada vez que actualizas cuotas, cualquier selección que supere el umbral de valor queda registrada automáticamente en "Historial y CLV", para que puedas revisar con el tiempo cuántas veces el modelo detectó valor y cómo les fue.
+
 ## Notas
 
 - Los mercados y ligas disponibles dependen de tu plan en The Odds API; el plan gratis cubre las principales ligas de fútbol.

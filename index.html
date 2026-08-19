@@ -10,7 +10,7 @@
   body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#0B0E11; color:#E6E9ED; }
   .mono { font-family:'IBM Plex Mono',monospace; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
-  header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+  header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
   h1 { font-size:20px; font-weight:600; margin:0; }
   .sub { font-size:12px; color:#7C8797; margin-top:2px; max-width:520px; }
   .panel { background:#12161C; border:1px solid #232A33; border-radius:10px; padding:16px; margin-bottom:16px; }
@@ -27,6 +27,8 @@
   .val-mid { color:#3ECF8E; }
   .val-low { color:#7C8797; }
   .pinnacle { color:#7F77DD; }
+  .clv-pos { color:#3ECF8E; }
+  .clv-neg { color:#E5484D; }
   .match-card { border-left:3px solid #232A33; padding-left:12px; margin-bottom:18px; }
   .match-card.has-value { border-left-color:#F0B429; }
   .row { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:center; }
@@ -43,6 +45,16 @@
   .alert-box.ok { border-left-color:#3ECF8E; }
   .alert-item { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px solid #1A1F26; }
   .keys { display:flex; gap:8px; flex-wrap:wrap; }
+  .nav { display:flex; gap:8px; margin-bottom:16px; }
+  .nav-btn { background:transparent; border:1px solid #232A33; color:#7C8797; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+  .nav-btn.active { color:#E6E9ED; border-color:#3ECF8E; }
+  .view { display:none; }
+  .view.active { display:block; }
+  .form-box { display:inline-flex; gap:10px; margin-top:6px; font-size:12px; }
+  .badge { font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px; }
+  .badge.W { color:#3ECF8E; background:rgba(62,207,142,.12); }
+  .badge.D { color:#7C8797; background:rgba(124,135,151,.12); }
+  .badge.L { color:#E5484D; background:rgba(229,72,77,.12); }
 </style>
 </head>
 <body>
@@ -50,66 +62,114 @@
   <header>
     <div>
       <h1>Radar de valor</h1>
-      <div class="sub">Cuotas reales de varias casas (Pinnacle como referencia de precio justo), múltiples mercados y alertas automáticas de bajas por lesión o sanción. Solo informativo, no procesa apuestas.</div>
+      <div class="sub">Cuotas reales, múltiples mercados, forma reciente, stake sugerido (Kelly) y seguimiento de CLV. Solo informativo, no procesa apuestas.</div>
     </div>
     <div class="panel keys" style="padding:10px 14px;">
       <div>
         <div class="muted" style="margin-bottom:4px;">API key de cuotas (the-odds-api.com)</div>
-        <input id="apiKey" type="password" placeholder="Odds API key" style="width:200px;" />
+        <input id="apiKey" type="password" placeholder="Odds API key" style="width:190px;" />
       </div>
       <div>
         <div class="muted" style="margin-bottom:4px;">API key de plantillas (api-football.com, opcional)</div>
-        <input id="footballKey" type="password" placeholder="API-Football key" style="width:200px;" />
+        <input id="footballKey" type="password" placeholder="API-Football key" style="width:190px;" />
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:4px;">Bankroll</div>
+        <input id="bankroll" type="number" placeholder="1000" style="width:100px;" />
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:4px;">Fracción Kelly</div>
+        <select id="kellyFraction" style="width:100px;">
+          <option value="1">100%</option>
+          <option value="0.5" selected>50%</option>
+          <option value="0.25">25%</option>
+        </select>
       </div>
       <div style="display:flex; align-items:flex-end;"><button onclick="saveKeys()">Guardar</button></div>
     </div>
   </header>
 
-  <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-    <label class="muted">Liga</label>
-    <select id="sport" onchange="loadOdds()">
-      <option value="soccer_epl">Premier League</option>
-      <option value="soccer_spain_la_liga">La Liga</option>
-      <option value="soccer_italy_serie_a">Serie A</option>
-      <option value="soccer_germany_bundesliga">Bundesliga</option>
-      <option value="soccer_uefa_champs_league">Champions League</option>
-    </select>
-    <button onclick="loadOdds()">Actualizar cuotas</button>
-    <span id="status" class="muted"></span>
+  <div class="nav">
+    <button class="nav-btn active" id="nav-partidos" onclick="switchView('partidos')">Partidos</button>
+    <button class="nav-btn" id="nav-historial" onclick="switchView('historial')">Historial y CLV</button>
   </div>
 
-  <div id="content"></div>
+  <div id="view-partidos" class="view active">
+    <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <label class="muted">Liga</label>
+      <select id="sport" onchange="loadOdds()">
+        <option value="soccer_epl">Premier League</option>
+        <option value="soccer_spain_la_liga">La Liga</option>
+        <option value="soccer_italy_serie_a">Serie A</option>
+        <option value="soccer_germany_bundesliga">Bundesliga</option>
+        <option value="soccer_uefa_champs_league">Champions League</option>
+      </select>
+      <button onclick="loadOdds()">Actualizar cuotas</button>
+      <span id="status" class="muted"></span>
+    </div>
+    <div id="content"></div>
+  </div>
+
+  <div id="view-historial" class="view">
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:8px;">Apuestas registradas (seguimiento de CLV)</div>
+      <div class="muted" style="margin-bottom:10px;">CLV compara la cuota a la que registraste la apuesta contra la cuota justo antes del partido. Un CLV positivo y sostenido en el tiempo es la señal más fiable de que tienes un edge real, mucho más que el resultado de una apuesta suelta.</div>
+      <div id="clv-list"></div>
+    </div>
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:8px;">Historial de value bets detectados</div>
+      <div class="muted" style="margin-bottom:10px;">Registro automático de toda selección que superó el umbral de valor cada vez que actualizas cuotas, aunque no la hayas apostado. Útil para revisar tu tasa de acierto real con el tiempo.</div>
+      <div id="value-log-list"></div>
+    </div>
+  </div>
 </div>
 
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
+const BANKROLL_STORAGE = "radar-valor-bankroll";
+const KELLY_STORAGE = "radar-valor-kelly-fraction";
 const NOTES_KEY = "radar-valor-notes";
+const CLV_LOG_KEY = "radar-valor-clv-log";
+const VALUE_LOG_KEY = "radar-valor-value-log";
 const VALUE_THRESHOLD = 0.02;
 const BOOKMAKERS = "pinnacle,williamhill,unibet_eu,bwin";
 const FEATURED_MARKETS = "h2h,spreads,totals";
 const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
-const MARKET_LABELS = {
-  h2h: "Resultado final (1X2)",
-  spreads: "Hándicap",
-  totals: "Más/Menos goles",
-  btts: "Ambos anotan",
-  double_chance: "Doble oportunidad",
-  draw_no_bet: "Empate anula apuesta",
-};
+const MARKET_LABELS = { h2h:"Resultado final (1X2)", spreads:"Hándicap", totals:"Más/Menos goles", btts:"Ambos anotan", double_chance:"Doble oportunidad", draw_no_bet:"Empate anula apuesta" };
+const ROW_REGISTRY = {};
+let rowCounter = 0;
+
+function switchView(v) {
+  document.getElementById("view-partidos").classList.toggle("active", v==="partidos");
+  document.getElementById("view-historial").classList.toggle("active", v==="historial");
+  document.getElementById("nav-partidos").classList.toggle("active", v==="partidos");
+  document.getElementById("nav-historial").classList.toggle("active", v==="historial");
+  if (v === "historial") renderHistorial();
+}
 
 function saveKeys() {
   const k1 = document.getElementById("apiKey").value.trim();
   const k2 = document.getElementById("footballKey").value.trim();
+  const br = document.getElementById("bankroll").value.trim();
+  const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
-  document.getElementById("status").textContent = "Claves guardadas.";
+  if (br) localStorage.setItem(BANKROLL_STORAGE, br);
+  localStorage.setItem(KELLY_STORAGE, kf);
+  document.getElementById("status").textContent = "Configuración guardada.";
   loadOdds();
 }
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
+function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
+function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
 function saveNote(id, text) { const n = getNotes(); n[id] = text; localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
+function getClvLog() { try { return JSON.parse(localStorage.getItem(CLV_LOG_KEY) || "[]"); } catch(e) { return []; } }
+function saveClvLog(l) { localStorage.setItem(CLV_LOG_KEY, JSON.stringify(l)); }
+function getValueLog() { try { return JSON.parse(localStorage.getItem(VALUE_LOG_KEY) || "[]"); } catch(e) { return []; } }
+function saveValueLog(l) { localStorage.setItem(VALUE_LOG_KEY, JSON.stringify(l)); }
 
 function impliedProbs(oddsObj) {
   const probs = {}; let sum = 0;
@@ -118,26 +178,29 @@ function impliedProbs(oddsObj) {
   return probs;
 }
 function pct(n) { return (n*100).toFixed(1) + "%"; }
+function money(n) { return `$${Number(n).toLocaleString("es-ES", { maximumFractionDigits: 0 })}`; }
 function outcomeKey(o) { return o.point != null ? `${o.name} ${o.point > 0 ? "+" : ""}${o.point}` : o.name; }
+function currentSeason() { const now = new Date(); return now.getMonth()+1 >= 7 ? now.getFullYear() : now.getFullYear()-1; }
 
-function currentSeason() {
-  const now = new Date();
-  const y = now.getFullYear();
-  return now.getMonth() + 1 >= 7 ? y : y - 1;
+function kellyStake(prob, odds, bankroll, fraction) {
+  const b = odds - 1;
+  const f = (prob * b - (1 - prob)) / b;
+  const stake = Math.max(0, f) * fraction * bankroll;
+  return Math.round(stake);
 }
 
 async function loadOdds() {
   const key = getOddsKey();
   const statusEl = document.getElementById("status");
   const contentEl = document.getElementById("content");
-  const apiKeyInput = document.getElementById("apiKey");
-  const footballKeyInput = document.getElementById("footballKey");
-  if (apiKeyInput) apiKeyInput.value = key;
-  if (footballKeyInput) footballKeyInput.value = getFootballKey();
+  document.getElementById("apiKey").value = key;
+  document.getElementById("footballKey").value = getFootballKey();
+  document.getElementById("bankroll").value = getBankroll();
+  document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
     contentEl.innerHTML = `<div class="panel setup">
       <div style="font-size:14px; margin-bottom:8px;">Necesitas una API key gratuita de The Odds API</div>
-      <div class="muted">Regístrate en the-odds-api.com (plan gratis: 500 peticiones/mes), pega tu key arriba y pulsa Guardar.<br/>Opcional: para alertas de lesiones/sanciones, añade también una key gratis de api-football.com.</div>
+      <div class="muted">Regístrate en the-odds-api.com, pégala arriba y pulsa Guardar.</div>
       <a class="link-btn" href="https://the-odds-api.com" target="_blank">Ir a the-odds-api.com →</a>
     </div>`;
     return;
@@ -157,12 +220,18 @@ async function loadOdds() {
   }
 }
 
-function buildMarketTable(market) {
+function logValueBet(entry) {
+  const log = getValueLog();
+  const day = new Date().toISOString().slice(0,10);
+  const dupe = log.find(e => e.day === day && e.matchId === entry.matchId && e.marketKey === entry.marketKey && e.selection === entry.selection);
+  if (dupe) return;
+  log.unshift({ ...entry, day, loggedAt: new Date().toLocaleString("es-ES") });
+  saveValueLog(log.slice(0, 300));
+}
+
+function buildMarketTable(market, matchMeta) {
   const groups = {};
-  market.selections.forEach(sel => {
-    if (!groups[sel.key]) groups[sel.key] = {};
-    groups[sel.key][sel.bookie] = sel.price;
-  });
+  market.selections.forEach(sel => { if (!groups[sel.key]) groups[sel.key] = {}; groups[sel.key][sel.bookie] = sel.price; });
   const bookieKeys = [...new Set(market.selections.map(s => s.bookie))];
   const probsByBookie = {};
   bookieKeys.forEach(bk => {
@@ -177,77 +246,85 @@ function buildMarketTable(market) {
     fair[gk] = n >= 2 ? sum/n : null;
   });
   let hasValue = false;
+  const bankroll = getBankroll(), kf = getKellyFraction();
   const rows = Object.keys(groups).map(gk => {
     const odds = groups[gk];
     let bestBk = null, best = -Infinity;
     Object.keys(odds).forEach(bk => { if (odds[bk] > best) { best = odds[bk]; bestBk = bk; } });
     const ev = fair[gk] != null ? best * fair[gk] - 1 : null;
-    if (ev != null && ev >= VALUE_THRESHOLD) hasValue = true;
+    const isValue = ev != null && ev >= VALUE_THRESHOLD;
+    if (isValue) hasValue = true;
     const pinnacleOdds = odds["pinnacle"];
     const evClass = ev == null ? "val-low" : ev >= VALUE_THRESHOLD ? "val-high" : ev > 0 ? "val-mid" : "val-low";
-    return { html: `<tr>
+    const stake = (isValue && fair[gk] != null) ? kellyStake(fair[gk], best, bankroll, kf) : null;
+
+    if (isValue) {
+      logValueBet({ matchId: matchMeta.matchId, home: matchMeta.home, away: matchMeta.away, league: matchMeta.league,
+        marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best, ev, fairProb: fair[gk] });
+    }
+
+    let regBtn = "";
+    if (isValue) {
+      const rid = `r${rowCounter++}`;
+      ROW_REGISTRY[rid] = { sport: matchMeta.sport, eventId: matchMeta.eventId, matchId: matchMeta.matchId, home: matchMeta.home, away: matchMeta.away,
+        league: matchMeta.league, marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best };
+      regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button>`;
+    }
+
+    return `<tr>
       <td>${gk}</td>
       <td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td>
       <td class="mono pinnacle">${pinnacleOdds ? pinnacleOdds.toFixed(2) : "—"}</td>
       <td class="mono">${best.toFixed(2)} <span class="muted">(${bestBk})</span></td>
       <td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td>
-    </tr>`, hasValue: ev != null && ev >= VALUE_THRESHOLD };
+      <td class="mono">${stake != null ? money(stake) : "—"}</td>
+      <td>${regBtn}</td>
+    </tr>`;
   });
-  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Pinnacle</th><th>Mejor cuota</th><th>Valor</th></tr></thead><tbody>${rows.map(r=>r.html).join("")}</tbody></table>`, hasValue };
+  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Pinnacle</th><th>Mejor cuota</th><th>Valor</th><th>Stake Kelly</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, hasValue };
 }
 
 function extractFeaturedMarkets(m) {
   const byMarket = {};
-  m.bookmakers.forEach(bk => {
-    bk.markets.forEach(mk => {
-      if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
-      mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
-    });
-  });
+  m.bookmakers.forEach(bk => bk.markets.forEach(mk => {
+    if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
+    mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
+  }));
   return byMarket;
 }
 
 function renderMatches(matches, sport) {
   const contentEl = document.getElementById("content");
   const notes = getNotes();
-  if (!matches.length) {
-    contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`;
-    return;
-  }
+  if (!matches.length) { contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`; return; }
   contentEl.innerHTML = matches.map((m, idx) => {
+    const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, league: sport, sport, eventId: m.id };
     const byMarket = extractFeaturedMarkets(m);
     let matchHasValue = false;
-    const tabs = Object.keys(byMarket).map((mkKey, i) => {
-      const built = buildMarketTable(byMarket[mkKey]);
+    const tabs = Object.keys(byMarket).map((mkKey) => {
+      const built = buildMarketTable(byMarket[mkKey], matchMeta);
       if (built.hasValue) matchHasValue = true;
-      return { key: mkKey, label: MARKET_LABELS[mkKey] || mkKey, html: built.table, i };
+      return { key: mkKey, label: MARKET_LABELS[mkKey] || mkKey, html: built.table };
     });
     const date = new Date(m.commence_time);
     const dateStr = date.toLocaleString("es-ES", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
     const searchQuery = encodeURIComponent(`${m.home_team} vs ${m.away_team} preview news injuries`);
     const cardId = `m${idx}`;
-
     return `<div class="panel match-card ${matchHasValue ? 'has-value' : ''}" id="${cardId}">
       <div class="row">
-        <div>
-          <div style="font-weight:600;">${m.home_team} vs ${m.away_team}</div>
-          <div class="muted">${dateStr}</div>
-        </div>
+        <div><div style="font-weight:600;">${m.home_team} vs ${m.away_team}</div><div class="muted">${dateStr}</div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Cargar más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Ver bajas y sanciones</button>
+          <button class="small ghost" onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Forma reciente</button>
           <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Buscar noticias →</a>
         </div>
       </div>
-
-      <div class="mkt-tabs">
-        ${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}
-      </div>
+      <div class="mkt-tabs">${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
       <div id="${cardId}-extra"></div>
-
       <div id="${cardId}-injuries"></div>
-
+      <div id="${cardId}-form"></div>
       <div style="margin-top:10px;">
         <label class="muted">Notas propias</label>
         <textarea placeholder="Cualquier otro factor a tener en cuenta..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
@@ -272,37 +349,30 @@ async function loadExtraMarkets(sport, eventId, cardId) {
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     const byMarket = {};
-    (data.bookmakers || []).forEach(bk => {
-      bk.markets.forEach(mk => {
-        if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
-        mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
-      });
-    });
+    (data.bookmakers || []).forEach(bk => bk.markets.forEach(mk => {
+      if (!byMarket[mk.key]) byMarket[mk.key] = { key: mk.key, selections: [] };
+      mk.outcomes.forEach(o => byMarket[mk.key].selections.push({ key: outcomeKey(o), bookie: bk.key, price: o.price }));
+    }));
     const keys = Object.keys(byMarket);
+    const matchMeta = { matchId: eventId, home: data.home_team, away: data.away_team, league: sport, sport, eventId };
     if (!keys.length) { target.innerHTML = `<div class="muted" style="margin-top:8px;">No hay mercados adicionales disponibles para este partido todavía.</div>`; return; }
-    target.innerHTML = keys.map(k => `<div style="margin-top:12px;"><div class="muted" style="margin-bottom:6px;">${MARKET_LABELS[k]||k}</div>${buildMarketTable(byMarket[k]).table}</div>`).join("");
+    target.innerHTML = keys.map(k => `<div style="margin-top:12px;"><div class="muted" style="margin-bottom:6px;">${MARKET_LABELS[k]||k}</div>${buildMarketTable(byMarket[k], matchMeta).table}</div>`).join("");
   } catch (e) {
     target.innerHTML = `<div style="color:#E5484D; margin-top:8px; font-size:12px;">No se pudieron cargar mercados adicionales: ${e.message}</div>`;
   }
 }
 
 async function findTeamId(name, footballKey) {
-  const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(name)}`, {
-    headers: { "x-apisports-key": footballKey }
-  });
+  const res = await fetch(`https://v3.football.api-sports.io/teams?search=${encodeURIComponent(name)}`, { headers: { "x-apisports-key": footballKey } });
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json();
-  if (!data.response || !data.response.length) return null;
-  return data.response[0].team.id;
+  return (data.response && data.response.length) ? data.response[0].team.id : null;
 }
 
 async function loadInjuries(cardId, homeName, awayName) {
   const footballKey = getFootballKey();
   const target = document.getElementById(`${cardId}-injuries`);
-  if (!footballKey) {
-    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Para ver bajas automáticas añade tu API key gratis de <a href="https://www.api-football.com" target="_blank">api-football.com</a> arriba.</div>`;
-    return;
-  }
+  if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API key de api-football.com arriba para ver bajas automáticas.</div>`; return; }
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Buscando bajas...</div>`;
   try {
     const season = currentSeason();
@@ -315,15 +385,116 @@ async function loadInjuries(cardId, homeName, awayName) {
       return { teamName, list: (data.response || []).slice(0, 8) };
     };
     const [homeInj, awayInj] = await Promise.all([fetchInjuries(homeId, homeName), fetchInjuries(awayId, awayName)]);
-    const renderTeam = (teamData) => {
-      if (!teamData.list.length) return `<div class="alert-box ok">${teamData.teamName}: sin bajas registradas.</div>`;
-      const items = teamData.list.map(inj => `<div class="alert-item"><span>${inj.player.name}</span><span class="muted">${inj.player.reason || inj.player.type || "baja"}</span></div>`).join("");
-      return `<div class="alert-box"><div style="font-weight:500; margin-bottom:4px;">${teamData.teamName}</div>${items}</div>`;
-    };
+    const renderTeam = (t) => !t.list.length
+      ? `<div class="alert-box ok">${t.teamName}: sin bajas registradas.</div>`
+      : `<div class="alert-box"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div>${t.list.map(inj => `<div class="alert-item"><span>${inj.player.name}</span><span class="muted">${inj.player.reason || inj.player.type || "baja"}</span></div>`).join("")}</div>`;
     target.innerHTML = renderTeam(homeInj) + renderTeam(awayInj);
   } catch (e) {
-    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar bajas automáticamente (${e.message}). Prueba con las notas manuales.</div>`;
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar bajas (${e.message}).</div>`;
   }
+}
+
+async function loadForm(cardId, homeName, awayName) {
+  const footballKey = getFootballKey();
+  const target = document.getElementById(`${cardId}-form`);
+  if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API key de api-football.com arriba para ver la forma reciente.</div>`; return; }
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Cargando forma reciente...</div>`;
+  try {
+    const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
+    const fetchForm = async (teamId, teamName) => {
+      if (!teamId) return { teamName, fixtures: [] };
+      const res = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&last=5`, { headers: { "x-apisports-key": footballKey } });
+      if (!res.ok) return { teamName, fixtures: [] };
+      const data = await res.json();
+      return { teamName, fixtures: data.response || [] };
+    };
+    const [homeForm, awayForm] = await Promise.all([fetchForm(homeId, homeName), fetchForm(awayId, awayName)]);
+    const renderTeam = (t) => {
+      if (!t.fixtures.length) return `<div class="alert-box ok">${t.teamName}: sin datos de forma reciente.</div>`;
+      let gf = 0, ga = 0;
+      const badges = t.fixtures.map(fx => {
+        const isHome = fx.teams.home.id === (t.fixtures[0].teams.home.name === t.teamName ? fx.teams.home.id : fx.teams.home.id);
+        const homeGoals = fx.goals.home, awayGoals = fx.goals.away;
+        const teamIsHome = fx.teams.home.name === t.teamName;
+        const scored = teamIsHome ? homeGoals : awayGoals;
+        const conceded = teamIsHome ? awayGoals : homeGoals;
+        gf += scored || 0; ga += conceded || 0;
+        const result = scored > conceded ? "W" : scored < conceded ? "L" : "D";
+        return `<span class="badge ${result}">${result}</span>`;
+      }).join(" ");
+      return `<div class="alert-box ok"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div><div class="form-box">${badges}<span class="muted">GF ${gf} · GC ${ga} (últimos ${t.fixtures.length})</span></div></div>`;
+    };
+    target.innerHTML = renderTeam(homeForm) + renderTeam(awayForm);
+  } catch (e) {
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar la forma reciente (${e.message}).</div>`;
+  }
+}
+
+function registerCLV(rid) {
+  const data = ROW_REGISTRY[rid];
+  if (!data) return;
+  const log = getClvLog();
+  log.unshift({ id: `c${Date.now()}`, ...data, openAt: new Date().toLocaleString("es-ES"), openTimestamp: Date.now(), closingOdds: null, closingAt: null, clvPct: null });
+  saveClvLog(log);
+  alert("Apuesta registrada para seguimiento de CLV. Consúltala en la pestaña Historial y CLV.");
+}
+
+async function updateClosing(id) {
+  const log = getClvLog();
+  const entry = log.find(e => e.id === id);
+  if (!entry) return;
+  const key = getOddsKey();
+  try {
+    const url = `https://api.the-odds-api.com/v4/sports/${entry.sport}/events/${entry.eventId}/odds/?apiKey=${key}&regions=uk,eu&markets=${entry.marketKey}&oddsFormat=decimal&bookmakers=${entry.bookie}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    let closing = null;
+    (data.bookmakers || []).forEach(bk => bk.markets.forEach(mk => mk.outcomes.forEach(o => {
+      if (outcomeKey(o) === entry.selection) closing = o.price;
+    })));
+    if (closing == null) { alert("No se encontró esa cuota todavía (puede que el partido ya haya empezado o la casa haya retirado el mercado)."); return; }
+    entry.closingOdds = closing;
+    entry.closingAt = new Date().toLocaleString("es-ES");
+    entry.clvPct = (entry.odds / closing - 1) * 100;
+    saveClvLog(log);
+    renderHistorial();
+  } catch (e) {
+    alert("Error al actualizar el cierre: " + e.message);
+  }
+}
+
+function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
+
+function renderHistorial() {
+  const clvList = document.getElementById("clv-list");
+  const log = getClvLog();
+  clvList.innerHTML = !log.length ? `<div class="muted">Aún no has registrado ninguna apuesta. Pulsa "Registrar" junto a una selección con valor en la pestaña Partidos.</div>` :
+    `<table><thead><tr><th>Partido</th><th>Selección</th><th>Cuota registrada</th><th>Cuota de cierre</th><th>CLV</th><th></th></tr></thead><tbody>
+      ${log.map(e => `<tr>
+        <td>${e.home} vs ${e.away}<div class="muted">${e.marketLabel} · ${e.openAt}</div></td>
+        <td>${e.selection} <span class="muted">(${e.bookie})</span></td>
+        <td class="mono">${e.odds.toFixed(2)}</td>
+        <td class="mono">${e.closingOdds != null ? e.closingOdds.toFixed(2) : "—"}</td>
+        <td class="mono ${e.clvPct == null ? '' : e.clvPct >= 0 ? 'clv-pos' : 'clv-neg'}">${e.clvPct != null ? (e.clvPct>=0?"+":"")+e.clvPct.toFixed(1)+"%" : "—"}</td>
+        <td style="display:flex; gap:6px;">
+          ${e.closingOdds == null ? `<button class="small ghost" onclick="updateClosing('${e.id}')">Actualizar cierre</button>` : ""}
+          <button class="small ghost" onclick="deleteClvEntry('${e.id}')">Borrar</button>
+        </td>
+      </tr>`).join("")}
+    </tbody></table>`;
+
+  const valueLog = getValueLog();
+  document.getElementById("value-log-list").innerHTML = !valueLog.length ? `<div class="muted">Todavía no se ha detectado ningún value bet.</div>` :
+    `<table><thead><tr><th>Fecha</th><th>Partido</th><th>Selección</th><th>Cuota</th><th>Valor</th></tr></thead><tbody>
+      ${valueLog.slice(0,100).map(e => `<tr>
+        <td class="muted">${e.loggedAt}</td>
+        <td>${e.home} vs ${e.away}<div class="muted">${e.marketLabel}</div></td>
+        <td>${e.selection} <span class="muted">(${e.bookie})</span></td>
+        <td class="mono">${e.odds.toFixed(2)}</td>
+        <td class="mono val-high">+${pct(e.ev)}</td>
+      </tr>`).join("")}
+    </tbody></table>`;
 }
 
 loadOdds();
