@@ -594,13 +594,26 @@ async function loadLeagueStats() {
 
 loadOdds();
 </script>
-       <script>
-    loadOdds();
+      
   </script>
-  <div id="wg-api-football-games" data-host="v3.football.api-sports.io" data-key="da94503b4db2897ac402f83e8fc770c7" data-theme="dark" data-refresh="15"></div>
+
+  <!-- AQUÍ EMPIEZA TU NUEVO WIDGET DE LIGAS -->
+  <api-sports-widget data-type="leagues"></api-sports-widget>
+
+  <!-- CONFIGURACIÓN OFICIAL DE TU API-SPORTS -->
+  <api-sports-widget data-type="config"
+    data-key="da94503b4db2897ac402f83e8fc770c7"
+    data-sport="football"
+    data-lang="es"
+    data-theme="white"
+    data-show-errors="true"
+  ></api-sports-widget>
+
+  <!-- EL SCRIPT QUE CORRE TODO -->
   <script type="module" src="https://api-sports.io"></script>
 </body>
 </html>
+
 
 </body>
 </html>
