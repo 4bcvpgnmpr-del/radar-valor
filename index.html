@@ -13,7 +13,7 @@
   header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
   h1 { font-size:20px; font-weight:600; margin:0; }
   .sub { font-size:12px; color:#7C8797; margin-top:2px; max-width:520px; }
-  .panel { background:#12161C; border:1px solid #232A33; border-radius:10px; padding:16px; margin-bottom:16px; }
+  .panel { background:#12161C; border:1px solid #232A33; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,.3); }
   select, input, textarea, button { font-family:inherit; font-size:13px; }
   select, input, textarea { background:#0F1319; border:1px solid #232A33; color:#E6E9ED; padding:8px 10px; border-radius:6px; }
   textarea { width:100%; min-height:50px; resize:vertical; }
@@ -47,7 +47,8 @@
   .alert-item { display:flex; justify-content:space-between; padding:4px 0; font-size:12px; border-bottom:1px solid #1A1F26; }
   .keys { display:flex; gap:8px; flex-wrap:wrap; }
   .nav { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
-  .nav-btn { background:transparent; border:1px solid #232A33; color:#7C8797; padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer; }
+  .nav-btn { background:transparent; border:1px solid #232A33; color:#7C8797; padding:9px 16px; border-radius:8px; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:6px; transition:border-color .15s, color .15s; }
+  .nav-btn:hover { border-color:#3ECF8E55; color:#E6E9ED; }
   .nav-btn.active { color:#E6E9ED; border-color:#3ECF8E; }
   .view { display:none; }
   .view.active { display:block; }
@@ -62,14 +63,19 @@
   .stat-box { background:#171C23; border:1px solid #232A33; border-radius:8px; padding:12px 16px; min-width:120px; }
   .stat-box .n { font-size:22px; font-weight:700; }
   .stat-box .l { font-size:11px; color:#7C8797; text-transform:uppercase; letter-spacing:.04em; }
-  .sparkline { width:100%; height:60px; }
+  .dash-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:16px; }
+  .dash-card { background:linear-gradient(180deg, #12161C, #10141A); border:1px solid #232A33; border-radius:12px; padding:14px 16px; }
+  .dash-card .l { font-size:11px; color:#7C8797; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+  .dash-card .n { font-size:24px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .wordmark { display:flex; align-items:center; gap:10px; }
+  .wordmark .dot { width:10px; height:10px; border-radius:50%; background:#3ECF8E; box-shadow:0 0 8px #3ECF8E88; }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
-      <h1>Radar de valor</h1>
+      <div class="wordmark"><span class="dot"></span><h1>Radar de valor</h1></div>
       <div class="sub">Cuotas de William Hill comparadas contra el precio justo del mercado (calculado con Pinnacle y otras referencias por detrás). Solo informativo.</div>
     </div>
     <div class="panel keys" style="padding:10px 14px;">
@@ -93,6 +99,7 @@
   </div>
 
   <div id="view-partidos" class="view active">
+    <div class="dash-grid" id="dash-summary"></div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
       <select id="sport" onchange="loadOdds()">
@@ -202,6 +209,7 @@ function switchView(v) {
   document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
+  renderDashboard();
 }
 
 function saveKeys() {
@@ -240,6 +248,23 @@ function money(n) { return `$${Number(n).toLocaleString("es-ES", { maximumFracti
 function outcomeKey(o) { return o.point != null ? `${o.name} ${o.point > 0 ? "+" : ""}${o.point}` : o.name; }
 function currentSeason() { const now = new Date(); return now.getMonth()+1 >= 7 ? now.getFullYear() : now.getFullYear()-1; }
 function kellyStake(prob, odds, bankroll, fraction) { const b = odds - 1; const f = (prob * b - (1 - prob)) / b; return Math.round(Math.max(0, f) * fraction * bankroll); }
+
+function renderDashboard() {
+  const el = document.getElementById("dash-summary");
+  if (!el) return;
+  const valueLog = getValueLog();
+  const clvLog = getClvLog();
+  const withClosing = clvLog.filter(e => e.closingOdds != null);
+  const avgClv = withClosing.length ? withClosing.reduce((s,e) => s + e.clvPct, 0) / withClosing.length : null;
+  const today = new Date().toISOString().slice(0,10);
+  const todayCount = valueLog.filter(e => e.day === today).length;
+  el.innerHTML = `
+    <div class="dash-card"><div class="l">Bankroll</div><div class="n">${money(getBankroll())}</div></div>
+    <div class="dash-card"><div class="l">Alertas hoy</div><div class="n">${todayCount}</div></div>
+    <div class="dash-card"><div class="l">Apuestas registradas</div><div class="n">${clvLog.length}</div></div>
+    <div class="dash-card"><div class="l">CLV promedio</div><div class="n" style="color:${avgClv==null?'inherit':avgClv>=0?'#3ECF8E':'#E5484D'};">${avgClv != null ? (avgClv>=0?"+":"")+avgClv.toFixed(1)+"%" : "—"}</div></div>
+  `;
+}
 
 async function loadOdds(forceRefresh) {
   const key = getOddsKey();
@@ -549,6 +574,7 @@ function registerCLV(rid) {
   log.unshift({ id: `c${Date.now()}`, ...data, openAt: new Date().toLocaleString("es-ES"), closingOdds: null, closingAt: null, clvPct: null });
   saveClvLog(log);
   alert("Registrada. Consúltala en Historial y CLV.");
+  renderDashboard();
 }
 
 async function updateClosing(id) {
@@ -576,6 +602,7 @@ function resetAllData() {
   [CLV_LOG_KEY, VALUE_LOG_KEY, NOTES_KEY, "radar-valor-outcomes"].forEach(k => localStorage.removeItem(k));
   renderHistorial();
   renderStats();
+  renderDashboard();
   alert("Historial borrado.");
 }
 
@@ -733,6 +760,7 @@ async function loadLeagueStats() {
 
 
 loadOdds();
+renderDashboard();
 </script>
 </body>
 </html>
