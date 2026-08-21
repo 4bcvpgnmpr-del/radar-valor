@@ -660,23 +660,7 @@ async function loadLeagueStats() {
 }
 
 
-  <script>
-    loadOdds();
-  </script>
-
-  <!-- CAMBIADO A PARTIDOS EN VIVO (Carga al instante) -->
-  <api-sports-widget data-type="fixtures-live"></api-sports-widget>
-
-  <!-- CONFIGURACIÓN CON TU CLAVE -->
-  <api-sports-widget data-type="config"
-    data-key="da94503b4db2897ac402f83e8fc770c7"
-    data-sport="football"
-    data-lang="es"
-    data-theme="dark"
-    data-show-error="true"
-  ></api-sports-widget>
-
-  <script type="module" src="https://api-sports.io"></script>
+loadOdds();
+</script>
 </body>
 </html>
-
