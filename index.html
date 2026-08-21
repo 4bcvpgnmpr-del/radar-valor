@@ -75,6 +75,7 @@
     <div class="panel keys" style="padding:10px 14px;">
       <div><div class="muted" style="margin-bottom:4px;">Odds API key</div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">API-Football key</div><input id="footballKey" type="password" placeholder="api-football.com" style="width:170px;" /></div>
+      <div><div class="muted" style="margin-bottom:4px;">Anthropic API key (opcional, análisis IA)</div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:90px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Fracción Kelly</div>
         <select id="kellyFraction" style="width:90px;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
@@ -117,6 +118,10 @@
       <div style="font-weight:600; margin-bottom:8px;">Historial de value bets y errores de cuotas detectados</div>
       <div id="value-log-list"></div>
     </div>
+    <div class="panel">
+      <button class="ghost" style="border-color:#E5484D; color:#E5484D;" onclick="resetAllData()">Borrar todo el historial, notas y estadísticas</button>
+      <div class="muted" style="margin-top:6px;">Borra apuestas registradas, CLV, historial de value bets, resultados marcados y notas. No se puede deshacer.</div>
+    </div>
   </div>
 
   <div id="view-stats" class="view">
@@ -156,6 +161,7 @@
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
+const ANTHROPIC_KEY_STORAGE = "radar-valor-anthropic-key";
 const BANKROLL_STORAGE = "radar-valor-bankroll";
 const KELLY_STORAGE = "radar-valor-kelly-fraction";
 const NOTES_KEY = "radar-valor-notes";
@@ -181,10 +187,12 @@ function switchView(v) {
 function saveKeys() {
   const k1 = document.getElementById("apiKey").value.trim();
   const k2 = document.getElementById("footballKey").value.trim();
+  const k3 = document.getElementById("anthropicKey").value.trim();
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
+  if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
   document.getElementById("status").textContent = "Configuración guardada.";
@@ -192,6 +200,7 @@ function saveKeys() {
 }
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
+function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ""; }
 function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
 function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
@@ -214,6 +223,7 @@ async function loadOdds() {
   const contentEl = document.getElementById("content");
   document.getElementById("apiKey").value = key;
   document.getElementById("footballKey").value = getFootballKey();
+  document.getElementById("anthropicKey").value = getAnthropicKey();
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
@@ -269,7 +279,7 @@ function buildMarketTable(market, matchMeta) {
     }
     let bestBk = null, best = -Infinity;
     Object.keys(displayOdds).forEach(bk => { if (displayOdds[bk] > best) { best = displayOdds[bk]; bestBk = bk; } });
-    const ev = fair[gk] != null ? best * fair[gk] - 1 : null;
+    const ev = (fair[gk] != null && !usingFallback) ? best * fair[gk] - 1 : null;
     const isError = ev != null && ev >= ERROR_THRESHOLD;
     const isValue = ev != null && ev >= VALUE_THRESHOLD && !isError;
     if (isError) flagLevel = "error"; else if (isValue && flagLevel !== "error") flagLevel = "value";
@@ -329,6 +339,7 @@ function renderMatches(matches, sport) {
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
           <button class="small ghost" onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Forma reciente</button>
           <button class="small ghost" onclick="loadH2H('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Faltas y tarjetas (H2H)</button>
+          <button class="small" onclick="analyzeWithAI('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Analizar con IA</button>
           <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Noticias →</a>
         </div>
       </div>
@@ -338,6 +349,7 @@ function renderMatches(matches, sport) {
       <div id="${cardId}-injuries"></div>
       <div id="${cardId}-form"></div>
       <div id="${cardId}-h2h"></div>
+      <div id="${cardId}-ai"></div>
       <div style="margin-top:10px;"><label class="muted">Notas propias</label><textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea></div>
     </div>`;
   }).join("");
@@ -437,6 +449,52 @@ async function loadH2H(cardId, homeName, awayName) {
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
 
+async function analyzeWithAI(cardId, homeName, awayName) {
+  const key = getAnthropicKey();
+  const target = document.getElementById(`${cardId}-ai`);
+  if (!key) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu Anthropic API key arriba (console.anthropic.com) para usar el análisis con IA. Se guarda solo en tu navegador.</div>`; return; }
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Generando análisis...</div>`;
+  const card = document.getElementById(cardId);
+  const contextParts = [];
+  const mainTable = card.querySelector(".mkt-body.active table");
+  if (mainTable) contextParts.push("Cuotas y valor detectado:\n" + mainTable.innerText);
+  const formBox = document.getElementById(`${cardId}-form`);
+  if (formBox && formBox.innerText.trim()) contextParts.push("Forma reciente:\n" + formBox.innerText);
+  const injBox = document.getElementById(`${cardId}-injuries`);
+  if (injBox && injBox.innerText.trim()) contextParts.push("Bajas y sanciones:\n" + injBox.innerText);
+  const h2hBox = document.getElementById(`${cardId}-h2h`);
+  if (h2hBox && h2hBox.innerText.trim()) contextParts.push("Último enfrentamiento directo:\n" + h2hBox.innerText);
+  const textarea = card.querySelector("textarea");
+  if (textarea && textarea.value.trim()) contextParts.push("Notas propias:\n" + textarea.value.trim());
+  const context = contextParts.join("\n\n") || "No hay datos adicionales cargados para este partido (carga forma, bajas o H2H antes para un análisis más completo).";
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 700,
+        messages: [{
+          role: "user",
+          content: `Eres un analista de apuestas deportivas objetivo. Con los datos de abajo sobre ${homeName} vs ${awayName}, escribe un análisis breve (máx. 200 palabras) en español: 1) lectura de las cuotas y si hay valor real, 2) factores de forma/bajas relevantes, 3) un aviso claro de que esto es apoyo informativo, no una garantía de resultado. No inventes datos que no aparezcan abajo.\n\n${context}`
+        }],
+      }),
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(`${res.status}: ${t.slice(0,200)}`); }
+    const data = await res.json();
+    const text = (data.content || []).map(c => c.text || "").join("\n");
+    target.innerHTML = `<div class="alert-box ok" style="border-left-color:#7F77DD;"><div style="font-weight:500; margin-bottom:6px;">Análisis IA</div><div style="white-space:pre-wrap;">${text}</div></div>`;
+  } catch (e) {
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo generar el análisis: ${e.message}</div>`;
+  }
+}
+
 function registerCLV(rid) {
   const data = ROW_REGISTRY[rid];
   if (!data) return;
@@ -465,6 +523,14 @@ async function updateClosing(id) {
 }
 
 function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
+
+function resetAllData() {
+  if (!confirm("¿Seguro? Esto borra todo tu historial, CLV, notas y resultados marcados en este navegador. No se puede deshacer.")) return;
+  [CLV_LOG_KEY, VALUE_LOG_KEY, NOTES_KEY, "radar-valor-outcomes"].forEach(k => localStorage.removeItem(k));
+  renderHistorial();
+  renderStats();
+  alert("Historial borrado.");
+}
 
 function renderHistorial() {
   const log = getClvLog();
@@ -533,9 +599,11 @@ function renderStats() {
 
 async function apiFootball(path, footballKey) {
   const res = await fetch(`https://v3.football.api-sports.io${path}`, { headers: { "x-apisports-key": footballKey } });
+  if (res.status === 429) throw new Error("Límite de peticiones alcanzado (plan gratuito: 10/min, 100/día). Espera un minuto y vuelve a intentarlo.");
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json();
   if (data.errors && Object.keys(data.errors).length) throw new Error(JSON.stringify(data.errors));
+  if (typeof data.results === "number" && data.results === 0 && data["x-ratelimit-requests-remaining"] === "0") throw new Error("Límite diario de peticiones agotado.");
   return data.response || [];
 }
 
