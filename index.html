@@ -76,6 +76,7 @@
       <div><div class="muted" style="margin-bottom:4px;">Odds API key</div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">API-Football key</div><input id="footballKey" type="password" placeholder="api-football.com" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Anthropic API key (opcional, análisis IA)</div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:170px;" /></div>
+      <div><div class="muted" style="margin-bottom:4px;">football-data.org key (opcional, verificación)</div><input id="fdKey" type="password" placeholder="football-data.org" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:90px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Fracción Kelly</div>
         <select id="kellyFraction" style="width:90px;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
@@ -162,6 +163,7 @@
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
 const ANTHROPIC_KEY_STORAGE = "radar-valor-anthropic-key";
+const FD_KEY_STORAGE = "radar-valor-footballdata-key";
 const BANKROLL_STORAGE = "radar-valor-bankroll";
 const KELLY_STORAGE = "radar-valor-kelly-fraction";
 const NOTES_KEY = "radar-valor-notes";
@@ -169,6 +171,8 @@ const CLV_LOG_KEY = "radar-valor-clv-log";
 const VALUE_LOG_KEY = "radar-valor-value-log";
 const VALUE_THRESHOLD = 0.02;
 const ERROR_THRESHOLD = 0.15;
+const ODDS_CACHE_PREFIX = "radar-valor-odds-cache-";
+const ODDS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
 const DISPLAY_BOOKMAKER_MATCH = ["williamhill"];
 const REFERENCE_BOOKMAKERS = ["pinnacle", "unibet_eu"];
 const FEATURED_MARKETS = "h2h,spreads,totals";
@@ -204,11 +208,13 @@ function saveKeys() {
   const k1 = document.getElementById("apiKey").value.trim();
   const k2 = document.getElementById("footballKey").value.trim();
   const k3 = document.getElementById("anthropicKey").value.trim();
+  const k4 = document.getElementById("fdKey").value.trim();
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
   if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
+  if (k4) localStorage.setItem(FD_KEY_STORAGE, k4);
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
   document.getElementById("status").textContent = "Configuración guardada.";
@@ -217,6 +223,8 @@ function saveKeys() {
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
 function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ""; }
+function getFdKey() { return localStorage.getItem(FD_KEY_STORAGE) || ""; }
+const FD_LEAGUE_CODES = { "39": "PL", "140": "PD", "135": "SA", "78": "BL1", "2": "CL" };
 function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
 function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
@@ -233,13 +241,14 @@ function outcomeKey(o) { return o.point != null ? `${o.name} ${o.point > 0 ? "+"
 function currentSeason() { const now = new Date(); return now.getMonth()+1 >= 7 ? now.getFullYear() : now.getFullYear()-1; }
 function kellyStake(prob, odds, bankroll, fraction) { const b = odds - 1; const f = (prob * b - (1 - prob)) / b; return Math.round(Math.max(0, f) * fraction * bankroll); }
 
-async function loadOdds() {
+async function loadOdds(forceRefresh) {
   const key = getOddsKey();
   const statusEl = document.getElementById("status");
   const contentEl = document.getElementById("content");
   document.getElementById("apiKey").value = key;
   document.getElementById("footballKey").value = getFootballKey();
   document.getElementById("anthropicKey").value = getAnthropicKey();
+  document.getElementById("fdKey").value = getFdKey();
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
@@ -247,15 +256,32 @@ async function loadOdds() {
     return;
   }
   const sport = document.getElementById("sport").value;
+  const cacheKey = `${ODDS_CACHE_PREFIX}${sport}`;
+
+  if (!forceRefresh) {
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (cached && (Date.now() - cached.timestamp) < ODDS_CACHE_TTL_MS) {
+        const minsAgo = Math.round((Date.now() - cached.timestamp) / 60000);
+        const seenBookies = new Set();
+        cached.data.forEach(m => m.bookmakers.forEach(bk => seenBookies.add(bk.key)));
+        statusEl.innerHTML = `${cached.data.length} partidos (caché, hace ${minsAgo} min). Casas: ${[...seenBookies].join(", ") || "ninguna"}. <button class="small ghost" onclick="loadOdds(true)">Forzar actualización</button>`;
+        renderMatches(cached.data, sport);
+        return;
+      }
+    } catch (e) { /* caché corrupta, seguimos a pedir datos frescos */ }
+  }
+
   statusEl.textContent = "Cargando cuotas...";
   try {
     const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
     const data = await res.json();
+    try { localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() })); } catch (e) { /* localStorage lleno, seguimos igual */ }
     const seenBookies = new Set();
     data.forEach(m => m.bookmakers.forEach(bk => seenBookies.add(bk.key)));
-    statusEl.textContent = `${data.length} partidos cargados. Casas detectadas: ${[...seenBookies].join(", ") || "ninguna"}.`;
+    statusEl.innerHTML = `${data.length} partidos cargados (nuevo). Casas detectadas: ${[...seenBookies].join(", ") || "ninguna"}. <button class="small ghost" onclick="loadOdds(true)">Forzar actualización</button>`;
     renderMatches(data, sport);
   } catch (e) {
     statusEl.textContent = "";
@@ -673,7 +699,32 @@ async function loadLeagueStats() {
       <div style="margin-bottom:20px;"><div class="muted" style="margin-bottom:6px;">Más tarjetas amarillas</div>${yellowsHtml}</div>
       <div><div class="muted" style="margin-bottom:6px;">Más tarjetas rojas</div>${redsHtml}</div>
       <div class="muted" style="margin-top:16px;">Faltas cometidas por partido: no hay un ranking de temporada disponible en el plan gratuito de API-Football, pero puedes consultarlas partido a partido — dime si quieres que añada esa vista para un encuentro concreto.</div>
+      <div id="fd-check" style="margin-top:20px;"></div>
     `;
+
+    const fdKey = getFdKey();
+    const fdCode = FD_LEAGUE_CODES[league];
+    if (fdKey && fdCode) {
+      const fdCheckEl = document.getElementById("fd-check");
+      fdCheckEl.innerHTML = `<div class="muted">Verificando clasificación con football-data.org...</div>`;
+      try {
+        const fdRes = await fetch(`https://api.football-data.org/v4/competitions/${fdCode}/standings`, { headers: { "X-Auth-Token": fdKey } });
+        if (!fdRes.ok) throw new Error(`${fdRes.status}`);
+        const fdData = await fdRes.json();
+        const fdTable = fdData.standings?.[0]?.table || [];
+        const compareRows = table.map(r => {
+          const fdRow = fdTable.find(f => f.team.name.toLowerCase().includes(r.team.name.toLowerCase().split(" ")[0].toLowerCase()) || r.team.name.toLowerCase().includes(f.team.name.toLowerCase().split(" ")[0].toLowerCase()));
+          const match = fdRow && fdRow.points === r.points && fdRow.position === r.rank;
+          const diff = fdRow ? (match ? `<span style="color:#3ECF8E;">✓ coincide</span>` : `<span style="color:#F0B429;">⚠ #${fdRow.position} · ${fdRow.points}pts</span>`) : `<span class="muted">sin coincidencia</span>`;
+          return `<tr><td>${r.team.name}</td><td class="mono">#${r.rank} · ${r.points}pts (API-Football)</td><td>${diff}</td></tr>`;
+        }).join("");
+        fdCheckEl.innerHTML = `<div class="muted" style="margin-bottom:6px;">Verificación cruzada con football-data.org</div><table><thead><tr><th>Equipo</th><th>API-Football</th><th>football-data.org</th></tr></thead><tbody>${compareRows}</tbody></table>`;
+      } catch (e) {
+        fdCheckEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo verificar con football-data.org: ${e.message}</div>`;
+      }
+    } else if (fdKey && !fdCode) {
+      document.getElementById("fd-check").innerHTML = `<div class="muted">football-data.org no tiene esta liga en su plan gratuito, así que no se puede comparar aquí.</div>`;
+    }
   } catch (e) {
     statusEl.textContent = "";
     container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudieron cargar las estadísticas: ${e.message}. En el plan gratuito, algunas ligas o temporadas pueden no estar disponibles.</div>`;
