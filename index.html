@@ -176,6 +176,22 @@ const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
 const MARKET_LABELS = { h2h:"Resultado final (1X2)", spreads:"Hándicap", totals:"Más/Menos goles", btts:"Ambos anotan", double_chance:"Doble oportunidad", draw_no_bet:"Empate anula apuesta" };
 const ROW_REGISTRY = {};
 let rowCounter = 0;
+const teamBadgeCache = new Map();
+
+async function getTeamBadge(name) {
+  if (teamBadgeCache.has(name)) return teamBadgeCache.get(name);
+  try {
+    const res = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(name)}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const badge = data.teams && data.teams[0] ? data.teams[0].strTeamBadge : null;
+    teamBadgeCache.set(name, badge);
+    return badge;
+  } catch (e) {
+    teamBadgeCache.set(name, null);
+    return null;
+  }
+}
 
 function switchView(v) {
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -333,7 +349,7 @@ function renderMatches(matches, sport) {
     const cardClass = cardFlag === "error" ? "has-error" : cardFlag === "value" ? "has-value" : "";
     return `<div class="panel match-card ${cardClass}" id="${cardId}">
       <div class="row">
-        <div><div style="font-weight:600;">${m.home_team} vs ${m.away_team}</div><div class="muted">${dateStr}</div></div>
+        <div><div style="font-weight:600; display:flex; align-items:center; gap:8px;"><img id="${cardId}-badge-h" class="team-badge" style="width:20px; height:20px; object-fit:contain; display:none;" /> ${m.home_team} vs ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:20px; height:20px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
@@ -358,6 +374,11 @@ function renderMatches(matches, sport) {
     ${valueCount ? `<div><span class="tag-value">${valueCount} selección(es) con valor</span></div>` : ""}
   </div>` : "";
   contentEl.innerHTML = cards;
+  matches.forEach((m, idx) => {
+    const cardId = `m${idx}`;
+    getTeamBadge(m.home_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-h`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
+    getTeamBadge(m.away_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-a`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
+  });
 }
 
 function switchTab(cardId, idx) { const card = document.getElementById(cardId); card.querySelectorAll(".mkt-tab").forEach((b,i) => b.classList.toggle("active", i===idx)); card.querySelectorAll(".mkt-body").forEach(b => b.classList.toggle("active", Number(b.dataset.idx)===idx)); }
