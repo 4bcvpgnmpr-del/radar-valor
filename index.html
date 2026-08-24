@@ -67,6 +67,8 @@
   .dash-card { background:linear-gradient(180deg, #12161C, #10141A); border:1px solid #232A33; border-radius:12px; padding:14px 16px; }
   .dash-card .l { font-size:11px; color:#7C8797; text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
   .dash-card .n { font-size:24px; font-weight:600; font-family:'IBM Plex Mono',monospace; }
+  .live-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1A1F26; font-size:13px; }
+  .live-min { background:rgba(229,72,77,.15); color:#E5484D; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
   .wordmark { display:flex; align-items:center; gap:10px; }
   .wordmark .dot { width:10px; height:10px; border-radius:50%; background:#3ECF8E; box-shadow:0 0 8px #3ECF8E88; }
 </style>
@@ -99,6 +101,13 @@
 
   <div id="view-partidos" class="view active">
     <div class="dash-grid" id="dash-summary"></div>
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-weight:600;">Marcador en vivo</div>
+        <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo</button>
+      </div>
+      <div id="live-scores" class="muted">Pulsa "Actualizar en vivo" para ver los partidos que se están jugando ahora mismo (requiere tu API-Football key).</div>
+    </div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
       <select id="sport" onchange="loadOdds()">
@@ -147,7 +156,7 @@
   <div id="view-widgets" class="view">
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
-      <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas.</div>
+      <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>El plan gratuito de API-Football solo da acceso a temporadas hasta 2024</b>, no a la temporada en curso.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <select id="widgetLeague">
           <option value="39">Premier League</option>
@@ -156,7 +165,7 @@
           <option value="78">Bundesliga</option>
           <option value="2">Champions League</option>
         </select>
-        <input id="widgetSeason" type="number" placeholder="Temporada (ej: 2025)" style="width:150px;" />
+        <input id="widgetSeason" type="number" placeholder="2024 (plan gratuito)" value="2024" style="width:150px;" />
         <button onclick="loadLeagueStats()">Cargar estadísticas</button>
       </div>
       <div id="widgets-status" class="muted"></div>
@@ -672,6 +681,24 @@ async function apiFootball(path, footballKey) {
   if (data.errors && Object.keys(data.errors).length) throw new Error(JSON.stringify(data.errors));
   if (typeof data.results === "number" && data.results === 0 && data["x-ratelimit-requests-remaining"] === "0") throw new Error("Límite diario de peticiones agotado.");
   return data.response || [];
+}
+
+async function loadLiveScores() {
+  const footballKey = getFootballKey();
+  const el = document.getElementById("live-scores");
+  if (!footballKey) { el.innerHTML = `Añade tu API-Football key arriba para ver el marcador en vivo.`; return; }
+  el.innerHTML = `<span class="muted">Buscando partidos en vivo...</span>`;
+  try {
+    const live = await apiFootball(`/fixtures?live=all`, footballKey);
+    if (!live.length) { el.innerHTML = `<span class="muted">No hay partidos en juego ahora mismo.</span>`; return; }
+    el.innerHTML = live.slice(0, 15).map(f => `
+      <div class="live-row">
+        <div><span class="live-min">${f.fixture.status.elapsed ?? "—"}'</span> ${f.league.name}</div>
+        <div class="mono">${f.teams.home.name} <b>${f.goals.home ?? 0}</b> - <b>${f.goals.away ?? 0}</b> ${f.teams.away.name}</div>
+      </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el marcador en vivo: ${e.message}</span>`;
+  }
 }
 
 async function loadLeagueStats() {
