@@ -103,6 +103,8 @@
     <div class="wordmark"><span class="dot"></span><h1 style="font-size:16px;">Radar de valor</h1></div>
     <div class="sidebar-nav">
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><span class="ic">⚽</span> Partidos</button>
+      <button class="side-btn" data-v="live" onclick="switchView('live')"><span class="ic">🔴</span> En vivo</button>
+      <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><span class="ic">🧩</span> Formaciones</button>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><span class="ic">📈</span> Historial y CLV</button>
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><span class="ic">🧪</span> Backtesting</button>
       <button class="side-btn" data-v="widgets" onclick="switchView('widgets')"><span class="ic">🏆</span> Estadísticas de liga</button>
@@ -133,13 +135,6 @@
 
   <div id="view-partidos" class="view active">
     <div class="dash-grid" id="dash-summary"></div>
-    <div class="panel">
-      <div class="row" style="margin-bottom:10px;">
-        <div style="font-weight:600;">Marcador en vivo</div>
-        <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo</button>
-      </div>
-      <div id="live-scores" class="muted">Pulsa "Actualizar en vivo" para ver los partidos que se están jugando ahora mismo (requiere tu API-Football key).</div>
-    </div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
       <select id="sport" onchange="loadOdds()">
@@ -160,6 +155,28 @@
     <div id="all-leagues-panel"></div>
     <div id="alert-summary"></div>
     <div id="content"></div>
+  </div>
+
+  <div id="view-live" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-weight:600;">Marcador en vivo</div>
+        <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo</button>
+      </div>
+      <div id="live-scores" class="muted">Pulsa "Actualizar en vivo" para ver los partidos que se están jugando ahora mismo (requiere tu API-Football key).</div>
+    </div>
+  </div>
+
+  <div id="view-lineups" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-weight:600;">Formaciones</div>
+        <button class="small ghost" onclick="loadLiveForLineups()">Buscar partidos en vivo</button>
+      </div>
+      <div class="muted" style="margin-bottom:10px;">Elige un partido en vivo para ver el campo con la posición exacta de cada jugador (formación real, no genérica).</div>
+      <div id="lineup-picker" class="muted">Pulsa "Buscar partidos en vivo" para elegir un partido.</div>
+    </div>
+    <div id="lineup-pitch-container"></div>
   </div>
 
   <div id="view-historial" class="view">
@@ -906,6 +923,84 @@ async function loadLiveScores() {
     }).join("");
   } catch (e) {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el marcador en vivo: ${e.message}</span>`;
+  }
+}
+
+async function loadLiveForLineups() {
+  const footballKey = getFootballKey();
+  const el = document.getElementById("lineup-picker");
+  if (!footballKey) { el.innerHTML = `Añade tu API-Football key arriba.`; return; }
+  el.innerHTML = `<span class="muted">Buscando partidos en vivo...</span>`;
+  try {
+    const live = await apiFootball(`/fixtures?live=all`, footballKey);
+    if (!live.length) { el.innerHTML = `<span class="muted">No hay partidos en vivo ahora mismo (las formaciones solo están disponibles una vez empieza el partido).</span>`; return; }
+    el.innerHTML = live.slice(0, 15).map(f => `
+      <div class="live-row" style="cursor:pointer;" onclick="loadLineups(${f.fixture.id})">
+        <div>${f.league.flag ? `<img src="${f.league.flag}" style="width:16px; height:11px; object-fit:cover; border-radius:2px;" />` : "⚽"} ${f.teams.home.name} vs ${f.teams.away.name}</div>
+        <div class="mono">${f.goals.home ?? 0}-${f.goals.away ?? 0} <span class="live-min">${f.fixture.status.elapsed ?? "—"}'</span></div>
+      </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar: ${e.message}</span>`;
+  }
+}
+
+function renderPitch(team, side) {
+  const players = team.startXI.map(p => p.player);
+  const byRow = {};
+  players.forEach(p => {
+    const [row, col] = (p.grid || "1:1").split(":").map(Number);
+    if (!byRow[row]) byRow[row] = [];
+    byRow[row].push({ ...p, col });
+  });
+  const rows = Object.keys(byRow).map(Number).sort((a,b) => a - b);
+  const maxRow = Math.max(...rows);
+  const W = 300, H = 440;
+  const color = side === "home" ? "#3ECF8E" : "#7F77DD";
+  let elements = "";
+  rows.forEach(r => {
+    const y = H - 30 - ((r - 1) / (maxRow - 1 || 1)) * (H - 60);
+    const rowPlayers = byRow[r].sort((a,b) => a.col - b.col);
+    rowPlayers.forEach((p, i) => {
+      const x = ((i + 1) / (rowPlayers.length + 1)) * W;
+      const lastName = (p.name || "").split(" ").slice(-1)[0];
+      elements += `
+        <circle cx="${x}" cy="${y}" r="15" fill="${color}" stroke="#0B0E11" stroke-width="2" />
+        <text x="${x}" y="${y+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#0B0E11" font-family="IBM Plex Mono, monospace">${p.number ?? ""}</text>
+        <text x="${x}" y="${y+26}" text-anchor="middle" font-size="9" fill="#E6E9ED" font-family="IBM Plex Sans, sans-serif">${lastName}</text>
+      `;
+    });
+  });
+  return `
+    <div>
+      <div class="row" style="margin-bottom:6px;"><b>${team.team.name}</b><span class="muted mono">${team.formation || ""}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%; max-width:320px; background:#12210F; border:1px solid #232A33; border-radius:8px;">
+        <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#2E4A28" stroke-width="2" />
+        <line x1="2" y1="${H/2}" x2="${W-2}" y2="${H/2}" stroke="#2E4A28" stroke-width="2" />
+        <circle cx="${W/2}" cy="${H/2}" r="40" fill="none" stroke="#2E4A28" stroke-width="2" />
+        <rect x="${W/2-60}" y="2" width="120" height="50" fill="none" stroke="#2E4A28" stroke-width="2" />
+        <rect x="${W/2-60}" y="${H-52}" width="120" height="50" fill="none" stroke="#2E4A28" stroke-width="2" />
+        ${elements}
+      </svg>
+      ${team.coach ? `<div class="muted" style="margin-top:6px; font-size:12px;">DT: ${team.coach.name}</div>` : ""}
+    </div>`;
+}
+
+async function loadLineups(fixtureId) {
+  const footballKey = getFootballKey();
+  const container = document.getElementById("lineup-pitch-container");
+  container.innerHTML = `<div class="panel muted">Cargando formaciones...</div>`;
+  try {
+    const lineups = await apiFootball(`/fixtures/lineups?fixture=${fixtureId}`, footballKey);
+    if (!lineups.length || !lineups[0].startXI?.length) {
+      container.innerHTML = `<div class="panel muted">Las alineaciones todavía no están confirmadas para este partido.</div>`;
+      return;
+    }
+    container.innerHTML = `<div class="panel" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
+      ${renderPitch(lineups[0], "home")}
+      ${lineups[1] ? renderPitch(lineups[1], "away") : ""}
+    </div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="panel" style="color:#7C8797;">No se pudieron cargar las formaciones: ${e.message}</div>`;
   }
 }
 
