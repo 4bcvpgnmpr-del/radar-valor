@@ -685,10 +685,10 @@ async function loadLeagueStats() {
   container.innerHTML = "";
   try {
     const [standings, scorers, yellows, reds] = await Promise.all([
-      apiFootball(`/standings?league=${league}&season=${season}`, footballKey).catch(() => []),
-      apiFootball(`/players/topscorers?league=${league}&season=${season}`, footballKey).catch(() => []),
-      apiFootball(`/players/topyellowcards?league=${league}&season=${season}`, footballKey).catch(() => []),
-      apiFootball(`/players/topredcards?league=${league}&season=${season}`, footballKey).catch(() => []),
+      apiFootball(`/standings?league=${league}&season=${season}`, footballKey).catch((e) => { console.warn("standings:", e.message); return []; }),
+      apiFootball(`/players/topscorers?league=${league}&season=${season}`, footballKey).catch((e) => { console.warn("topscorers:", e.message); return []; }),
+      apiFootball(`/players/topyellowcards?league=${league}&season=${season}`, footballKey).catch((e) => { console.warn("topyellowcards:", e.message); return []; }),
+      apiFootball(`/players/topredcards?league=${league}&season=${season}`, footballKey).catch((e) => { console.warn("topredcards:", e.message); return []; }),
     ]);
     statusEl.textContent = "";
 
