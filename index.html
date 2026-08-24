@@ -111,11 +111,11 @@
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
       <select id="sport" onchange="loadOdds()">
-        <option value="soccer_epl">Premier League</option>
-        <option value="soccer_spain_la_liga">La Liga</option>
-        <option value="soccer_italy_serie_a">Serie A</option>
-        <option value="soccer_germany_bundesliga">Bundesliga</option>
-        <option value="soccer_uefa_champs_league">Champions League</option>
+        <option value="soccer_epl">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+        <option value="soccer_spain_la_liga">🇪🇸 La Liga</option>
+        <option value="soccer_italy_serie_a">🇮🇹 Serie A</option>
+        <option value="soccer_germany_bundesliga">🇩🇪 Bundesliga</option>
+        <option value="soccer_uefa_champs_league">🇪🇺 Champions League</option>
       </select>
       <button onclick="loadOdds()">Actualizar cuotas</button>
       <span id="status" class="muted"></span>
@@ -159,11 +159,11 @@
       <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>El plan gratuito de API-Football solo da acceso a temporadas hasta 2024</b>, no a la temporada en curso.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <select id="widgetLeague">
-          <option value="39">Premier League</option>
-          <option value="140">La Liga</option>
-          <option value="135">Serie A</option>
-          <option value="78">Bundesliga</option>
-          <option value="2">Champions League</option>
+          <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+          <option value="140">🇪🇸 La Liga</option>
+          <option value="135">🇮🇹 Serie A</option>
+          <option value="78">🇩🇪 Bundesliga</option>
+          <option value="2">🇪🇺 Champions League</option>
         </select>
         <input id="widgetSeason" type="number" placeholder="2024 (plan gratuito)" value="2024" style="width:150px;" />
         <button onclick="loadLeagueStats()">Cargar estadísticas</button>
@@ -402,7 +402,7 @@ function renderMatches(matches, sport) {
     const cardClass = cardFlag === "error" ? "has-error" : cardFlag === "value" ? "has-value" : "";
     return `<div class="panel match-card ${cardClass}" id="${cardId}">
       <div class="row">
-        <div><div style="font-weight:600; display:flex; align-items:center; gap:8px;"><img id="${cardId}-badge-h" class="team-badge" style="width:20px; height:20px; object-fit:contain; display:none;" /> ${m.home_team} vs ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:20px; height:20px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
+        <div><div style="font-weight:600; display:flex; align-items:center; gap:10px; font-size:15px;"><img id="${cardId}-badge-h" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /> ${m.home_team} vs ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
@@ -683,6 +683,12 @@ async function apiFootball(path, footballKey) {
   return data.response || [];
 }
 
+const LEAGUE_FLAGS = {
+  "Premier League": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "La Liga": "🇪🇸", "Serie A": "🇮🇹", "Bundesliga": "🇩🇪",
+  "Ligue 1": "🇫🇷", "UEFA Champions League": "🇪🇺", "Eredivisie": "🇳🇱", "Primeira Liga": "🇵🇹",
+};
+function leagueFlag(name) { return LEAGUE_FLAGS[name] || "⚽"; }
+
 async function loadLiveScores() {
   const footballKey = getFootballKey();
   const el = document.getElementById("live-scores");
@@ -691,11 +697,14 @@ async function loadLiveScores() {
   try {
     const live = await apiFootball(`/fixtures?live=all`, footballKey);
     if (!live.length) { el.innerHTML = `<span class="muted">No hay partidos en juego ahora mismo.</span>`; return; }
-    el.innerHTML = live.slice(0, 15).map(f => `
-      <div class="live-row">
-        <div><span class="live-min">${f.fixture.status.elapsed ?? "—"}'</span> ${f.league.name}</div>
-        <div class="mono">${f.teams.home.name} <b>${f.goals.home ?? 0}</b> - <b>${f.goals.away ?? 0}</b> ${f.teams.away.name}</div>
-      </div>`).join("");
+    el.innerHTML = live.slice(0, 15).map(f => {
+      return `<div class="live-row">
+        <div style="display:flex; align-items:center; gap:6px;"><span class="live-min">${f.fixture.status.elapsed ?? "—"}'</span> ${f.league.flag ? `<img src="${f.league.flag}" style="width:16px; height:11px; object-fit:cover; border-radius:2px;" />` : "⚽"} <span class="muted">${f.league.name}</span></div>
+        <div class="mono" style="display:flex; align-items:center; gap:6px;">
+          ${f.teams.home.logo ? `<img src="${f.teams.home.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""} ${f.teams.home.name} <b>${f.goals.home ?? 0}</b> - <b>${f.goals.away ?? 0}</b> ${f.teams.away.name} ${f.teams.away.logo ? `<img src="${f.teams.away.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""}
+        </div>
+      </div>`;
+    }).join("");
   } catch (e) {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el marcador en vivo: ${e.message}</span>`;
   }
@@ -722,7 +731,7 @@ async function loadLeagueStats() {
     const table = standings[0]?.league?.standings?.[0] || [];
     const standingsHtml = !table.length ? `<div class="muted">Sin datos de clasificación para esta temporada/liga.</div>` : `
       <table><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead><tbody>
-        ${table.map(r => `<tr><td class="mono">${r.rank}</td><td>${r.team.name}</td><td class="mono">${r.all.played}</td><td class="mono">${r.points}</td><td class="mono">${r.goalsDiff}</td></tr>`).join("")}
+        ${table.map(r => `<tr><td class="mono">${r.rank}</td><td style="display:flex; align-items:center; gap:6px;">${r.team.logo ? `<img src="${r.team.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""} ${r.team.name}</td><td class="mono">${r.all.played}</td><td class="mono">${r.points}</td><td class="mono">${r.goalsDiff}</td></tr>`).join("")}
       </tbody></table>`;
 
     const scorersHtml = !scorers.length ? `<div class="muted">Sin datos de goleadores.</div>` : `
