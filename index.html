@@ -152,9 +152,12 @@
       <button onclick="loadOdds()">Actualizar cuotas</button>
       <input id="teamSearch" type="text" placeholder="Buscar equipo..." style="width:160px;" oninput="applyFilters()" />
       <input id="dateFilter" type="date" oninput="applyFilters()" />
-      <button class="ghost" onclick="document.getElementById('teamSearch').value=''; document.getElementById('dateFilter').value=''; applyFilters();">Limpiar filtros</button>
+      <button class="ghost" onclick="document.getElementById('teamSearch').value=''; document.getElementById('dateFilter').value=''; document.getElementById('onlyFavs').checked=false; applyFilters();">Limpiar filtros</button>
+      <label class="muted" style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="onlyFavs" onchange="applyFilters()" /> Solo favoritos ⭐</label>
+      <button class="ghost" onclick="showAllLeaguesValue()">Comparar todas las ligas (caché)</button>
       <span id="status" class="muted"></span>
     </div>
+    <div id="all-leagues-panel"></div>
     <div id="alert-summary"></div>
     <div id="content"></div>
   </div>
@@ -287,6 +290,13 @@ function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) 
 function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
 function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
+function getFavorites() { try { return new Set(JSON.parse(localStorage.getItem("radar-valor-favorites") || "[]")); } catch(e) { return new Set(); } }
+function toggleFavorite(name) {
+  const favs = getFavorites();
+  if (favs.has(name)) favs.delete(name); else favs.add(name);
+  localStorage.setItem("radar-valor-favorites", JSON.stringify([...favs]));
+  applyFilters();
+}
 function saveNote(id, text) { const n = getNotes(); n[id] = text; localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
 function getClvLog() { try { return JSON.parse(localStorage.getItem(CLV_LOG_KEY) || "[]"); } catch(e) { return []; } }
 function saveClvLog(l) { localStorage.setItem(CLV_LOG_KEY, JSON.stringify(l)); }
@@ -383,6 +393,27 @@ function logValueBet(entry, kind) {
   saveValueLog(log.slice(0, 400));
 }
 
+function getLineHistory() { try { return JSON.parse(localStorage.getItem("radar-valor-line-history") || "{}"); } catch(e) { return {}; } }
+function recordLineMovement(key, odds) {
+  const hist = getLineHistory();
+  if (!hist[key]) hist[key] = [];
+  const last = hist[key][hist[key].length - 1];
+  if (!last || last.odds !== odds) {
+    hist[key].push({ odds, t: Date.now() });
+    if (hist[key].length > 8) hist[key].shift();
+    localStorage.setItem("radar-valor-line-history", JSON.stringify(hist));
+  }
+  return hist[key];
+}
+function lineTrendArrow(key, currentOdds) {
+  const hist = getLineHistory()[key];
+  if (!hist || hist.length < 2) return "";
+  const prev = hist[hist.length - 2].odds;
+  if (currentOdds > prev) return `<span style="color:#3ECF8E;" title="Subió desde ${prev.toFixed(2)}">▲</span>`;
+  if (currentOdds < prev) return `<span style="color:#E5484D;" title="Bajó desde ${prev.toFixed(2)}">▼</span>`;
+  return `<span class="muted">–</span>`;
+}
+
 function buildMarketTable(market, matchMeta) {
   const groups = {};
   market.selections.forEach(sel => { if (!groups[sel.key]) groups[sel.key] = {}; groups[sel.key][sel.bookie] = sel.price; });
@@ -406,6 +437,9 @@ function buildMarketTable(market, matchMeta) {
     }
     let bestBk = null, best = -Infinity;
     Object.keys(displayOdds).forEach(bk => { if (displayOdds[bk] > best) { best = displayOdds[bk]; bestBk = bk; } });
+    const lineKey = `${matchMeta.matchId}|${market.key}|${gk}`;
+    if (!usingFallback) recordLineMovement(lineKey, best);
+    const trendArrow = usingFallback ? "" : lineTrendArrow(lineKey, best);
     const ev = (fair[gk] != null && !usingFallback) ? best * fair[gk] - 1 : null;
     const isError = ev != null && ev >= ERROR_THRESHOLD;
     const isValue = ev != null && ev >= VALUE_THRESHOLD && !isError;
@@ -434,7 +468,7 @@ function buildMarketTable(market, matchMeta) {
       regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button>`;
     }
     const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — William Hill sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
-    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td>${regBtn}</td></tr>`;
+    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${trendArrow} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td>${regBtn}</td></tr>`;
   }).filter(Boolean);
   return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Cuota</th><th>Edge</th><th>Stake Kelly</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
 }
@@ -448,12 +482,53 @@ function extractFeaturedMarkets(m) {
 let lastMatches = [];
 let lastSport = null;
 
+function showAllLeaguesValue() {
+  const sports = [
+    { key: "soccer_epl", label: "Premier League" },
+    { key: "soccer_spain_la_liga", label: "La Liga" },
+    { key: "soccer_italy_serie_a", label: "Serie A" },
+    { key: "soccer_germany_bundesliga", label: "Bundesliga" },
+    { key: "soccer_uefa_champs_league", label: "Champions League" },
+  ];
+  const panel = document.getElementById("all-leagues-panel");
+  let cachedLeagues = 0;
+  sports.forEach(s => {
+    try {
+      const cached = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${s.key}`) || "null");
+      if (!cached) return;
+      cachedLeagues++;
+      cached.data.forEach(m => {
+        const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, sport: s.key, eventId: m.id };
+        const byMarket = extractFeaturedMarkets(m);
+        Object.keys(byMarket).forEach(mkKey => { buildMarketTable(byMarket[mkKey], matchMeta); });
+      });
+    } catch (e) { /* liga sin caché, se omite */ }
+  });
+  const recentLog = getValueLog().filter(e => e.day === new Date().toISOString().slice(0,10));
+  const sorted = recentLog.sort((a,b) => b.ev - a.ev).slice(0, 20);
+  if (!cachedLeagues) {
+    panel.innerHTML = `<div class="panel muted">Todavía no tienes ninguna liga en caché. Visita cada liga desde el selector al menos una vez (aunque sea en los últimos 10 min) y vuelve a pulsar este botón.</div>`;
+    return;
+  }
+  panel.innerHTML = `<div class="panel">
+    <div style="font-weight:600; margin-bottom:8px;">Mejores oportunidades de hoy, todas las ligas (${cachedLeagues}/5 en caché)</div>
+    ${!sorted.length ? `<div class="muted">No hay value bets detectados hoy en las ligas que tienes en caché.</div>` : sorted.map(e => `
+      <div class="live-row">
+        <div>${e.kind === "error" ? `<span class="tag-error">ERROR</span>` : `<span class="tag-value">VALOR</span>`} ${e.home} vs ${e.away} <span class="muted">· ${e.marketLabel}</span></div>
+        <div class="mono">${e.selection} @ ${e.odds.toFixed(2)} <b style="color:${e.kind==='error'?'#E5484D':'#F0B429'};">+${pct(e.ev)}</b></div>
+      </div>`).join("")}
+  </div>`;
+}
+
 function applyFilters() {
   const term = (document.getElementById("teamSearch")?.value || "").toLowerCase().trim();
   const dateVal = document.getElementById("dateFilter")?.value || "";
+  const onlyFavs = document.getElementById("onlyFavs")?.checked;
+  const favs = getFavorites();
   let filtered = lastMatches;
   if (term) filtered = filtered.filter(m => m.home_team.toLowerCase().includes(term) || m.away_team.toLowerCase().includes(term));
   if (dateVal) filtered = filtered.filter(m => m.commence_time.slice(0,10) === dateVal);
+  if (onlyFavs) filtered = filtered.filter(m => favs.has(m.home_team) || favs.has(m.away_team));
   renderMatches(filtered, lastSport, true);
 }
 
@@ -461,6 +536,7 @@ function renderMatches(matches, sport, isFiltered) {
   if (!isFiltered) { lastMatches = matches; lastSport = sport; }
   const contentEl = document.getElementById("content");
   const notes = getNotes();
+  const favs = getFavorites();
   if (!matches.length) { contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`; document.getElementById("alert-summary").innerHTML = ""; return; }
   let errorCount = 0, valueCount = 0;
   const cards = matches.map((m, idx) => {
@@ -480,7 +556,7 @@ function renderMatches(matches, sport, isFiltered) {
     const cardClass = cardFlag === "error" ? "has-error" : cardFlag === "value" ? "has-value" : "";
     return `<div class="panel match-card ${cardClass}" id="${cardId}">
       <div class="row">
-        <div><div style="font-weight:600; display:flex; align-items:center; gap:10px; font-size:15px;"><img id="${cardId}-badge-h" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /> ${m.home_team} vs ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
+        <div><div style="font-weight:600; display:flex; align-items:center; gap:10px; font-size:15px;"><img id="${cardId}-badge-h" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /> ${m.home_team} <span style="cursor:pointer;" onclick="toggleFavorite('${m.home_team.replace(/'/g,"\\'")}')">${favs.has(m.home_team) ? "⭐" : "☆"}</span> vs <span style="cursor:pointer;" onclick="toggleFavorite('${m.away_team.replace(/'/g,"\\'")}')">${favs.has(m.away_team) ? "⭐" : "☆"}</span> ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
@@ -587,16 +663,25 @@ async function loadH2H(cardId, homeName, awayName) {
     }
     const h2hAll = await apiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, footballKey);
     const played = h2hAll.filter(f => f.fixture.status && (f.fixture.status.short === "FT" || f.fixture.status.short === "AET" || f.fixture.status.short === "PEN"));
-    const h2h = played.sort((a,b) => new Date(b.fixture.date) - new Date(a.fixture.date));
+    const h2h = played.sort((a,b) => new Date(b.fixture.date) - new Date(a.fixture.date)).slice(0, 5);
     if (!h2h.length) { target.innerHTML = `<div class="alert-box ok">Sin enfrentamientos directos finalizados registrados.</div>`; return; }
+
+    const historyRows = h2h.map(f => `<div class="live-row"><span class="muted">${f.fixture.date.slice(0,10)}</span><span class="mono">${f.teams.home.name} ${f.goals.home}-${f.goals.away} ${f.teams.away.name}</span></div>`).join("");
+
     const fixtureId = h2h[0].fixture.id;
     const stats = await apiFootball(`/fixtures/statistics?fixture=${fixtureId}`, footballKey);
-    if (!stats.length) { target.innerHTML = `<div class="alert-box ok">Último H2H: ${h2h[0].teams.home.name} ${h2h[0].goals.home}-${h2h[0].goals.away} ${h2h[0].teams.away.name} (${h2h[0].fixture.date.slice(0,10)}). Sin estadísticas detalladas disponibles.</div>`; return; }
+    if (!stats.length) {
+      target.innerHTML = `<div class="alert-box ok"><div style="font-weight:500; margin-bottom:6px;">Últimos ${h2h.length} enfrentamientos directos</div>${historyRows}<div class="muted" style="margin-top:6px;">Sin estadísticas detalladas del más reciente.</div></div>`;
+      return;
+    }
     const pick = (arr, type) => arr.find(s => s.type === type)?.value ?? "—";
-    const rows = stats.map(s => `<tr><td>${s.team.name}</td><td class="mono">${pick(s.statistics, "Fouls")}</td><td class="mono">${pick(s.statistics, "Yellow Cards")}</td><td class="mono">${pick(s.statistics, "Red Cards")}</td><td class="mono">${pick(s.statistics, "Corner Kicks")}</td></tr>`).join("");
+    const rows = stats.map(s => `<tr><td>${s.team.name}</td><td class="mono">${pick(s.statistics, "Ball Possession")}</td><td class="mono">${pick(s.statistics, "Total Shots")}</td><td class="mono">${pick(s.statistics, "Shots on Goal")}</td><td class="mono">${pick(s.statistics, "expected_goals")}</td><td class="mono">${pick(s.statistics, "Fouls")}</td><td class="mono">${pick(s.statistics, "Yellow Cards")}</td><td class="mono">${pick(s.statistics, "Red Cards")}</td><td class="mono">${pick(s.statistics, "Corner Kicks")}</td></tr>`).join("");
     target.innerHTML = `<div class="alert-box ok">
-      <div style="font-weight:500; margin-bottom:6px;">Último H2H: ${h2h[0].teams.home.name} ${h2h[0].goals.home}-${h2h[0].goals.away} ${h2h[0].teams.away.name} (${h2h[0].fixture.date.slice(0,10)})</div>
-      <table><thead><tr><th>Equipo</th><th>Faltas</th><th>Amarillas</th><th>Rojas</th><th>Córners</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="font-weight:500; margin-bottom:6px;">Últimos ${h2h.length} enfrentamientos directos</div>
+      ${historyRows}
+      <div style="font-weight:500; margin:10px 0 6px;">Estadísticas del más reciente (${h2h[0].fixture.date.slice(0,10)})</div>
+      <div style="overflow-x:auto;"><table><thead><tr><th>Equipo</th><th>Posesión</th><th>Tiros</th><th>Tiros a puerta</th><th>xG</th><th>Faltas</th><th>Amarillas</th><th>Rojas</th><th>Córners</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="muted" style="margin-top:6px;">xG puede no estar disponible en el plan gratuito de API-Football; se mostrará "—" si falta.</div>
     </div>`;
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
