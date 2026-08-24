@@ -8,6 +8,23 @@
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
   * { box-sizing: border-box; }
   body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#0B0E11; color:#E6E9ED; }
+  .app-shell { display:flex; min-height:100vh; }
+  .sidebar { width:220px; flex-shrink:0; background:#0E1116; border-right:1px solid #232A33; padding:20px 14px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; }
+  .sidebar .wordmark { margin-bottom:24px; padding:0 6px; }
+  .sidebar-nav { display:flex; flex-direction:column; gap:4px; }
+  .side-btn { background:transparent; border:none; border-left:3px solid transparent; color:#7C8797; padding:10px 12px; border-radius:6px; font-size:13px; cursor:pointer; text-align:left; display:flex; align-items:center; gap:10px; transition:background .15s, color .15s; }
+  .side-btn:hover { background:#171C23; color:#E6E9ED; }
+  .side-btn.active { background:#171C23; color:#E6E9ED; border-left-color:#3ECF8E; }
+  .side-btn .ic { font-size:15px; width:18px; text-align:center; }
+  .sidebar-footer { margin-top:auto; padding-top:16px; border-top:1px solid #232A33; }
+  .main-area { flex:1; min-width:0; }
+  @media (max-width: 720px) {
+    .app-shell { flex-direction:column; }
+    .sidebar { width:100%; height:auto; position:relative; flex-direction:row; align-items:center; overflow-x:auto; padding:12px; }
+    .sidebar .wordmark { margin-bottom:0; margin-right:12px; }
+    .sidebar-nav { flex-direction:row; }
+    .sidebar-footer { display:none; }
+  }
   .mono { font-family:'IBM Plex Mono',monospace; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
   header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
@@ -74,10 +91,23 @@
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="app-shell">
+  <div class="sidebar">
+    <div class="wordmark"><span class="dot"></span><h1 style="font-size:16px;">Radar de valor</h1></div>
+    <div class="sidebar-nav">
+      <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><span class="ic">⚽</span> Partidos</button>
+      <button class="side-btn" data-v="historial" onclick="switchView('historial')"><span class="ic">📈</span> Historial y CLV</button>
+      <button class="side-btn" data-v="stats" onclick="switchView('stats')"><span class="ic">🧪</span> Backtesting</button>
+      <button class="side-btn" data-v="widgets" onclick="switchView('widgets')"><span class="ic">🏆</span> Estadísticas de liga</button>
+    </div>
+    <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
+      Herramienta informativa. No procesa apuestas ni dinero real.
+    </div>
+  </div>
+  <div class="main-area">
+  <div class="wrap">
   <header>
     <div>
-      <div class="wordmark"><span class="dot"></span><h1>Radar de valor</h1></div>
       <div class="sub">Cuotas de William Hill comparadas contra el precio justo del mercado (calculado con Pinnacle y otras referencias por detrás). Solo informativo.</div>
     </div>
     <div class="panel keys" style="padding:10px 14px;">
@@ -92,12 +122,7 @@
     </div>
   </header>
 
-  <div class="nav">
-    <button class="nav-btn active" data-v="partidos" onclick="switchView('partidos')">Partidos</button>
-    <button class="nav-btn" data-v="historial" onclick="switchView('historial')">Historial y CLV</button>
-    <button class="nav-btn" data-v="stats" onclick="switchView('stats')">Backtesting</button>
-    <button class="nav-btn" data-v="widgets" onclick="switchView('widgets')">Estadísticas de liga</button>
-  </div>
+
 
   <div id="view-partidos" class="view active">
     <div class="dash-grid" id="dash-summary"></div>
@@ -173,6 +198,8 @@
     </div>
   </div>
 </div>
+</div>
+</div>
 
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
@@ -213,7 +240,7 @@ async function getTeamBadge(name) {
 
 function switchView(v) {
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
-  document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
+  document.querySelectorAll(".side-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
   renderDashboard();
