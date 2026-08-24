@@ -18,6 +18,12 @@
   .side-btn .ic { font-size:15px; width:18px; text-align:center; }
   .sidebar-footer { margin-top:auto; padding-top:16px; border-top:1px solid #232A33; }
   .main-area { flex:1; min-width:0; }
+  .toast-container { position:fixed; top:16px; right:16px; z-index:999; display:flex; flex-direction:column; gap:8px; max-width:320px; }
+  .toast { background:#171C23; border:1px solid #E5484D; border-left:4px solid #E5484D; border-radius:8px; padding:12px 14px; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,.4); animation:toast-in .2s ease-out; }
+  @keyframes toast-in { from { transform:translateX(20px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+  .market-bar-row { margin-bottom:10px; }
+  .market-bar-track { background:#1A1F26; border-radius:4px; height:8px; overflow:hidden; margin-top:4px; }
+  .market-bar-fill { background:#3ECF8E; height:100%; }
   @media (max-width: 720px) {
     .app-shell { flex-direction:column; }
     .sidebar { width:100%; height:auto; position:relative; flex-direction:row; align-items:center; overflow-x:auto; padding:12px; }
@@ -91,6 +97,7 @@
 </style>
 </head>
 <body>
+<div class="toast-container" id="toast-container"></div>
 <div class="app-shell">
   <div class="sidebar">
     <div class="wordmark"><span class="dot"></span><h1 style="font-size:16px;">Radar de valor</h1></div>
@@ -143,6 +150,9 @@
         <option value="soccer_uefa_champs_league">🇪🇺 Champions League</option>
       </select>
       <button onclick="loadOdds()">Actualizar cuotas</button>
+      <input id="teamSearch" type="text" placeholder="Buscar equipo..." style="width:160px;" oninput="applyFilters()" />
+      <input id="dateFilter" type="date" oninput="applyFilters()" />
+      <button class="ghost" onclick="document.getElementById('teamSearch').value=''; document.getElementById('dateFilter').value=''; applyFilters();">Limpiar filtros</button>
       <span id="status" class="muted"></span>
     </div>
     <div id="alert-summary"></div>
@@ -151,12 +161,18 @@
 
   <div id="view-historial" class="view">
     <div class="panel">
-      <div style="font-weight:600; margin-bottom:8px;">Apuestas registradas (seguimiento de CLV)</div>
+      <div class="row" style="margin-bottom:8px;">
+        <div style="font-weight:600;">Apuestas registradas (seguimiento de CLV)</div>
+        <button class="small ghost" onclick="exportClvCsv()">Exportar CSV</button>
+      </div>
       <div class="muted" style="margin-bottom:10px;">CLV compara tu cuota registrada contra la cuota justo antes del partido. Positivo y sostenido en el tiempo = edge real.</div>
       <div id="clv-list"></div>
     </div>
     <div class="panel">
-      <div style="font-weight:600; margin-bottom:8px;">Historial de value bets y errores de cuotas detectados</div>
+      <div class="row" style="margin-bottom:8px;">
+        <div style="font-weight:600;">Historial de value bets y errores de cuotas detectados</div>
+        <button class="small ghost" onclick="exportValueLogCsv()">Exportar CSV</button>
+      </div>
       <div id="value-log-list"></div>
     </div>
     <div class="panel">
@@ -169,6 +185,11 @@
     <div class="panel">
       <div style="font-weight:600; margin-bottom:10px;">Resumen</div>
       <div class="summary-bar" id="stats-summary"></div>
+    </div>
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:6px;">Rendimiento por tipo de mercado</div>
+      <div class="muted" style="margin-bottom:10px;">Qué mercados generan más señales de valor y con qué edge medio — útil para saber dónde enfocar tu análisis.</div>
+      <div id="market-breakdown"></div>
     </div>
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Backtesting de tu historial</div>
@@ -343,6 +364,16 @@ async function loadOdds(forceRefresh) {
   }
 }
 
+const notifiedErrors = new Set();
+function showToast(message) {
+  const container = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = message;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 8000);
+}
+
 function logValueBet(entry, kind) {
   const log = getValueLog();
   const day = new Date().toISOString().slice(0,10);
@@ -387,6 +418,13 @@ function buildMarketTable(market, matchMeta) {
       logValueBet({ matchId: matchMeta.matchId, home: matchMeta.home, away: matchMeta.away, sport: matchMeta.sport, eventId: matchMeta.eventId,
         marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best, ev, fairProb: fair[gk] }, isError ? "error" : "value");
     }
+    if (isError) {
+      const notifyKey = `${matchMeta.matchId}|${market.key}|${gk}`;
+      if (!notifiedErrors.has(notifyKey)) {
+        notifiedErrors.add(notifyKey);
+        showToast(`<b style="color:#E5484D;">Posible error de cuota</b><br/>${matchMeta.home} vs ${matchMeta.away}<br/>${gk} a ${best.toFixed(2)} — edge de ${pct(ev)}`);
+      }
+    }
 
     let regBtn = "";
     if (isValue || isError) {
@@ -407,7 +445,20 @@ function extractFeaturedMarkets(m) {
   return byMarket;
 }
 
-function renderMatches(matches, sport) {
+let lastMatches = [];
+let lastSport = null;
+
+function applyFilters() {
+  const term = (document.getElementById("teamSearch")?.value || "").toLowerCase().trim();
+  const dateVal = document.getElementById("dateFilter")?.value || "";
+  let filtered = lastMatches;
+  if (term) filtered = filtered.filter(m => m.home_team.toLowerCase().includes(term) || m.away_team.toLowerCase().includes(term));
+  if (dateVal) filtered = filtered.filter(m => m.commence_time.slice(0,10) === dateVal);
+  renderMatches(filtered, lastSport, true);
+}
+
+function renderMatches(matches, sport, isFiltered) {
+  if (!isFiltered) { lastMatches = matches; lastSport = sport; }
   const contentEl = document.getElementById("content");
   const notes = getNotes();
   if (!matches.length) { contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`; document.getElementById("alert-summary").innerHTML = ""; return; }
@@ -635,6 +686,25 @@ function resetAllData() {
   alert("Historial borrado.");
 }
 
+function downloadCSV(rows, headers, filename) {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const csv = [headers.map(esc).join(","), ...rows.map(r => headers.map(h => esc(r[h])).join(","))].join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function exportClvCsv() {
+  const log = getClvLog();
+  downloadCSV(log, ["home","away","marketLabel","selection","bookie","odds","openAt","closingOdds","closingAt","clvPct"], "clv.csv");
+}
+function exportValueLogCsv() {
+  const log = getValueLog();
+  downloadCSV(log, ["loggedAt","home","away","marketLabel","selection","bookie","odds","ev","kind"], "value_bets.csv");
+}
+
 function renderHistorial() {
   const log = getClvLog();
   document.getElementById("clv-list").innerHTML = !log.length ? `<div class="muted">Aún no has registrado ninguna apuesta.</div>` :
@@ -669,6 +739,23 @@ function renderStats() {
     <div class="stat-box"><div class="n">${avgClv != null ? (avgClv>=0?"+":"")+avgClv.toFixed(1)+"%" : "—"}</div><div class="l">CLV promedio</div></div>
     <div class="stat-box"><div class="n">${positiveClv != null ? positiveClv+"%" : "—"}</div><div class="l">% apuestas con CLV positivo</div></div>
   `;
+
+  const byMarket = {};
+  valueLog.forEach(e => {
+    if (!byMarket[e.marketLabel]) byMarket[e.marketLabel] = { count: 0, sumEv: 0 };
+    byMarket[e.marketLabel].count++;
+    byMarket[e.marketLabel].sumEv += e.ev;
+  });
+  const marketEntries = Object.entries(byMarket).sort((a,b) => b[1].count - a[1].count);
+  const maxCount = Math.max(1, ...marketEntries.map(m => m[1].count));
+  const marketHtml = !marketEntries.length ? `<div class="muted">Todavía no hay suficientes datos por mercado.</div>` :
+    marketEntries.map(([label, d]) => `
+      <div class="market-bar-row">
+        <div class="row"><span>${label}</span><span class="muted mono">${d.count} detecciones · edge medio +${((d.sumEv/d.count)*100).toFixed(1)}%</span></div>
+        <div class="market-bar-track"><div class="market-bar-fill" style="width:${(d.count/maxCount*100).toFixed(0)}%;"></div></div>
+      </div>`).join("");
+  const marketBoxEl = document.getElementById("market-breakdown");
+  if (marketBoxEl) marketBoxEl.innerHTML = marketHtml;
 
   const bankroll = getBankroll();
   const stakePct = 0.01;
