@@ -1016,8 +1016,9 @@ async function showPlayerPanel(playerId) {
   }
   panel.innerHTML = `<div class="panel" style="width:320px; background:#171C23;"><div class="muted">Cargando jugador...</div></div>`;
   try {
-    const res = await apiFootball(`/players?id=${playerId}&season=${currentSeason()}`, footballKey);
-    if (!res.length) { panel.innerHTML = `<div class="panel" style="width:320px; background:#171C23;">Sin datos para este jugador en la temporada ${currentSeason()}.</div>`; return; }
+    const playerSeason = 2024;
+    const res = await apiFootball(`/players?id=${playerId}&season=${playerSeason}`, footballKey);
+    if (!res.length) { panel.innerHTML = `<div class="panel" style="width:320px; background:#171C23;">Sin datos para este jugador en la temporada ${playerSeason}.</div>`; return; }
     const p = res[0];
     const st = p.statistics?.[0];
     panel.innerHTML = `<div class="panel" style="width:320px; background:#171C23;" onclick="event.stopPropagation()">
