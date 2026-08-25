@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Radar de valor</title>
+<link rel="manifest" href="./manifest.json" />
+<meta name="theme-color" content="#0B0E11" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
   * { box-sizing: border-box; }
@@ -105,6 +108,7 @@
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><span class="ic">⚽</span> Partidos</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><span class="ic">🔴</span> En vivo</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><span class="ic">🧩</span> Formaciones</button>
+      <button class="side-btn" data-v="arbitrage" onclick="switchView('arbitrage')"><span class="ic">⚖️</span> Arbitraje</button>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><span class="ic">📈</span> Historial y CLV</button>
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><span class="ic">🧪</span> Backtesting</button>
       <button class="side-btn" data-v="widgets" onclick="switchView('widgets')"><span class="ic">🏆</span> Estadísticas de liga</button>
@@ -194,6 +198,19 @@
     </div>
   </div>
 
+  <div id="view-arbitrage" class="view">
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:6px;">Detector de arbitraje (surebets)</div>
+      <div class="muted" style="margin-bottom:10px;">Busca combinaciones entre TODAS las casas que trae la API (no solo William Hill) donde, apostando a todos los resultados posibles repartiendo el stake, ganas seguro sin importar el resultado. Se calcula con los partidos ya cargados en la pestaña Partidos — visita esa pestaña primero.</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <label class="muted">Stake total a repartir</label>
+        <input id="arbStake" type="number" value="100" style="width:100px;" />
+        <button class="small ghost" onclick="renderArbitrage()">Buscar arbitrajes</button>
+      </div>
+      <div id="arbitrage-list" class="muted">Pulsa "Buscar arbitrajes" después de haber cargado partidos en la pestaña Partidos.</div>
+    </div>
+  </div>
+
   <div id="view-historial" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:8px;">
@@ -209,6 +226,17 @@
         <button class="small ghost" onclick="exportValueLogCsv()">Exportar CSV</button>
       </div>
       <div id="value-log-list"></div>
+    </div>
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:8px;">Copia de seguridad</div>
+      <div class="muted" style="margin-bottom:10px;">Descarga todo tu historial, notas, favoritos y configuración (sin tus claves de API) para guardarlo o pasarlo a otro dispositivo.</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="ghost" onclick="exportBackup()">Descargar copia de seguridad</button>
+        <label class="ghost small" style="cursor:pointer; display:inline-flex; align-items:center; padding:8px 14px; border-radius:6px;">
+          Restaurar copia
+          <input type="file" accept="application/json" style="display:none;" onchange="importBackup(event)" />
+        </label>
+      </div>
     </div>
     <div class="panel">
       <button class="ghost" style="border-color:#E5484D; color:#E5484D;" onclick="resetAllData()">Borrar todo el historial, notas y estadísticas</button>
@@ -408,6 +436,7 @@ async function loadOdds(forceRefresh) {
 }
 
 const notifiedErrors = new Set();
+let lastTopScorers = [];
 function showToast(message) {
   const container = document.getElementById("toast-container");
   const el = document.createElement("div");
@@ -514,6 +543,7 @@ function extractFeaturedMarkets(m) {
 
 let lastMatches = [];
 let lastSport = null;
+let lastFullMarketsByMatch = {};
 
 function showAllLeaguesValue() {
   const sports = [
@@ -553,6 +583,49 @@ function showAllLeaguesValue() {
   </div>`;
 }
 
+function renderArbitrage() {
+  const el = document.getElementById("arbitrage-list");
+  const stakeTotal = Number(document.getElementById("arbStake").value) || 100;
+  const matchIds = Object.keys(lastFullMarketsByMatch);
+  if (!matchIds.length) { el.innerHTML = `<span class="muted">No hay partidos cargados todavía. Ve a la pestaña Partidos primero.</span>`; return; }
+
+  const opportunities = [];
+  matchIds.forEach(mid => {
+    const { matchMeta, byMarket } = lastFullMarketsByMatch[mid];
+    Object.keys(byMarket).forEach(mkKey => {
+      const market = byMarket[mkKey];
+      const groups = {};
+      market.selections.forEach(sel => { if (!groups[sel.key]) groups[sel.key] = {}; groups[sel.key][sel.bookie] = sel.price; });
+      const selectionNames = Object.keys(groups);
+      if (selectionNames.length < 2) return;
+      let sumInverse = 0;
+      const legs = selectionNames.map(name => {
+        let bestBk = null, best = -Infinity;
+        Object.keys(groups[name]).forEach(bk => { if (groups[name][bk] > best) { best = groups[name][bk]; bestBk = bk; } });
+        sumInverse += 1 / best;
+        return { name, odds: best, bookie: bestBk };
+      });
+      if (sumInverse < 0.99) {
+        const profitPct = (1 / sumInverse - 1) * 100;
+        const stakes = legs.map(l => ({ ...l, stake: Math.round((stakeTotal * (1/l.odds) / sumInverse) * 100) / 100 }));
+        opportunities.push({ home: matchMeta.home, away: matchMeta.away, marketLabel: MARKET_LABELS[mkKey] || mkKey, profitPct, stakes });
+      }
+    });
+  });
+
+  if (!opportunities.length) {
+    el.innerHTML = `<span class="muted">No se detectó ningún arbitraje real en los partidos cargados ahora mismo (es normal — son poco frecuentes y se corrigen rápido entre casas).</span>`;
+    return;
+  }
+  opportunities.sort((a,b) => b.profitPct - a.profitPct);
+  el.innerHTML = opportunities.map(o => `
+    <div class="live-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+      <div class="row" style="width:100%;"><b>${o.home} vs ${o.away}</b><span class="tag-value">+${o.profitPct.toFixed(2)}% garantizado</span></div>
+      <div class="muted">${o.marketLabel}</div>
+      ${o.stakes.map(s => `<div class="mono" style="font-size:12px;">Apostar ${money(s.stake)} a "${s.name}" @ ${s.odds.toFixed(2)} (${s.bookie})</div>`).join("")}
+    </div>`).join("");
+}
+
 function applyFilters() {
   const term = (document.getElementById("teamSearch")?.value || "").toLowerCase().trim();
   const dateVal = document.getElementById("dateFilter")?.value || "";
@@ -575,6 +648,7 @@ function renderMatches(matches, sport, isFiltered) {
   const cards = matches.map((m, idx) => {
     const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, sport, eventId: m.id };
     const byMarket = extractFeaturedMarkets(m);
+    lastFullMarketsByMatch[m.id] = { matchMeta, byMarket };
     let cardFlag = "none";
     const tabs = Object.keys(byMarket).map((mkKey) => {
       const built = buildMarketTable(byMarket[mkKey], matchMeta);
@@ -658,8 +732,15 @@ async function loadInjuries(cardId, homeName, awayName) {
     const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
     const fetchInjuries = async (teamId, teamName) => { if (!teamId) return { teamName, list: [] }; const res = await fetch(`https://v3.football.api-sports.io/injuries?team=${teamId}&season=${season}`, { headers: { "x-apisports-key": footballKey } }); if (!res.ok) return { teamName, list: [] }; const data = await res.json(); return { teamName, list: (data.response || []).slice(0, 8) }; };
     const [homeInj, awayInj] = await Promise.all([fetchInjuries(homeId, homeName), fetchInjuries(awayId, awayName)]);
-    const renderTeam = (t) => !t.list.length ? `<div class="alert-box ok">${t.teamName}: sin bajas registradas.</div>` : `<div class="alert-box"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div>${t.list.map(inj => `<div class="alert-item"><span>${inj.player.name}</span><span class="muted">${inj.player.reason || inj.player.type || "baja"}</span></div>`).join("")}</div>`;
+    const renderTeam = (t) => !t.list.length ? `<div class="alert-box ok">${t.teamName}: sin bajas registradas.</div>` : `<div class="alert-box"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div>${t.list.map(inj => {
+      const isTopScorer = lastTopScorers.some(name => name.toLowerCase() === inj.player.name.toLowerCase());
+      return `<div class="alert-item">
+        <span>${inj.player.name} ${isTopScorer ? `<span class="tag-error" style="margin-left:4px;">⚠ MÁXIMO GOLEADOR</span>` : ""}</span>
+        <span class="muted">${inj.player.reason || inj.player.type || "baja"}</span>
+      </div>`;
+    }).join("")}</div>`;
     target.innerHTML = renderTeam(homeInj) + renderTeam(awayInj);
+    if (!lastTopScorers.length) target.innerHTML += `<div class="muted" style="font-size:11px; margin-top:4px;">Consejo: carga "Estadísticas de liga" primero para que la app pueda avisarte si algún lesionado es máximo goleador.</div>`;
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
 
@@ -794,6 +875,39 @@ async function updateClosing(id) {
 }
 
 function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
+
+const BACKUP_KEYS = [
+  "radar-valor-clv-log", "radar-valor-value-log", "radar-valor-notes", "radar-valor-outcomes",
+  "radar-valor-favorites", "radar-valor-formation-stats", "radar-valor-line-history",
+  "radar-valor-bankroll", "radar-valor-kelly-fraction",
+];
+function exportBackup() {
+  const data = {};
+  BACKUP_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) data[k] = v; });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `radar-valor-backup-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!confirm("Esto reemplazará tu historial actual con el de la copia de seguridad. ¿Continuar?")) return;
+      Object.keys(data).forEach(k => { if (BACKUP_KEYS.includes(k)) localStorage.setItem(k, data[k]); });
+      alert("Copia restaurada. La página se va a recargar.");
+      location.reload();
+    } catch (e) {
+      alert("El archivo no es una copia de seguridad válida.");
+    }
+  };
+  reader.readAsText(file);
+}
 
 function resetAllData() {
   if (!confirm("¿Seguro? Esto borra todo tu historial, CLV, notas y resultados marcados en este navegador. No se puede deshacer.")) return;
@@ -1118,22 +1232,33 @@ async function loadLineups(fixtureId) {
       return;
     }
     lineups.forEach(t => t.__fixtureId = fixtureId);
+
+    let refereeHtml = "";
+    let fx = null;
+    try {
+      const fxRes = await apiFootball(`/fixtures?id=${fixtureId}`, footballKey);
+      fx = fxRes[0];
+      if (fx?.fixture?.referee) {
+        refereeHtml = `<div class="muted" style="margin-bottom:10px; width:100%; text-align:center;">🧑‍⚖️ Árbitro: <b>${fx.fixture.referee}</b> <span style="font-size:11px;">(la API gratuita no da estadísticas históricas por árbitro, solo el nombre)</span></div>`;
+      }
+    } catch (e) { /* no bloqueamos si falla */ }
+
     container.innerHTML = `<div class="panel" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
+      ${refereeHtml}
       ${renderPitch(lineups[0], "home")}
       ${lineups[1] ? renderPitch(lineups[1], "away") : ""}
     </div>
     <div id="lineup-events"></div>`;
 
-    try {
-      const fx = await apiFootball(`/fixtures?id=${fixtureId}`, footballKey);
-      const status = fx[0]?.fixture?.status?.short;
+    if (fx) {
+      const status = fx.fixture?.status?.short;
       if (status === "FT" || status === "AET" || status === "PEN") {
-        const gh = fx[0].goals.home, ga = fx[0].goals.away;
+        const gh = fx.goals.home, ga = fx.goals.away;
         if (lineups[0]?.formation) recordFormationResult(lineups[0].formation, gh > ga ? "wins" : gh < ga ? "losses" : "draws");
         if (lineups[1]?.formation) recordFormationResult(lineups[1].formation, ga > gh ? "wins" : ga < gh ? "losses" : "draws");
         renderFormationStats();
       }
-    } catch (e) { /* no bloqueamos la vista de formaciones si esto falla */ }
+    }
   } catch (e) {
     container.innerHTML = `<div class="panel" style="color:#7C8797;">No se pudieron cargar las formaciones: ${e.message}</div>`;
   }
@@ -1156,6 +1281,7 @@ async function loadLeagueStats() {
       apiFootball(`/players/topredcards?league=${league}&season=${season}`, footballKey).catch((e) => { console.warn("topredcards:", e.message); return []; }),
     ]);
     statusEl.textContent = "";
+    lastTopScorers = scorers.map(s => s.player.name);
 
     const table = standings[0]?.league?.standings?.[0] || [];
     const standingsHtml = !table.length ? `<div class="muted">Sin datos de clasificación para esta temporada/liga.</div>` : `
@@ -1194,6 +1320,11 @@ async function loadLeagueStats() {
 
 loadOdds();
 renderDashboard();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW no registrado:", e));
+  });
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+{
+  "name": "Radar de valor",
+  "short_name": "Radar",
+  "description": "Análisis de cuotas, valor, formaciones y estadísticas de fútbol",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0B0E11",
+  "theme_color": "#0B0E11",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
