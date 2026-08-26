@@ -109,6 +109,7 @@
       <button class="side-btn" data-v="live" onclick="switchView('live')"><span class="ic">🔴</span> En vivo</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><span class="ic">🧩</span> Formaciones</button>
       <button class="side-btn" data-v="arbitrage" onclick="switchView('arbitrage')"><span class="ic">⚖️</span> Arbitraje</button>
+      <button class="side-btn" data-v="calendar" onclick="switchView('calendar')"><span class="ic">📅</span> Calendario favoritos</button>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><span class="ic">📈</span> Historial y CLV</button>
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><span class="ic">🧪</span> Backtesting</button>
       <button class="side-btn" data-v="widgets" onclick="switchView('widgets')"><span class="ic">🏆</span> Estadísticas de liga</button>
@@ -138,6 +139,10 @@
 
 
   <div id="view-partidos" class="view active">
+    <div class="panel" id="today-summary-panel">
+      <div style="font-weight:600; margin-bottom:8px;">Resumen del día</div>
+      <div id="today-summary" class="muted">Cargando...</div>
+    </div>
     <div class="dash-grid" id="dash-summary"></div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
@@ -211,6 +216,17 @@
     </div>
   </div>
 
+  <div id="view-calendar" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-weight:600;">Calendario de tus equipos favoritos</div>
+        <button class="small ghost" onclick="loadFavoritesCalendar()">Actualizar calendario</button>
+      </div>
+      <div class="muted" style="margin-bottom:10px;">Próximos partidos de los equipos que hayas marcado con ⭐ en la pestaña Partidos.</div>
+      <div id="favorites-calendar" class="muted">Marca algún equipo como favorito y pulsa "Actualizar calendario".</div>
+    </div>
+  </div>
+
   <div id="view-historial" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:8px;">
@@ -279,6 +295,15 @@
       </div>
       <div id="widgets-status" class="muted"></div>
       <div id="widgets-container"></div>
+    </div>
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:6px;">Comparador casa vs fuera</div>
+      <div class="muted" style="margin-bottom:10px;">Rendimiento de un equipo jugando en casa comparado con fuera, en la temporada elegida arriba.</div>
+      <div style="display:flex; gap:8px; margin-bottom:10px;">
+        <input id="hvaTeam" type="text" placeholder="Nombre del equipo..." style="width:220px;" />
+        <button class="small ghost" onclick="loadHomeAwayCompare()">Comparar</button>
+      </div>
+      <div id="hva-result" class="muted"></div>
     </div>
   </div>
 </div>
@@ -379,13 +404,23 @@ function renderDashboard() {
   const withClosing = clvLog.filter(e => e.closingOdds != null);
   const avgClv = withClosing.length ? withClosing.reduce((s,e) => s + e.clvPct, 0) / withClosing.length : null;
   const today = new Date().toISOString().slice(0,10);
-  const todayCount = valueLog.filter(e => e.day === today).length;
+  const todayLog = valueLog.filter(e => e.day === today);
+  const best = todayLog.length ? todayLog.reduce((a,b) => b.ev > a.ev ? b : a) : null;
+  const favs = getFavorites();
+  const favMatchesToday = lastMatches.filter(m => (favs.has(m.home_team) || favs.has(m.away_team)) && m.commence_time.slice(0,10) === today);
   el.innerHTML = `
     <div class="dash-card"><div class="l">Bankroll</div><div class="n">${money(getBankroll())}</div></div>
-    <div class="dash-card"><div class="l">Alertas hoy</div><div class="n">${todayCount}</div></div>
+    <div class="dash-card"><div class="l">Alertas hoy</div><div class="n">${todayLog.length}</div></div>
     <div class="dash-card"><div class="l">Apuestas registradas</div><div class="n">${clvLog.length}</div></div>
     <div class="dash-card"><div class="l">CLV promedio</div><div class="n" style="color:${avgClv==null?'inherit':avgClv>=0?'#3ECF8E':'#E5484D'};">${avgClv != null ? (avgClv>=0?"+":"")+avgClv.toFixed(1)+"%" : "—"}</div></div>
   `;
+  const summaryPanel = document.getElementById("today-summary");
+  if (summaryPanel) {
+    let html = "";
+    if (best) html += `<div class="live-row"><div>🏆 Mejor value de hoy: ${best.home} vs ${best.away} — ${best.selection}</div><div class="mono tag-value">+${pct(best.ev)}</div></div>`;
+    if (favMatchesToday.length) favMatchesToday.forEach(m => html += `<div class="live-row"><div>⭐ ${m.home_team} vs ${m.away_team}</div><div class="muted">hoy</div></div>`);
+    summaryPanel.innerHTML = html || `<span class="muted">Sin novedades destacadas todavía hoy — actualiza cuotas en Partidos.</span>`;
+  }
 }
 
 async function loadOdds(forceRefresh) {
@@ -669,6 +704,7 @@ function renderMatches(matches, sport, isFiltered) {
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
           <button class="small ghost" onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Forma reciente</button>
           <button class="small ghost" onclick="loadH2H('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Faltas y tarjetas (H2H)</button>
+          <button class="small ghost" onclick="runMonteCarlo('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Simular (Monte Carlo)</button>
           <button class="small" onclick="analyzeWithAI('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Analizar con IA</button>
           <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Noticias →</a>
         </div>
@@ -679,6 +715,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-injuries"></div>
       <div id="${cardId}-form"></div>
       <div id="${cardId}-h2h"></div>
+      <div id="${cardId}-montecarlo"></div>
       <div id="${cardId}-ai"></div>
       <div style="margin-top:10px;"><label class="muted">Notas propias</label><textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea></div>
     </div>`;
@@ -744,6 +781,25 @@ async function loadInjuries(cardId, homeName, awayName) {
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
 
+const teamStatsCache = {};
+
+function computeStreak(fixtures, teamName) {
+  // fixtures ya vienen ordenados del más reciente al más antiguo
+  let streak = 0, type = null;
+  for (const fx of fixtures) {
+    const teamIsHome = fx.teams.home.name === teamName;
+    const scored = teamIsHome ? fx.goals.home : fx.goals.away;
+    const conceded = teamIsHome ? fx.goals.away : fx.goals.home;
+    const result = scored > conceded ? "W" : scored < conceded ? "L" : "D";
+    if (type === null) { type = result === "L" ? "L" : "unbeaten"; streak = 1; continue; }
+    const matches = type === "L" ? result === "L" : result !== "L";
+    if (matches) streak++; else break;
+  }
+  if (!fixtures.length) return "";
+  if (type === "L") return `🔻 ${streak} derrota(s) seguidas`;
+  return `🔥 ${streak} partido(s) invicto (${fixtures.length >= streak ? "últimos" : ""})`;
+}
+
 async function loadForm(cardId, homeName, awayName) {
   const footballKey = getFootballKey();
   const target = document.getElementById(`${cardId}-form`);
@@ -751,16 +807,88 @@ async function loadForm(cardId, homeName, awayName) {
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Cargando forma reciente...</div>`;
   try {
     const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
-    const fetchForm = async (teamId, teamName) => { if (!teamId) return { teamName, fixtures: [] }; const res = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&last=5`, { headers: { "x-apisports-key": footballKey } }); if (!res.ok) return { teamName, fixtures: [] }; const data = await res.json(); return { teamName, fixtures: data.response || [] }; };
+    const fetchForm = async (teamId, teamName) => { if (!teamId) return { teamName, fixtures: [] }; const res = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&last=10`, { headers: { "x-apisports-key": footballKey } }); if (!res.ok) return { teamName, fixtures: [] }; const data = await res.json(); return { teamName, fixtures: data.response || [] }; };
     const [homeForm, awayForm] = await Promise.all([fetchForm(homeId, homeName), fetchForm(awayId, awayName)]);
     const renderTeam = (t) => {
       if (!t.fixtures.length) return `<div class="alert-box ok">${t.teamName}: sin datos.</div>`;
       let gf = 0, ga = 0;
-      const badges = t.fixtures.map(fx => { const teamIsHome = fx.teams.home.name === t.teamName; const scored = teamIsHome ? fx.goals.home : fx.goals.away; const conceded = teamIsHome ? fx.goals.away : fx.goals.home; gf += scored||0; ga += conceded||0; const result = scored > conceded ? "W" : scored < conceded ? "L" : "D"; return `<span class="badge ${result}">${result}</span>`; }).join(" ");
-      return `<div class="alert-box ok"><div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div><div class="form-box">${badges}<span class="muted">GF ${gf} · GC ${ga}</span></div></div>`;
+      const homeMatches = t.fixtures.filter(fx => fx.teams.home.name === t.teamName);
+      const awayMatches = t.fixtures.filter(fx => fx.teams.away.name === t.teamName);
+      const record = (arr, isHomeSide) => {
+        let w=0,d=0,l=0;
+        arr.forEach(fx => { const s = isHomeSide ? fx.goals.home : fx.goals.away; const c = isHomeSide ? fx.goals.away : fx.goals.home; if (s>c) w++; else if (s<c) l++; else d++; });
+        return `${w}V ${d}E ${l}D`;
+      };
+      const badges = t.fixtures.slice(0,5).map(fx => { const teamIsHome = fx.teams.home.name === t.teamName; const scored = teamIsHome ? fx.goals.home : fx.goals.away; const conceded = teamIsHome ? fx.goals.away : fx.goals.home; gf += scored||0; ga += conceded||0; const result = scored > conceded ? "W" : scored < conceded ? "L" : "D"; return `<span class="badge ${result}">${result}</span>`; }).join(" ");
+      teamStatsCache[t.teamName] = { avgGf: gf/Math.min(5, t.fixtures.length), avgGa: ga/Math.min(5, t.fixtures.length) };
+      return `<div class="alert-box ok">
+        <div style="font-weight:500; margin-bottom:4px;">${t.teamName}</div>
+        <div class="form-box">${badges}<span class="muted">GF ${gf} · GC ${ga} (últimos 5)</span></div>
+        <div class="muted" style="margin-top:4px;">${computeStreak(t.fixtures, t.teamName)}</div>
+        <div class="muted" style="margin-top:4px;">Como local: ${record(homeMatches, true)} (${homeMatches.length} PJ) · Como visitante: ${record(awayMatches, false)} (${awayMatches.length} PJ)</div>
+      </div>`;
     };
     target.innerHTML = renderTeam(homeForm) + renderTeam(awayForm);
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
+}
+
+function poissonRandom(lambda) {
+  const L = Math.exp(-lambda);
+  let k = 0, p = 1;
+  do { k++; p *= Math.random(); } while (p > L);
+  return k - 1;
+}
+
+async function runMonteCarlo(cardId, homeName, awayName) {
+  const target = document.getElementById(`${cardId}-montecarlo`);
+  target.innerHTML = `<div class="muted" style="margin-top:8px;">Simulando 20.000 partidos...</div>`;
+  const footballKey = getFootballKey();
+  if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba.</div>`; return; }
+  try {
+    if (!teamStatsCache[homeName] || !teamStatsCache[awayName]) {
+      await loadFormSilently(homeName, awayName, footballKey);
+    }
+    const home = teamStatsCache[homeName], away = teamStatsCache[awayName];
+    if (!home || !away) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No hay suficientes datos de goles recientes para simular.</div>`; return; }
+    const lambdaHome = Math.max(0.3, (home.avgGf + away.avgGa) / 2);
+    const lambdaAway = Math.max(0.3, (away.avgGf + home.avgGa) / 2);
+    const N = 20000;
+    let hw=0, dr=0, aw=0, over25=0, btts=0;
+    for (let i=0;i<N;i++) {
+      const hg = poissonRandom(lambdaHome), ag = poissonRandom(lambdaAway);
+      if (hg>ag) hw++; else if (hg<ag) aw++; else dr++;
+      if (hg+ag > 2.5) over25++;
+      if (hg>0 && ag>0) btts++;
+    }
+    target.innerHTML = `<div class="alert-box ok">
+      <div style="font-weight:500; margin-bottom:6px;">Simulación Monte Carlo (modelo Poisson simplificado, basado en goles de los últimos 5 partidos)</div>
+      <table>
+        <tr><td>${homeName} gana</td><td class="mono">${(hw/N*100).toFixed(1)}%</td></tr>
+        <tr><td>Empate</td><td class="mono">${(dr/N*100).toFixed(1)}%</td></tr>
+        <tr><td>${awayName} gana</td><td class="mono">${(aw/N*100).toFixed(1)}%</td></tr>
+        <tr><td>Más de 2.5 goles</td><td class="mono">${(over25/N*100).toFixed(1)}%</td></tr>
+        <tr><td>Ambos anotan</td><td class="mono">${(btts/N*100).toFixed(1)}%</td></tr>
+      </table>
+      <div class="muted" style="margin-top:6px; font-size:11px;">Modelo simplificado (no ajusta por lesiones, contexto ni forma como local/visitante específica) — compáralo con la probabilidad justa del mercado en la tabla de arriba, no lo tomes como predicción exacta.</div>
+    </div>`;
+  } catch (e) {
+    target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo simular: ${e.message}</div>`;
+  }
+}
+
+async function loadFormSilently(homeName, awayName, footballKey) {
+  const [homeId, awayId] = await Promise.all([findTeamId(homeName, footballKey), findTeamId(awayName, footballKey)]);
+  const fetchForm = async (teamId, teamName) => {
+    if (!teamId) return;
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?team=${teamId}&last=5`, { headers: { "x-apisports-key": footballKey } });
+    if (!res.ok) return;
+    const data = await res.json();
+    const fixtures = data.response || [];
+    let gf=0, ga=0;
+    fixtures.forEach(fx => { const isHome = fx.teams.home.name === teamName; gf += (isHome ? fx.goals.home : fx.goals.away) || 0; ga += (isHome ? fx.goals.away : fx.goals.home) || 0; });
+    if (fixtures.length) teamStatsCache[teamName] = { avgGf: gf/fixtures.length, avgGa: ga/fixtures.length };
+  };
+  await Promise.all([fetchForm(homeId, homeName), fetchForm(awayId, awayName)]);
 }
 
 async function loadH2H(cardId, homeName, awayName) {
@@ -1056,6 +1184,33 @@ async function loadLiveScores() {
   }
 }
 
+async function loadFavoritesCalendar() {
+  const footballKey = getFootballKey();
+  const el = document.getElementById("favorites-calendar");
+  const favs = [...getFavorites()];
+  if (!footballKey) { el.innerHTML = `Añade tu API-Football key arriba.`; return; }
+  if (!favs.length) { el.innerHTML = `<span class="muted">No tienes equipos favoritos todavía. Marca alguno con ⭐ en la pestaña Partidos.</span>`; return; }
+  el.innerHTML = `<span class="muted">Buscando próximos partidos de ${favs.length} equipo(s)...</span>`;
+  try {
+    const results = [];
+    for (const teamName of favs) {
+      const teamId = await findTeamId(teamName, footballKey);
+      if (!teamId) continue;
+      const fixtures = await apiFootball(`/fixtures?team=${teamId}&next=5`, footballKey);
+      fixtures.forEach(fx => results.push({ team: teamName, fx }));
+    }
+    if (!results.length) { el.innerHTML = `<span class="muted">No se encontraron próximos partidos para tus favoritos.</span>`; return; }
+    results.sort((a,b) => new Date(a.fx.fixture.date) - new Date(b.fx.fixture.date));
+    el.innerHTML = results.map(r => `
+      <div class="live-row">
+        <div>${r.fx.league.flag ? `<img src="${r.fx.league.flag}" style="width:16px; height:11px; object-fit:cover; border-radius:2px;" />` : "⚽"} <b>${r.team}</b>: ${r.fx.teams.home.name} vs ${r.fx.teams.away.name}</div>
+        <div class="mono muted">${new Date(r.fx.fixture.date).toLocaleString("es-ES", { weekday:"short", day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" })}</div>
+      </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el calendario: ${e.message}</span>`;
+  }
+}
+
 async function loadTodayForLineups() {
   const footballKey = getFootballKey();
   const el = document.getElementById("lineup-picker");
@@ -1261,6 +1416,39 @@ async function loadLineups(fixtureId) {
     }
   } catch (e) {
     container.innerHTML = `<div class="panel" style="color:#7C8797;">No se pudieron cargar las formaciones: ${e.message}</div>`;
+  }
+}
+
+async function loadHomeAwayCompare() {
+  const footballKey = getFootballKey();
+  const el = document.getElementById("hva-result");
+  const teamName = document.getElementById("hvaTeam").value.trim();
+  const league = document.getElementById("widgetLeague").value;
+  const season = document.getElementById("widgetSeason").value || 2024;
+  if (!footballKey) { el.innerHTML = `Añade tu API-Football key arriba.`; return; }
+  if (!teamName) { el.innerHTML = `<span class="muted">Escribe el nombre de un equipo.</span>`; return; }
+  el.innerHTML = `<span class="muted">Buscando...</span>`;
+  try {
+    const teamId = await findTeamId(teamName, footballKey);
+    if (!teamId) { el.innerHTML = `<span class="muted">No se encontró ese equipo.</span>`; return; }
+    const stats = await apiFootball(`/teams/statistics?team=${teamId}&league=${league}&season=${season}`, footballKey);
+    const s = Array.isArray(stats) ? stats[0] : stats;
+    if (!s || !s.fixtures) { el.innerHTML = `<span class="muted">Sin datos para este equipo en esa liga/temporada.</span>`; return; }
+    el.innerHTML = `<table>
+      <thead><tr><th></th><th>Como local</th><th>Como visitante</th></tr></thead>
+      <tbody>
+        <tr><td>Partidos jugados</td><td class="mono">${s.fixtures.played.home}</td><td class="mono">${s.fixtures.played.away}</td></tr>
+        <tr><td>Victorias</td><td class="mono">${s.fixtures.wins.home}</td><td class="mono">${s.fixtures.wins.away}</td></tr>
+        <tr><td>Empates</td><td class="mono">${s.fixtures.draws.home}</td><td class="mono">${s.fixtures.draws.away}</td></tr>
+        <tr><td>Derrotas</td><td class="mono">${s.fixtures.loses.home}</td><td class="mono">${s.fixtures.loses.away}</td></tr>
+        <tr><td>Goles a favor</td><td class="mono">${s.goals.for.total.home}</td><td class="mono">${s.goals.for.total.away}</td></tr>
+        <tr><td>Goles en contra</td><td class="mono">${s.goals.against.total.home}</td><td class="mono">${s.goals.against.total.away}</td></tr>
+        <tr><td>Promedio goles a favor</td><td class="mono">${s.goals.for.average.home}</td><td class="mono">${s.goals.for.average.away}</td></tr>
+        <tr><td>Promedio goles en contra</td><td class="mono">${s.goals.against.average.home}</td><td class="mono">${s.goals.against.average.away}</td></tr>
+      </tbody>
+    </table>`;
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar: ${e.message}</span>`;
   }
 }
 
