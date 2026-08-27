@@ -14,7 +14,9 @@
   .app-shell { display:flex; min-height:100vh; }
   .sidebar { width:220px; flex-shrink:0; background:#0E1116; border-right:1px solid #232A33; padding:20px 14px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; }
   .sidebar .wordmark { margin-bottom:24px; padding:0 6px; }
-  .sidebar-nav { display:flex; flex-direction:column; gap:4px; }
+  .sidebar-nav { display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
+  .sidebar-section { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#4A525E; padding:14px 12px 4px; }
+  .sidebar-section:first-child { padding-top:0; }
   .side-btn { background:transparent; border:none; border-left:3px solid transparent; color:#7C8797; padding:10px 12px; border-radius:6px; font-size:13px; cursor:pointer; text-align:left; display:flex; align-items:center; gap:10px; transition:background .15s, color .15s; }
   .side-btn:hover { background:#171C23; color:#E6E9ED; }
   .side-btn.active { background:#171C23; color:#E6E9ED; border-left-color:#3ECF8E; }
@@ -110,13 +112,21 @@
   <div class="sidebar">
     <div class="wordmark"><span class="dot"></span><h1 style="font-size:16px;">Radar de valor</h1></div>
     <div class="sidebar-nav">
-      <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><span class="ic">⚽</span> Partidos</button>
+      <div class="sidebar-section">Partidos</div>
+      <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><span class="ic">⚽</span> Partidos y valor</button>
+      <button class="side-btn" data-v="daydash" onclick="switchView('daydash')"><span class="ic">📊</span> Dashboard del día</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><span class="ic">🔴</span> En vivo</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><span class="ic">🧩</span> Formaciones</button>
+
+      <div class="sidebar-section">Herramientas</div>
       <button class="side-btn" data-v="arbitrage" onclick="switchView('arbitrage')"><span class="ic">⚖️</span> Arbitraje</button>
       <button class="side-btn" data-v="calendar" onclick="switchView('calendar')"><span class="ic">📅</span> Calendario favoritos</button>
+
+      <div class="sidebar-section">Mi actividad</div>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><span class="ic">📈</span> Historial y CLV</button>
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><span class="ic">🧪</span> Backtesting</button>
+
+      <div class="sidebar-section">Liga</div>
       <button class="side-btn" data-v="widgets" onclick="switchView('widgets')"><span class="ic">🏆</span> Estadísticas de liga</button>
     </div>
     <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
@@ -178,6 +188,27 @@
     <div id="all-leagues-panel"></div>
     <div id="alert-summary"></div>
     <div id="content"></div>
+  </div>
+
+  <div id="view-daydash" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div style="font-weight:600;">Dashboard del día — equipos que juegan hoy</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="dayDashLeague">
+            <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
+            <option value="140">🇪🇸 La Liga</option>
+            <option value="135">🇮🇹 Serie A</option>
+            <option value="78">🇩🇪 Bundesliga</option>
+            <option value="2">🇪🇺 Champions League</option>
+          </select>
+          <button class="small ghost" onclick="loadDayDashboard()">Cargar</button>
+        </div>
+      </div>
+      <div class="muted" style="margin-bottom:10px;">Ranking de los equipos que juegan hoy en esta liga, por goles anotados y tarjetas recibidas en la temporada (2024, límite del plan gratuito). Esto consume varias peticiones de API-Football (2 por equipo), úsalo con moderación si te queda poca cuota diaria.</div>
+      <div id="daydash-status" class="muted"></div>
+      <div id="daydash-content"></div>
+    </div>
   </div>
 
   <div id="view-live" class="view">
@@ -1399,6 +1430,67 @@ async function loadFavoritesCalendar() {
       </div>`).join("");
   } catch (e) {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el calendario: ${e.message}</span>`;
+  }
+}
+
+async function loadDayDashboard() {
+  const footballKey = getFootballKey();
+  const statusEl = document.getElementById("daydash-status");
+  const contentEl = document.getElementById("daydash-content");
+  if (!footballKey) { statusEl.innerHTML = `Añade tu API-Football key arriba.`; return; }
+  const league = document.getElementById("dayDashLeague").value;
+  const today = new Date().toISOString().slice(0,10);
+  statusEl.textContent = "Buscando partidos de hoy...";
+  contentEl.innerHTML = "";
+  try {
+    const fixtures = await apiFootball(`/fixtures?league=${league}&season=${currentSeason()}&date=${today}`, footballKey);
+    if (!fixtures.length) { statusEl.innerHTML = `<span class="muted">No hay partidos de esta liga hoy.</span>`; return; }
+    const teams = new Map();
+    fixtures.forEach(f => {
+      teams.set(f.teams.home.id, { name: f.teams.home.name, vs: f.teams.away.name, logo: f.teams.home.logo });
+      teams.set(f.teams.away.id, { name: f.teams.away.name, vs: f.teams.home.name, logo: f.teams.away.logo });
+    });
+    statusEl.textContent = `Consultando estadísticas de ${teams.size} equipos (temporada 2024)...`;
+    const statsSeason = 2024;
+    const results = [];
+    for (const [teamId, info] of teams) {
+      try {
+        const stats = await apiFootball(`/teams/statistics?team=${teamId}&league=${league}&season=${statsSeason}`, footballKey);
+        const s = Array.isArray(stats) ? stats[0] : stats;
+        if (!s || !s.fixtures) continue;
+        const avgGoals = parseFloat(s.goals?.for?.average?.total) || 0;
+        let totalYellow = 0, totalRed = 0;
+        if (s.cards?.yellow) Object.values(s.cards.yellow).forEach(v => totalYellow += v.total || 0);
+        if (s.cards?.red) Object.values(s.cards.red).forEach(v => totalRed += v.total || 0);
+        const played = s.fixtures.played.total || 1;
+        results.push({ name: info.name, vs: info.vs, logo: info.logo, avgGoals, cardsPerGame: (totalYellow + totalRed) / played, totalYellow, totalRed });
+      } catch (e) { /* seguimos con el resto aunque un equipo falle */ }
+    }
+    statusEl.textContent = `${results.length}/${teams.size} equipos con datos disponibles (temporada 2024).`;
+    if (!results.length) { contentEl.innerHTML = `<div class="muted">No se pudieron obtener estadísticas para estos equipos.</div>`; return; }
+
+    const byGoals = results.slice().sort((a,b) => b.avgGoals - a.avgGoals).slice(0, 10);
+    const byCards = results.slice().sort((a,b) => b.cardsPerGame - a.cardsPerGame).slice(0, 10);
+
+    contentEl.innerHTML = `
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
+        <div>
+          <div style="font-weight:600; margin-bottom:8px;">⚽ Más goles por partido (jugando hoy)</div>
+          <table><thead><tr><th>Equipo</th><th>Rival hoy</th><th>Prom. goles</th></tr></thead><tbody>
+            ${byGoals.map(t => `<tr><td>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name}</td><td class="muted">${t.vs}</td><td class="mono">${t.avgGoals.toFixed(2)}</td></tr>`).join("")}
+          </tbody></table>
+        </div>
+        <div>
+          <div style="font-weight:600; margin-bottom:8px;">🟨 Más tarjetas por partido (jugando hoy)</div>
+          <table><thead><tr><th>Equipo</th><th>Rival hoy</th><th>Tarj./partido</th></tr></thead><tbody>
+            ${byCards.map(t => `<tr><td>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name}</td><td class="muted">${t.vs}</td><td class="mono">${t.cardsPerGame.toFixed(2)}</td></tr>`).join("")}
+          </tbody></table>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    statusEl.innerHTML = "";
+    contentEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar el dashboard: ${e.message}</div>`;
   }
 }
 
