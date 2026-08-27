@@ -773,6 +773,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="row">
         <div><div style="font-weight:600; display:flex; align-items:center; gap:10px; font-size:15px;"><img id="${cardId}-badge-h" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /> ${m.home_team} <span style="cursor:pointer;" onclick="toggleFavorite('${m.home_team.replace(/'/g,"\\'")}')">${favs.has(m.home_team) ? "⭐" : "☆"}</span> vs <span style="cursor:pointer;" onclick="toggleFavorite('${m.away_team.replace(/'/g,"\\'")}')">${favs.has(m.away_team) ? "⭐" : "☆"}</span> ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button onclick="studyMatch('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar este partido</button>
           <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
           <button class="small ghost" onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Bajas y sanciones</button>
           <button class="small ghost" onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Forma reciente</button>
@@ -782,6 +783,7 @@ function renderMatches(matches, sport, isFiltered) {
           <a class="link-btn" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Noticias →</a>
         </div>
       </div>
+      <div id="${cardId}-study-status"></div>
       <div class="mkt-tabs">${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
       <div id="${cardId}-extra"></div>
@@ -803,6 +805,26 @@ function renderMatches(matches, sport, isFiltered) {
     getTeamBadge(m.home_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-h`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
     getTeamBadge(m.away_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-a`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
   });
+}
+
+async function studyMatch(cardId, homeName, awayName, sport, matchId) {
+  const statusEl = document.getElementById(`${cardId}-study-status`);
+  statusEl.innerHTML = `<div class="muted" style="margin:8px 0;">Estudiando partido: cargando forma, bajas, historial directo y simulación...</div>`;
+  const footballKey = getFootballKey();
+  if (!footballKey) {
+    statusEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba para poder estudiar el partido con datos (lesiones, forma, H2H, simulación). Las cuotas y el valor de arriba ya están disponibles sin esa key.</div>`;
+    return;
+  }
+  try {
+    await loadForm(cardId, homeName, awayName);
+    await loadInjuries(cardId, homeName, awayName);
+    await loadH2H(cardId, homeName, awayName);
+    await runMonteCarlo(cardId, homeName, awayName);
+    statusEl.innerHTML = `<div class="muted" style="margin:8px 0;">Estudio completo — revisa cuotas y valor arriba, y forma/bajas/H2H/simulación debajo. Si quieres, pulsa "Analizar con IA" para un resumen en texto de todo esto.</div>`;
+    document.getElementById(cardId).scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    statusEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Hubo un problema al estudiar el partido: ${e.message}</div>`;
+  }
 }
 
 function switchTab(cardId, idx) { const card = document.getElementById(cardId); card.querySelectorAll(".mkt-tab").forEach((b,i) => b.classList.toggle("active", i===idx)); card.querySelectorAll(".mkt-body").forEach(b => b.classList.toggle("active", Number(b.dataset.idx)===idx)); }
