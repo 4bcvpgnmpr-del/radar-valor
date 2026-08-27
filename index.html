@@ -354,6 +354,7 @@
         </select>
         <input id="widgetSeason" type="number" placeholder="2024 (plan gratuito)" value="2024" style="width:150px;" />
         <button onclick="loadLeagueStats()">Cargar estadísticas</button>
+        <button class="ghost" onclick="loadBundesligaOpenLigaDB()">Bundesliga vía OpenLigaDB (gratis, sin clave)</button>
       </div>
       <div id="widgets-status" class="muted"></div>
       <div id="widgets-container"></div>
@@ -1777,6 +1778,45 @@ async function loadHomeAwayCompare() {
     </table>`;
   } catch (e) {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar: ${e.message}</span>`;
+  }
+}
+
+async function loadBundesligaOpenLigaDB() {
+  const statusEl = document.getElementById("widgets-status");
+  const container = document.getElementById("widgets-container");
+  const season = document.getElementById("widgetSeason").value || new Date().getFullYear();
+  statusEl.textContent = "Cargando Bundesliga desde OpenLigaDB (sin clave)...";
+  container.innerHTML = `<div class="skeleton skeleton-line" style="width:30%;"></div><div class="skeleton skeleton-card"></div>`;
+  try {
+    const [tableRes, matchesRes] = await Promise.all([
+      fetch(`https://api.openligadb.de/getbltable/bl1/${season}`),
+      fetch(`https://api.openligadb.de/getmatchdata/bl1`),
+    ]);
+    if (!tableRes.ok) throw new Error(`${tableRes.status}`);
+    const table = await tableRes.json();
+    const matches = matchesRes.ok ? await matchesRes.json() : [];
+    statusEl.textContent = "";
+
+    const standingsHtml = !table.length ? `<div class="muted">Sin datos de clasificación para esa temporada.</div>` : `
+      <table><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead><tbody>
+        ${table.map((r, i) => `<tr><td class="mono">${i+1}</td><td>${r.teamIconUrl ? `<img src="${r.teamIconUrl}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${r.teamName}</td><td class="mono">${r.matches}</td><td class="mono">${r.points}</td><td class="mono">${r.goalDiff}</td></tr>`).join("")}
+      </tbody></table>`;
+
+    const upcoming = matches.filter(m => !m.matchIsFinished).slice(0, 8);
+    const matchesHtml = !upcoming.length ? `<div class="muted">Sin próximos partidos listados.</div>` : `
+      <div style="margin-top:16px;">
+        ${upcoming.map(m => `<div class="live-row"><div>${m.team1.teamName} vs ${m.team2.teamName}</div><div class="muted mono">${new Date(m.matchDateTime).toLocaleDateString("es-ES", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" })}</div></div>`).join("")}
+      </div>`;
+
+    container.innerHTML = `
+      <div class="muted" style="margin-bottom:10px;">Fuente: OpenLigaDB (gratis, sin clave, actualizado por la comunidad).</div>
+      <div style="margin-bottom:12px;">${standingsHtml}</div>
+      <div style="font-weight:600; margin-bottom:6px;">Próximos partidos</div>
+      ${matchesHtml}
+    `;
+  } catch (e) {
+    statusEl.textContent = "";
+    container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar desde OpenLigaDB: ${e.message}</div>`;
   }
 }
 
