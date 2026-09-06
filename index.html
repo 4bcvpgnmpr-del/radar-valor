@@ -98,6 +98,15 @@
   @keyframes confetti-fall { to { transform:translateY(100vh) rotate(540deg); opacity:0; } }
   .badge-chip { display:inline-flex; align-items:center; gap:6px; background:#171C23; border:1px solid #232A33; border-radius:20px; padding:6px 12px; font-size:12px; }
   .badge-chip.unlocked { border-color:#F0B429; color:#F0B429; }
+  .cmp-block { margin-bottom:14px; }
+  .cmp-label { text-align:center; font-size:11px; color:#7C8797; text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+  .cmp-row { display:flex; align-items:center; gap:10px; }
+  .cmp-val { min-width:48px; text-align:center; font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:13px; }
+  .cmp-track { flex:1; height:9px; background:#1A1F26; border-radius:5px; overflow:hidden; display:flex; }
+  .cmp-fill-left { background:#3ECF8E; height:100%; transition:width .3s; }
+  .cmp-fill-right { background:#7F77DD; height:100%; margin-left:auto; transition:width .3s; }
+  .rank-bar-track { background:#1A1F26; border-radius:4px; height:6px; overflow:hidden; margin-top:3px; width:100%; }
+  .rank-bar-fill { height:100%; border-radius:4px; }
   .form-box { display:inline-flex; gap:10px; margin-top:6px; font-size:12px; }
   .badge { font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px; }
   .badge.W { color:#3ECF8E; background:rgba(62,207,142,.12); }
@@ -1160,6 +1169,21 @@ async function loadForm(cardId, homeName, awayName) {
   } catch (e) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo consultar (${e.message}).</div>`; }
 }
 
+function cmpBar(label, leftVal, rightVal, fmt) {
+  fmt = fmt || (v => v);
+  const total = (Number(leftVal) + Number(rightVal)) || 1;
+  const leftPct = (Number(leftVal) / total * 100).toFixed(1);
+  const rightPct = (100 - leftPct).toFixed(1);
+  return `<div class="cmp-block">
+    <div class="cmp-label">${label}</div>
+    <div class="cmp-row">
+      <div class="cmp-val" style="color:#3ECF8E;">${fmt(leftVal)}</div>
+      <div class="cmp-track"><div class="cmp-fill-left" style="width:${leftPct}%"></div><div class="cmp-fill-right" style="width:${rightPct}%"></div></div>
+      <div class="cmp-val" style="color:#7F77DD;">${fmt(rightVal)}</div>
+    </div>
+  </div>`;
+}
+
 function poissonRandom(lambda) {
   const L = Math.exp(-lambda);
   let k = 0, p = 1;
@@ -1189,14 +1213,10 @@ async function runMonteCarlo(cardId, homeName, awayName) {
       if (hg>0 && ag>0) btts++;
     }
     target.innerHTML = `<div class="alert-box ok">
-      <div style="font-weight:500; margin-bottom:6px;">Simulación Monte Carlo (modelo Poisson simplificado, basado en goles de los últimos 5 partidos)</div>
-      <table>
-        <tr><td>${homeName} gana</td><td class="mono">${(hw/N*100).toFixed(1)}%</td></tr>
-        <tr><td>Empate</td><td class="mono">${(dr/N*100).toFixed(1)}%</td></tr>
-        <tr><td>${awayName} gana</td><td class="mono">${(aw/N*100).toFixed(1)}%</td></tr>
-        <tr><td>Más de 2.5 goles</td><td class="mono">${(over25/N*100).toFixed(1)}%</td></tr>
-        <tr><td>Ambos anotan</td><td class="mono">${(btts/N*100).toFixed(1)}%</td></tr>
-      </table>
+      <div style="font-weight:500; margin-bottom:10px;">Simulación Monte Carlo (modelo Poisson simplificado, basado en goles de los últimos 5 partidos)</div>
+      ${cmpBar(`${homeName} vs ${awayName} (empate: ${(dr/N*100).toFixed(1)}%)`, (hw/N*100).toFixed(1), (aw/N*100).toFixed(1), v => v+"%")}
+      ${cmpBar("Más de 2.5 / Menos de 2.5", (over25/N*100).toFixed(1), (100-over25/N*100).toFixed(1), v => v+"%")}
+      ${cmpBar("Ambos anotan / No", (btts/N*100).toFixed(1), (100-btts/N*100).toFixed(1), v => v+"%")}
       <div class="muted" style="margin-top:6px; font-size:11px;">Modelo simplificado (no ajusta por lesiones, contexto ni forma como local/visitante específica) — compáralo con la probabilidad justa del mercado en la tabla de arriba, no lo tomes como predicción exacta.</div>
     </div>`;
   } catch (e) {
@@ -1707,16 +1727,18 @@ async function loadDayDashboard() {
     contentEl.innerHTML = `
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
         <div>
-          <div style="font-weight:600; margin-bottom:8px;">⚽ Más goles por partido (jugando hoy)</div>
-          <table><thead><tr><th>Equipo</th><th>Rival hoy</th><th>Prom. goles</th></tr></thead><tbody>
-            ${byGoals.map(t => `<tr><td>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name}</td><td class="muted">${t.vs}</td><td class="mono">${t.avgGoals.toFixed(2)}</td></tr>`).join("")}
-          </tbody></table>
+          <div style="font-weight:600; margin-bottom:10px;">⚽ Más goles por partido (jugando hoy)</div>
+          ${byGoals.map(t => `<div style="margin-bottom:10px;">
+            <div class="row" style="margin-bottom:2px;"><span>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name} <span class="muted">vs ${t.vs}</span></span><span class="mono">${t.avgGoals.toFixed(2)}</span></div>
+            <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.min(100, t.avgGoals/Math.max(...byGoals.map(x=>x.avgGoals),1)*100)}%; background:#3ECF8E;"></div></div>
+          </div>`).join("")}
         </div>
         <div>
-          <div style="font-weight:600; margin-bottom:8px;">🟨 Más tarjetas por partido (jugando hoy)</div>
-          <table><thead><tr><th>Equipo</th><th>Rival hoy</th><th>Tarj./partido</th></tr></thead><tbody>
-            ${byCards.map(t => `<tr><td>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name}</td><td class="muted">${t.vs}</td><td class="mono">${t.cardsPerGame.toFixed(2)}</td></tr>`).join("")}
-          </tbody></table>
+          <div style="font-weight:600; margin-bottom:10px;">🟨 Más tarjetas por partido (jugando hoy)</div>
+          ${byCards.map(t => `<div style="margin-bottom:10px;">
+            <div class="row" style="margin-bottom:2px;"><span>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name} <span class="muted">vs ${t.vs}</span></span><span class="mono">${t.cardsPerGame.toFixed(2)}</span></div>
+            <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.min(100, t.cardsPerGame/Math.max(...byCards.map(x=>x.cardsPerGame),1)*100)}%; background:#F0B429;"></div></div>
+          </div>`).join("")}
         </div>
       </div>
     `;
@@ -1949,19 +1971,17 @@ async function loadHomeAwayCompare() {
     const stats = await apiFootball(`/teams/statistics?team=${teamId}&league=${league}&season=${season}`, footballKey);
     const s = Array.isArray(stats) ? stats[0] : stats;
     if (!s || !s.fixtures) { el.innerHTML = `<span class="muted">Sin datos para este equipo en esa liga/temporada.</span>`; return; }
-    el.innerHTML = `<table>
-      <thead><tr><th></th><th>Como local</th><th>Como visitante</th></tr></thead>
-      <tbody>
-        <tr><td>Partidos jugados</td><td class="mono">${s.fixtures.played.home}</td><td class="mono">${s.fixtures.played.away}</td></tr>
-        <tr><td>Victorias</td><td class="mono">${s.fixtures.wins.home}</td><td class="mono">${s.fixtures.wins.away}</td></tr>
-        <tr><td>Empates</td><td class="mono">${s.fixtures.draws.home}</td><td class="mono">${s.fixtures.draws.away}</td></tr>
-        <tr><td>Derrotas</td><td class="mono">${s.fixtures.loses.home}</td><td class="mono">${s.fixtures.loses.away}</td></tr>
-        <tr><td>Goles a favor</td><td class="mono">${s.goals.for.total.home}</td><td class="mono">${s.goals.for.total.away}</td></tr>
-        <tr><td>Goles en contra</td><td class="mono">${s.goals.against.total.home}</td><td class="mono">${s.goals.against.total.away}</td></tr>
-        <tr><td>Promedio goles a favor</td><td class="mono">${s.goals.for.average.home}</td><td class="mono">${s.goals.for.average.away}</td></tr>
-        <tr><td>Promedio goles en contra</td><td class="mono">${s.goals.against.average.home}</td><td class="mono">${s.goals.against.average.away}</td></tr>
-      </tbody>
-    </table>`;
+    el.innerHTML = `
+      <div class="row" style="margin-bottom:10px;"><span style="color:#3ECF8E; font-weight:600;">🏠 Como local</span><span style="color:#7F77DD; font-weight:600;">✈️ Como visitante</span></div>
+      ${cmpBar("Partidos jugados", s.fixtures.played.home, s.fixtures.played.away)}
+      ${cmpBar("Victorias", s.fixtures.wins.home, s.fixtures.wins.away)}
+      ${cmpBar("Empates", s.fixtures.draws.home, s.fixtures.draws.away)}
+      ${cmpBar("Derrotas", s.fixtures.loses.home, s.fixtures.loses.away)}
+      ${cmpBar("Goles a favor", s.goals.for.total.home, s.goals.for.total.away)}
+      ${cmpBar("Goles en contra", s.goals.against.total.home, s.goals.against.total.away)}
+      ${cmpBar("Promedio goles a favor", s.goals.for.average.home, s.goals.for.average.away)}
+      ${cmpBar("Promedio goles en contra", s.goals.against.average.home, s.goals.against.average.away)}
+    `;
   } catch (e) {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar: ${e.message}</span>`;
   }
@@ -2031,15 +2051,21 @@ async function loadLeagueStats() {
         ${table.map(r => `<tr><td class="mono">${r.rank}</td><td style="display:flex; align-items:center; gap:6px;">${r.team.logo ? `<img src="${r.team.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""} ${r.team.name}</td><td class="mono">${r.all.played}</td><td class="mono">${r.points}</td><td class="mono">${r.goalsDiff}</td></tr>`).join("")}
       </tbody></table>`;
 
+    const maxGoals = Math.max(...scorers.slice(0,10).map(p => p.statistics[0].goals.total ?? 0), 1);
     const scorersHtml = !scorers.length ? `<div class="muted">Sin datos de goleadores.</div>` : `
-      <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Goles</th><th>Asist.</th></tr></thead><tbody>
-        ${scorers.slice(0,10).map((p,i) => `<tr><td class="mono">${i+1}</td><td style="cursor:pointer; text-decoration:underline;" onclick="showPlayerPanel(${p.player.id})">${p.player.name}</td><td>${p.statistics[0].team.name}</td><td class="mono">${p.statistics[0].goals.total ?? 0}</td><td class="mono">${p.statistics[0].goals.assists ?? 0}</td></tr>`).join("")}
-      </tbody></table>`;
+      ${scorers.slice(0,10).map((p,i) => { const g = p.statistics[0].goals.total ?? 0; return `
+        <div style="margin-bottom:8px;">
+          <div class="row" style="margin-bottom:2px;"><span>${i+1}. <span style="cursor:pointer; text-decoration:underline;" onclick="showPlayerPanel(${p.player.id})">${p.player.name}</span> <span class="muted">(${p.statistics[0].team.name})</span></span><span class="mono">${g} goles · ${p.statistics[0].goals.assists ?? 0} asist.</span></div>
+          <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${g/maxGoals*100}%; background:#3ECF8E;"></div></div>
+        </div>`; }).join("")}`;
 
+    const maxYellow = Math.max(...yellows.slice(0,10).map(p => p.statistics[0].cards.yellow ?? 0), 1);
     const yellowsHtml = !yellows.length ? `<div class="muted">Sin datos de amarillas.</div>` : `
-      <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Amarillas</th></tr></thead><tbody>
-        ${yellows.slice(0,10).map((p,i) => `<tr><td class="mono">${i+1}</td><td>${p.player.name}</td><td>${p.statistics[0].team.name}</td><td class="mono">${p.statistics[0].cards.yellow ?? 0}</td></tr>`).join("")}
-      </tbody></table>`;
+      ${yellows.slice(0,10).map((p,i) => { const y = p.statistics[0].cards.yellow ?? 0; return `
+        <div style="margin-bottom:8px;">
+          <div class="row" style="margin-bottom:2px;"><span>${i+1}. ${p.player.name} <span class="muted">(${p.statistics[0].team.name})</span></span><span class="mono">${y}</span></div>
+          <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${y/maxYellow*100}%; background:#F0B429;"></div></div>
+        </div>`; }).join("")}`;
 
     const redsHtml = !reds.length ? `<div class="muted">Sin datos de rojas.</div>` : `
       <table><thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Rojas</th></tr></thead><tbody>
