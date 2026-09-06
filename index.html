@@ -208,7 +208,6 @@
         <div><div class="muted" style="margin-bottom:4px;">Odds API key <span class="tooltip" title="the-odds-api.com — necesaria para ver cuotas de partidos.">ⓘ</span></div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">API-Football key <span class="tooltip" title="api-football.com — necesaria para forma, lesiones, formaciones y estadísticas.">ⓘ</span></div><input id="footballKey" type="password" placeholder="api-football.com" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
-        <div><div class="muted" style="margin-bottom:4px;">SharpAPI key <span class="tooltip" title="Opcional — odds de casas de EE.UU. (DraftKings, FanDuel) en el plan gratis.">ⓘ</span></div><input id="sharpApiKey" type="password" placeholder="sk_live_..." style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
         <div style="display:flex; gap:10px;">
           <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:100%;" /></div>
@@ -260,14 +259,6 @@
       <span id="status" class="muted"></span>
     </div>
     <div id="all-leagues-panel"></div>
-    <div class="panel">
-      <div class="row" style="margin-bottom:8px;">
-        <div style="font-weight:600;">SharpAPI (odds EE.UU. — complementario)</div>
-        <button class="small ghost" onclick="loadSharpApiOdds()">Cargar odds de SharpAPI</button>
-      </div>
-      <div class="muted" style="margin-bottom:10px;">El plan gratis de SharpAPI solo cubre DraftKings y FanDuel (EE.UU.), no las casas europeas que ya usas arriba. Útil solo si sigues ligas/deportes de EE.UU.</div>
-      <div id="sharpapi-odds" class="muted">Pulsa el botón para cargar.</div>
-    </div>
     <div id="alert-summary"></div>
     <div id="content"></div>
   </div>
@@ -453,7 +444,6 @@
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
 const ANTHROPIC_KEY_STORAGE = "radar-valor-anthropic-key";
-const SHARPAPI_KEY_STORAGE = "radar-valor-sharpapi-key";
 const ISPORTS_KEY_STORAGE = "radar-valor-isports-key";
 const BANKROLL_STORAGE = "radar-valor-bankroll";
 const KELLY_STORAGE = "radar-valor-kelly-fraction";
@@ -501,14 +491,12 @@ function saveKeys() {
   const k1 = document.getElementById("apiKey").value.trim();
   const k2 = document.getElementById("footballKey").value.trim();
   const k3 = document.getElementById("anthropicKey").value.trim();
-  const k4 = document.getElementById("sharpApiKey").value.trim();
   const k5 = document.getElementById("isportsKey").value.trim();
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
   if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
-  if (k4) localStorage.setItem(SHARPAPI_KEY_STORAGE, k4);
   if (k5) localStorage.setItem(ISPORTS_KEY_STORAGE, k5);
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
@@ -518,7 +506,6 @@ function saveKeys() {
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
 function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ""; }
-function getSharpApiKey() { return localStorage.getItem(SHARPAPI_KEY_STORAGE) || ""; }
 function getIsportsKey() { return localStorage.getItem(ISPORTS_KEY_STORAGE) || ""; }
 function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
 function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
@@ -624,7 +611,6 @@ async function loadOdds(forceRefresh) {
   document.getElementById("apiKey").value = key;
   document.getElementById("footballKey").value = getFootballKey();
   document.getElementById("anthropicKey").value = getAnthropicKey();
-  document.getElementById("sharpApiKey").value = getSharpApiKey();
   document.getElementById("isportsKey").value = getIsportsKey();
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
@@ -903,25 +889,6 @@ function extractFeaturedMarkets(m) {
 let lastMatches = [];
 let lastSport = null;
 let lastFullMarketsByMatch = {};
-
-async function loadSharpApiOdds() {
-  const key = getSharpApiKey();
-  const el = document.getElementById("sharpapi-odds");
-  if (!key) { el.innerHTML = `Añade tu SharpAPI key arriba primero.`; return; }
-  el.innerHTML = `<div class="skeleton skeleton-line" style="width:40%;"></div><div class="skeleton skeleton-card"></div>`;
-  try {
-    const res = await fetch("https://api.sharpapi.io/api/v1/odds", { headers: { "X-API-Key": key } });
-    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
-    const json = await res.json();
-    const rows = json.data || [];
-    if (!rows.length) { el.innerHTML = `<span class="muted">Sin datos disponibles ahora mismo.</span>`; return; }
-    el.innerHTML = `<table><thead><tr><th>Deporte</th><th>Partido</th><th>Casa</th><th>Mercado</th></tr></thead><tbody>
-      ${rows.slice(0,30).map(r => `<tr><td>${r.sport || "—"}</td><td>${r.home_team || ""} vs ${r.away_team || ""}</td><td class="mono">${r.sportsbook || "—"}</td><td class="mono">${r.market || r.id || "—"}</td></tr>`).join("")}
-    </tbody></table>`;
-  } catch (e) {
-    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar SharpAPI: ${e.message}</span>`;
-  }
-}
 
 function showAllLeaguesValue() {
   const sports = [
