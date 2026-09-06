@@ -94,6 +94,10 @@
   .dropdown-menu button { display:block; width:100%; text-align:left; background:transparent; border:none; color:#E6E9ED; padding:8px 10px; font-size:12px; border-radius:6px; }
   .dropdown-menu button:hover { background:#0F1319; }
   .icon { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; vertical-align:-3px; }
+  .confetti-piece { position:fixed; top:-10px; width:8px; height:8px; z-index:1000; pointer-events:none; animation: confetti-fall 1.4s ease-in forwards; }
+  @keyframes confetti-fall { to { transform:translateY(100vh) rotate(540deg); opacity:0; } }
+  .badge-chip { display:inline-flex; align-items:center; gap:6px; background:#171C23; border:1px solid #232A33; border-radius:20px; padding:6px 12px; font-size:12px; }
+  .badge-chip.unlocked { border-color:#F0B429; color:#F0B429; }
   .form-box { display:inline-flex; gap:10px; margin-top:6px; font-size:12px; }
   .badge { font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px; }
   .badge.W { color:#3ECF8E; background:rgba(62,207,142,.12); }
@@ -112,7 +116,12 @@
   .live-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1A1F26; font-size:13px; }
   .live-min { background:rgba(229,72,77,.15); color:#E5484D; border-radius:4px; padding:2px 6px; font-size:11px; font-weight:700; }
   .wordmark { display:flex; align-items:center; gap:10px; }
-  .wordmark .dot { width:10px; height:10px; border-radius:50%; background:#3ECF8E; box-shadow:0 0 8px #3ECF8E88; }
+  .radar-logo { width:22px; height:22px; position:relative; border-radius:50%; border:1.5px solid #3ECF8E55; overflow:hidden; background:#0B0E11; }
+  .radar-logo::before { content:""; position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg, #3ECF8E00 0deg, #3ECF8E00 300deg, #3ECF8Ecc 355deg, #3ECF8E00 360deg); animation: radar-sweep 2.2s linear infinite; }
+  .radar-logo::after { content:""; position:absolute; top:50%; left:50%; width:4px; height:4px; margin:-2px; border-radius:50%; background:#3ECF8E; box-shadow:0 0 6px #3ECF8E; }
+  .radar-logo .ring { position:absolute; border:1px solid #3ECF8E33; border-radius:50%; animation: radar-ping 2.2s ease-out infinite; }
+  @keyframes radar-sweep { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  @keyframes radar-ping { 0% { width:0; height:0; top:50%; left:50%; opacity:.8; } 100% { width:130%; height:130%; top:-15%; left:-15%; opacity:0; } }
 </style>
 </head>
 <body>
@@ -121,7 +130,7 @@
 <div class="parlay-panel" id="parlay-panel" style="display:none;"></div>
 <div class="app-shell">
   <div class="sidebar">
-    <div class="wordmark"><span class="dot"></span><h1 style="font-size:16px;">Radar de valor</h1></div>
+    <div class="wordmark"><div class="radar-logo"><span class="ring"></span></div><h1 style="font-size:16px;">Radar de valor</h1></div>
     <div class="sidebar-nav">
       <div class="sidebar-section">Partidos</div>
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
@@ -154,11 +163,14 @@
       <div><div class="muted" style="margin-bottom:4px;">Odds API key</div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">API-Football key</div><input id="footballKey" type="password" placeholder="api-football.com" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Anthropic API key (opcional, análisis IA)</div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:170px;" /></div>
+      <div><div class="muted" style="margin-bottom:4px;">SharpAPI key (opcional, odds EE.UU.)</div><input id="sharpApiKey" type="password" placeholder="sk_live_..." style="width:170px;" /></div>
+      <div><div class="muted" style="margin-bottom:4px;">iSports API key (opcional, marcador alternativo)</div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:170px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:90px;" /></div>
       <div><div class="muted" style="margin-bottom:4px;">Fracción Kelly</div>
         <select id="kellyFraction" style="width:90px;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
       </div>
       <div style="display:flex; align-items:flex-end;"><button onclick="saveKeys()">Guardar</button></div>
+      <div style="display:flex; align-items:flex-end;"><label class="muted" style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" id="soundToggle" onchange="toggleSound()" /> 🔔 Sonido</label></div>
     </div>
   </header>
 
@@ -171,6 +183,10 @@
         <button class="small ghost" onclick="downloadDaySummaryImage()">Descargar informe (PNG)</button>
       </div>
       <div id="today-summary" class="muted">Cargando...</div>
+    </div>
+    <div class="panel">
+      <div style="font-weight:600; margin-bottom:8px;">Logros</div>
+      <div id="badges-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
     <div class="dash-grid" id="dash-summary"></div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -197,6 +213,14 @@
       <span id="status" class="muted"></span>
     </div>
     <div id="all-leagues-panel"></div>
+    <div class="panel">
+      <div class="row" style="margin-bottom:8px;">
+        <div style="font-weight:600;">SharpAPI (odds EE.UU. — complementario)</div>
+        <button class="small ghost" onclick="loadSharpApiOdds()">Cargar odds de SharpAPI</button>
+      </div>
+      <div class="muted" style="margin-bottom:10px;">El plan gratis de SharpAPI solo cubre DraftKings y FanDuel (EE.UU.), no las casas europeas que ya usas arriba. Útil solo si sigues ligas/deportes de EE.UU.</div>
+      <div id="sharpapi-odds" class="muted">Pulsa el botón para cargar.</div>
+    </div>
     <div id="alert-summary"></div>
     <div id="content"></div>
   </div>
@@ -224,11 +248,14 @@
 
   <div id="view-live" class="view">
     <div class="panel">
-      <div class="row" style="margin-bottom:10px;">
+      <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <div style="font-weight:600;">Marcador en vivo</div>
-        <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo</button>
+        <div style="display:flex; gap:8px;">
+          <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo (API-Football)</button>
+          <button class="small ghost" onclick="loadIsportsLive()">Actualizar en vivo (iSports API)</button>
+        </div>
       </div>
-      <div id="live-scores" class="muted">Pulsa "Actualizar en vivo" para ver los partidos que se están jugando ahora mismo (requiere tu API-Football key).</div>
+      <div id="live-scores" class="muted">Pulsa un botón para ver los partidos que se están jugando ahora mismo.</div>
     </div>
   </div>
 
@@ -377,6 +404,8 @@
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
 const ANTHROPIC_KEY_STORAGE = "radar-valor-anthropic-key";
+const SHARPAPI_KEY_STORAGE = "radar-valor-sharpapi-key";
+const ISPORTS_KEY_STORAGE = "radar-valor-isports-key";
 const BANKROLL_STORAGE = "radar-valor-bankroll";
 const KELLY_STORAGE = "radar-valor-kelly-fraction";
 const NOTES_KEY = "radar-valor-notes";
@@ -423,11 +452,15 @@ function saveKeys() {
   const k1 = document.getElementById("apiKey").value.trim();
   const k2 = document.getElementById("footballKey").value.trim();
   const k3 = document.getElementById("anthropicKey").value.trim();
+  const k4 = document.getElementById("sharpApiKey").value.trim();
+  const k5 = document.getElementById("isportsKey").value.trim();
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
   if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
+  if (k4) localStorage.setItem(SHARPAPI_KEY_STORAGE, k4);
+  if (k5) localStorage.setItem(ISPORTS_KEY_STORAGE, k5);
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
   document.getElementById("status").textContent = "Configuración guardada.";
@@ -436,6 +469,8 @@ function saveKeys() {
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
 function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ""; }
+function getSharpApiKey() { return localStorage.getItem(SHARPAPI_KEY_STORAGE) || ""; }
+function getIsportsKey() { return localStorage.getItem(ISPORTS_KEY_STORAGE) || ""; }
 function getBankroll() { return Number(localStorage.getItem(BANKROLL_STORAGE)) || 1000; }
 function getKellyFraction() { return Number(localStorage.getItem(KELLY_STORAGE)) || 0.5; }
 function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch(e) { return {}; } }
@@ -445,6 +480,7 @@ function toggleFavorite(name) {
   if (favs.has(name)) favs.delete(name); else favs.add(name);
   localStorage.setItem("radar-valor-favorites", JSON.stringify([...favs]));
   applyFilters();
+  checkBadges();
 }
 function saveNote(id, text) { const n = getNotes(); n[id] = text; localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
 function getClvLog() { try { return JSON.parse(localStorage.getItem(CLV_LOG_KEY) || "[]"); } catch(e) { return []; } }
@@ -539,6 +575,8 @@ async function loadOdds(forceRefresh) {
   document.getElementById("apiKey").value = key;
   document.getElementById("footballKey").value = getFootballKey();
   document.getElementById("anthropicKey").value = getAnthropicKey();
+  document.getElementById("sharpApiKey").value = getSharpApiKey();
+  document.getElementById("isportsKey").value = getIsportsKey();
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
@@ -600,6 +638,103 @@ async function loadOdds(forceRefresh) {
 
 const notifiedErrors = new Set();
 let lastTopScorers = [];
+let soundEnabled = localStorage.getItem("radar-valor-sound") === "1";
+let audioCtx = null;
+
+function toggleSound() {
+  soundEnabled = document.getElementById("soundToggle").checked;
+  localStorage.setItem("radar-valor-sound", soundEnabled ? "1" : "0");
+  if (soundEnabled) { playTone(880, 0.1); }
+}
+
+function playTone(freq, duration) {
+  if (!soundEnabled) return;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = freq;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+  } catch (e) { /* audio no disponible en este navegador, seguimos sin sonido */ }
+}
+
+function fireConfetti() {
+  const colors = ["#3ECF8E", "#F0B429", "#7F77DD", "#E6E9ED"];
+  for (let i = 0; i < 30; i++) {
+    const el = document.createElement("div");
+    el.className = "confetti-piece";
+    el.style.left = Math.random() * 100 + "vw";
+    el.style.background = colors[Math.floor(Math.random() * colors.length)];
+    el.style.animationDelay = (Math.random() * 0.3) + "s";
+    el.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1800);
+  }
+}
+
+const BADGES = [
+  { id: "first_value", label: "Primer value bet", check: () => getValueLog().length >= 1 },
+  { id: "ten_values", label: "10 value bets detectados", check: () => getValueLog().length >= 10 },
+  { id: "fifty_values", label: "50 value bets detectados", check: () => getValueLog().length >= 50 },
+  { id: "first_error", label: "Primer posible error de cuota", check: () => getValueLog().some(e => e.kind === "error") },
+  { id: "first_clv", label: "Primera apuesta registrada (CLV)", check: () => getClvLog().length >= 1 },
+  { id: "positive_clv", label: "Primer CLV positivo cerrado", check: () => getClvLog().some(e => e.clvPct != null && e.clvPct >= 0) },
+  { id: "first_win", label: "Primera apuesta marcada como ganada", check: () => Object.values(getOutcomesLog()).includes("ganada") },
+  { id: "favorite", label: "Primer equipo favorito marcado", check: () => getFavorites().size >= 1 },
+];
+
+function checkBadges() {
+  const unlocked = JSON.parse(localStorage.getItem("radar-valor-badges") || "[]");
+  let changed = false;
+  BADGES.forEach(b => {
+    if (!unlocked.includes(b.id) && b.check()) {
+      unlocked.push(b.id);
+      changed = true;
+      showToast(`🏅 <b>Logro desbloqueado</b><br/>${b.label}`);
+    }
+  });
+  if (changed) localStorage.setItem("radar-valor-badges", JSON.stringify(unlocked));
+  renderBadges();
+}
+
+function renderBadges() {
+  const el = document.getElementById("badges-list");
+  if (!el) return;
+  const unlocked = JSON.parse(localStorage.getItem("radar-valor-badges") || "[]");
+  el.innerHTML = BADGES.map(b => `<span class="badge-chip ${unlocked.includes(b.id) ? "unlocked" : ""}">${unlocked.includes(b.id) ? "🏅" : "🔒"} ${b.label}</span>`).join(" ");
+}
+
+function downloadBetCard(rid) {
+  const data = ROW_REGISTRY[rid];
+  if (!data) return;
+  const W = 700, H = 320;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0B0E11"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#232A33"; ctx.lineWidth = 2; ctx.strokeRect(1, 1, W-2, H-2);
+  ctx.fillStyle = "#3ECF8E"; ctx.font = "700 14px 'IBM Plex Mono', monospace"; ctx.fillText("RADAR DE VALOR", 30, 40);
+  ctx.fillStyle = "#E6E9ED"; ctx.font = "700 24px 'IBM Plex Sans', sans-serif"; ctx.fillText(`${data.home} vs ${data.away}`, 30, 90);
+  ctx.fillStyle = "#7C8797"; ctx.font = "14px 'IBM Plex Sans', sans-serif"; ctx.fillText(data.marketLabel || "", 30, 118);
+  ctx.fillStyle = "#F0B429"; ctx.font = "700 20px 'IBM Plex Mono', monospace"; ctx.fillText(`${data.selection} @ ${data.odds.toFixed(2)}`, 30, 165);
+  if (data.fairProb != null) {
+    const ev = data.odds * data.fairProb - 1;
+    ctx.fillStyle = ev >= 0 ? "#3ECF8E" : "#E5484D";
+    ctx.font = "700 32px 'IBM Plex Mono', monospace";
+    ctx.fillText(`${ev>=0?"+":""}${(ev*100).toFixed(1)}% EDGE`, 30, 215);
+  }
+  ctx.fillStyle = "#4A525E"; ctx.font = "12px 'IBM Plex Sans', sans-serif";
+  ctx.fillText("Herramienta informativa. No procesa apuestas ni dinero real.", 30, H - 25);
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url; a.download = `radar-valor-${data.home}-vs-${data.away}.png`.replace(/\s+/g, "-");
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
 function showToast(message) {
   const container = document.getElementById("toast-container");
   const el = document.createElement("div");
@@ -682,6 +817,8 @@ function buildMarketTable(market, matchMeta) {
       if (!notifiedErrors.has(notifyKey)) {
         notifiedErrors.add(notifyKey);
         showToast(`<b style="color:#E5484D;">Posible error de cuota</b><br/>${matchMeta.home} vs ${matchMeta.away}<br/>${gk} a ${best.toFixed(2)} — edge de ${pct(ev)}`);
+        playTone(660, 0.15);
+        setTimeout(() => playTone(880, 0.15), 150);
       }
     }
 
@@ -690,7 +827,7 @@ function buildMarketTable(market, matchMeta) {
       const rid = `r${rowCounter++}`;
       ROW_REGISTRY[rid] = { sport: matchMeta.sport, eventId: matchMeta.eventId, matchId: matchMeta.matchId, home: matchMeta.home, away: matchMeta.away,
         marketKey: market.key, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best };
-      regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button>`;
+      regBtn = `<button class="small ghost" onclick="registerCLV('${rid}')">Registrar</button> <button class="small ghost" onclick="downloadBetCard('${rid}')">🖼️ Compartir</button>`;
     }
     const parlayRid = `p${rowCounter++}`;
     ROW_REGISTRY[parlayRid] = { home: matchMeta.home, away: matchMeta.away, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best, fairProb: fair[gk] };
@@ -709,6 +846,25 @@ function extractFeaturedMarkets(m) {
 let lastMatches = [];
 let lastSport = null;
 let lastFullMarketsByMatch = {};
+
+async function loadSharpApiOdds() {
+  const key = getSharpApiKey();
+  const el = document.getElementById("sharpapi-odds");
+  if (!key) { el.innerHTML = `Añade tu SharpAPI key arriba primero.`; return; }
+  el.innerHTML = `<div class="skeleton skeleton-line" style="width:40%;"></div><div class="skeleton skeleton-card"></div>`;
+  try {
+    const res = await fetch("https://api.sharpapi.io/api/v1/odds", { headers: { "X-API-Key": key } });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const json = await res.json();
+    const rows = json.data || [];
+    if (!rows.length) { el.innerHTML = `<span class="muted">Sin datos disponibles ahora mismo.</span>`; return; }
+    el.innerHTML = `<table><thead><tr><th>Deporte</th><th>Partido</th><th>Casa</th><th>Mercado</th></tr></thead><tbody>
+      ${rows.slice(0,30).map(r => `<tr><td>${r.sport || "—"}</td><td>${r.home_team || ""} vs ${r.away_team || ""}</td><td class="mono">${r.sportsbook || "—"}</td><td class="mono">${r.market || r.id || "—"}</td></tr>`).join("")}
+    </tbody></table>`;
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar SharpAPI: ${e.message}</span>`;
+  }
+}
 
 function showAllLeaguesValue() {
   const sports = [
@@ -1207,6 +1363,7 @@ function registerCLV(rid) {
   saveClvLog(log);
   alert("Registrada. Consúltala en Historial y CLV.");
   renderDashboard();
+  checkBadges();
 }
 
 async function updateClosing(id) {
@@ -1325,7 +1482,14 @@ function renderHistorial() {
 
 function getOutcomesLog() { try { return JSON.parse(localStorage.getItem("radar-valor-outcomes") || "{}"); } catch(e) { return {}; } }
 function saveOutcomesLog(o) { localStorage.setItem("radar-valor-outcomes", JSON.stringify(o)); }
-function markOutcome(key, result) { const o = getOutcomesLog(); o[key] = result; saveOutcomesLog(o); renderStats(); }
+function markOutcome(key, result) {
+  const o = getOutcomesLog();
+  o[key] = result;
+  saveOutcomesLog(o);
+  renderStats();
+  if (result === "ganada") { fireConfetti(); playTone(1046, 0.2); }
+  checkBadges();
+}
 
 function renderStats() {
   const valueLog = getValueLog();
@@ -1430,6 +1594,28 @@ const LEAGUE_FLAGS = {
   "Ligue 1": "🇫🇷", "UEFA Champions League": "🇪🇺", "Eredivisie": "🇳🇱", "Primeira Liga": "🇵🇹",
 };
 function leagueFlag(name) { return LEAGUE_FLAGS[name] || "⚽"; }
+
+async function loadIsportsLive() {
+  const key = getIsportsKey();
+  const el = document.getElementById("live-scores");
+  if (!key) { el.innerHTML = `Añade tu iSports API key arriba primero.`; return; }
+  el.innerHTML = `<div class="skeleton skeleton-line" style="width:40%;"></div><div class="skeleton skeleton-card"></div>`;
+  try {
+    const res = await fetch(`https://api.isportsapi.com/sport/football/livescores?api_key=${key}`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const json = await res.json();
+    if (json.code !== 0) throw new Error(json.message || `código ${json.code}`);
+    const matches = json.data || [];
+    if (!matches.length) { el.innerHTML = `<span class="muted">No hay partidos en vivo ahora mismo según iSports API.</span>`; return; }
+    el.innerHTML = matches.slice(0, 15).map(m => `
+      <div class="live-row">
+        <div><span class="live-min">${m.minute ?? m.matchStatus ?? "—"}'</span> ${m.leagueName || m.competitionName || ""}</div>
+        <div class="mono">${m.homeName || m.hName || ""} <b>${m.homeScore ?? 0}</b> - <b>${m.awayScore ?? 0}</b> ${m.awayName || m.aName || ""}</div>
+      </div>`).join("");
+  } catch (e) {
+    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar iSports API: ${e.message}</span>`;
+  }
+}
 
 async function loadLiveScores() {
   const footballKey = getFootballKey();
@@ -1876,6 +2062,9 @@ async function loadLeagueStats() {
 
 loadOdds();
 renderDashboard();
+renderBadges();
+checkBadges();
+document.getElementById("soundToggle").checked = soundEnabled;
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW no registrado:", e));
