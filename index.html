@@ -94,6 +94,8 @@
   .dropdown-menu button { display:block; width:100%; text-align:left; background:transparent; border:none; color:#E6E9ED; padding:8px 10px; font-size:12px; border-radius:6px; }
   .dropdown-menu button:hover { background:#0F1319; }
   .icon { width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; vertical-align:-3px; }
+  .tooltip { cursor:help; color:#7C8797; border-bottom:1px dotted #7C8797; font-size:11px; }
+  .tooltip:hover { color:#3ECF8E; }
   .confetti-piece { position:fixed; top:-10px; width:8px; height:8px; z-index:1000; pointer-events:none; animation: confetti-fall 1.4s ease-in forwards; }
   @keyframes confetti-fall { to { transform:translateY(100vh) rotate(540deg); opacity:0; } }
   .badge-chip { display:inline-flex; align-items:center; gap:6px; background:#171C23; border:1px solid #232A33; border-radius:20px; padding:6px 12px; font-size:12px; }
@@ -132,6 +134,7 @@
   @keyframes radar-sweep { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
   @keyframes radar-ping { 0% { width:0; height:0; top:50%; left:50%; opacity:.8; } 100% { width:130%; height:130%; top:-15%; left:-15%; opacity:0; } }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="toast-container" id="toast-container"></div>
@@ -160,28 +163,63 @@
     </div>
     <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
       Herramienta informativa. No procesa apuestas ni dinero real.
+      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.5.0 — ver novedades</span></div>
     </div>
   </div>
+
+  <div id="changelog-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center;" onclick="if(event.target===this) toggleChangelog(false)">
+    <div class="panel" style="width:380px; max-height:75vh; overflow-y:auto; background:#171C23;">
+      <div class="row" style="margin-bottom:10px;">
+        <div style="font-weight:600;">Novedades — v1.5.0</div>
+        <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
+      </div>
+      <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li>Configuración movida a un panel aparte, header más limpio</li>
+        <li>Tooltips explicativos en Edge, Prob. justa, Kelly y CLV</li>
+        <li>Exportar a Excel (.xlsx) además de CSV</li>
+        <li>Barras comparativas visuales (Monte Carlo, casa/fuera, rankings)</li>
+        <li>Logo animado tipo radar, logros, sonido y confeti</li>
+        <li>Tarjeta compartible por selección, informe del día en PNG</li>
+        <li>Dashboard del día, calendario de favoritos, arbitraje</li>
+        <li>Formaciones, ficha de jugador, marcador en vivo, Monte Carlo</li>
+      </ul>
+    </div>
+  </div>
+
   <div class="main-area">
   <div class="wrap">
   <header>
     <div>
       <div class="sub">Cuotas de William Hill comparadas contra el precio justo del mercado (calculado con Pinnacle y otras referencias por detrás). Solo informativo.</div>
     </div>
-    <div class="panel keys" style="padding:10px 14px;">
-      <div><div class="muted" style="margin-bottom:4px;">Odds API key</div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:170px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">API-Football key</div><input id="footballKey" type="password" placeholder="api-football.com" style="width:170px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">Anthropic API key (opcional, análisis IA)</div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:170px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">SharpAPI key (opcional, odds EE.UU.)</div><input id="sharpApiKey" type="password" placeholder="sk_live_..." style="width:170px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">iSports API key (opcional, marcador alternativo)</div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:170px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:90px;" /></div>
-      <div><div class="muted" style="margin-bottom:4px;">Fracción Kelly</div>
-        <select id="kellyFraction" style="width:90px;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
-      </div>
-      <div style="display:flex; align-items:flex-end;"><button onclick="saveKeys()">Guardar</button></div>
-      <div style="display:flex; align-items:flex-end;"><label class="muted" style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" id="soundToggle" onchange="toggleSound()" /> 🔔 Sonido</label></div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label class="muted" style="display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" id="soundToggle" onchange="toggleSound()" /> 🔔</label>
+      <button class="ghost" onclick="toggleSettingsModal(true)">⚙️ Configuración</button>
     </div>
   </header>
+
+  <div id="settings-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center;" onclick="if(event.target===this) toggleSettingsModal(false)">
+    <div class="panel" style="width:360px; max-height:85vh; overflow-y:auto; background:#171C23;">
+      <div class="row" style="margin-bottom:14px;">
+        <div style="font-weight:600; font-size:16px;">Configuración</div>
+        <button class="small ghost" onclick="toggleSettingsModal(false)">Cerrar ✕</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div><div class="muted" style="margin-bottom:4px;">Odds API key <span class="tooltip" title="the-odds-api.com — necesaria para ver cuotas de partidos.">ⓘ</span></div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">API-Football key <span class="tooltip" title="api-football.com — necesaria para forma, lesiones, formaciones y estadísticas.">ⓘ</span></div><input id="footballKey" type="password" placeholder="api-football.com" style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">SharpAPI key <span class="tooltip" title="Opcional — odds de casas de EE.UU. (DraftKings, FanDuel) en el plan gratis.">ⓘ</span></div><input id="sharpApiKey" type="password" placeholder="sk_live_..." style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
+        <div style="display:flex; gap:10px;">
+          <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:100%;" /></div>
+          <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Fracción Kelly <span class="tooltip" title="Qué porcentaje del Kelly completo usar como stake. 100% es agresivo; 25-50% es lo habitual.">ⓘ</span></div>
+            <select id="kellyFraction" style="width:100%;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
+          </div>
+        </div>
+        <button onclick="saveKeys()">Guardar configuración</button>
+      </div>
+    </div>
+  </div>
 
 
 
@@ -324,6 +362,7 @@
       <div class="row" style="margin-bottom:8px;">
         <div style="font-weight:600;">Apuestas registradas (seguimiento de CLV)</div>
         <button class="small ghost" onclick="exportClvCsv()">Exportar CSV</button>
+        <button class="small ghost" onclick="exportClvXlsx()">Exportar Excel</button>
       </div>
       <div class="muted" style="margin-bottom:10px;">CLV compara tu cuota registrada contra la cuota justo antes del partido. Positivo y sostenido en el tiempo = edge real.</div>
       <div id="clv-chart" style="margin-bottom:14px;"></div>
@@ -333,6 +372,7 @@
       <div class="row" style="margin-bottom:8px;">
         <div style="font-weight:600;">Historial de value bets y errores de cuotas detectados</div>
         <button class="small ghost" onclick="exportValueLogCsv()">Exportar CSV</button>
+        <button class="small ghost" onclick="exportValueLogXlsx()">Exportar Excel</button>
       </div>
       <div id="value-log-list"></div>
     </div>
@@ -650,6 +690,14 @@ let lastTopScorers = [];
 let soundEnabled = localStorage.getItem("radar-valor-sound") === "1";
 let audioCtx = null;
 
+function toggleChangelog(show) {
+  document.getElementById("changelog-overlay").style.display = show ? "flex" : "none";
+}
+
+function toggleSettingsModal(show) {
+  document.getElementById("settings-overlay").style.display = show ? "flex" : "none";
+}
+
 function toggleSound() {
   soundEnabled = document.getElementById("soundToggle").checked;
   localStorage.setItem("radar-valor-sound", soundEnabled ? "1" : "0");
@@ -843,7 +891,7 @@ function buildMarketTable(market, matchMeta) {
     const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — William Hill sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
     return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${trendArrow} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td style="display:flex; gap:4px;">${regBtn}<button class="small ghost" title="Añadir a combinada" onclick="addToParlay('${parlayRid}')">➕</button></td></tr>`;
   }).filter(Boolean);
-  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa</th><th>Cuota</th><th>Edge</th><th>Stake Kelly</th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
+  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa <span class="tooltip" title="Probabilidad real estimada promediando el mercado (sin el margen de la casa). No es la cuota, es la probabilidad que implica.">ⓘ</span></th><th>Cuota</th><th>Edge <span class="tooltip" title="Ventaja esperada: cuánto más alta es la cuota respecto a la probabilidad justa. Positivo = valor a tu favor a largo plazo.">ⓘ</span></th><th>Stake Kelly <span class="tooltip" title="Cuánto apostar según tu bankroll y edge, usando la fracción de Kelly que elegiste en Configuración.">ⓘ</span></th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
 }
 
 function extractFeaturedMarkets(m) {
@@ -1466,6 +1514,22 @@ function exportValueLogCsv() {
   const log = getValueLog();
   downloadCSV(log, ["loggedAt","home","away","marketLabel","selection","bookie","odds","ev","kind"], "value_bets.csv");
 }
+function downloadXLSX(rows, headers, sheetName, filename) {
+  if (typeof XLSX === "undefined") { alert("No se pudo cargar la librería de Excel. Revisa tu conexión e inténtalo de nuevo."); return; }
+  const cleanRows = rows.map(r => { const o = {}; headers.forEach(h => o[h] = r[h]); return o; });
+  const ws = XLSX.utils.json_to_sheet(cleanRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
+}
+function exportClvXlsx() {
+  const log = getClvLog();
+  downloadXLSX(log, ["home","away","marketLabel","selection","bookie","odds","openAt","closingOdds","closingAt","clvPct"], "CLV", "clv.xlsx");
+}
+function exportValueLogXlsx() {
+  const log = getValueLog();
+  downloadXLSX(log, ["loggedAt","home","away","marketLabel","selection","bookie","odds","ev","kind"], "ValueBets", "value_bets.xlsx");
+}
 
 function renderHistorial() {
   const log = getClvLog();
@@ -1489,7 +1553,7 @@ function renderHistorial() {
   }
 
   document.getElementById("clv-list").innerHTML = !log.length ? `<div class="muted">Aún no has registrado ninguna apuesta.</div>` :
-    `<table><thead><tr><th>Partido</th><th>Selección</th><th>Cuota</th><th>Cierre</th><th>CLV</th><th></th></tr></thead><tbody>
+    `<table><thead><tr><th>Partido</th><th>Selección</th><th>Cuota</th><th>Cierre</th><th>CLV <span class="tooltip" title="Closing Line Value: compara tu cuota contra la cuota justo antes del partido. Positivo y sostenido en el tiempo indica que tienes edge real.">ⓘ</span></th><th></th></tr></thead><tbody>
       ${log.map(e => `<tr><td>${e.home} vs ${e.away}<div class="muted">${e.marketLabel} · ${e.openAt}</div></td><td>${e.selection} <span class="muted">(${e.bookie})</span></td><td class="mono">${e.odds.toFixed(2)}</td><td class="mono">${e.closingOdds != null ? e.closingOdds.toFixed(2) : "—"}</td><td class="mono ${e.clvPct == null ? '' : e.clvPct >= 0 ? 'clv-pos' : 'clv-neg'}">${e.clvPct != null ? (e.clvPct>=0?"+":"")+e.clvPct.toFixed(1)+"%" : "—"}</td><td style="display:flex; gap:6px;">${e.closingOdds == null ? `<button class="small ghost" onclick="updateClosing('${e.id}')">Actualizar cierre</button>` : ""}<button class="small ghost" onclick="deleteClvEntry('${e.id}')">Borrar</button></td></tr>`).join("")}
     </tbody></table>`;
 
