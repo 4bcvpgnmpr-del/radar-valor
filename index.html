@@ -234,6 +234,17 @@
       <div style="font-weight:600; margin-bottom:8px;">Logros</div>
       <div id="badges-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
     </div>
+    <div class="panel">
+      <div class="row" style="margin-bottom:8px;">
+        <div style="font-weight:600;">Recordatorios de favoritos ⭐</div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input id="reminderMinutes" type="number" value="30" style="width:70px;" /> <span class="muted">min. antes</span>
+          <button class="small ghost" onclick="enableReminders()">Activar</button>
+        </div>
+      </div>
+      <div class="muted" style="font-size:11px;">Solo funciona mientras tengas esta pestaña abierta en el navegador (no es una notificación push real en segundo plano). Revisa los partidos de tus favoritos que ya se han cargado en Partidos o en el Calendario de favoritos.</div>
+      <div id="reminders-status" class="muted" style="margin-top:6px;"></div>
+    </div>
     <div class="dash-grid" id="dash-summary"></div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
@@ -519,6 +530,32 @@ function toggleFavorite(name) {
   checkBadges();
 }
 function saveNote(id, text) { const n = getNotes(); n[id] = text; localStorage.setItem(NOTES_KEY, JSON.stringify(n)); }
+
+function getNoteTags() { try { return JSON.parse(localStorage.getItem("radar-valor-note-tags") || "{}"); } catch(e) { return {}; } }
+function saveNoteTags(t) { localStorage.setItem("radar-valor-note-tags", JSON.stringify(t)); }
+function addNoteTag(matchId, cardId) {
+  const input = document.getElementById(`${cardId}-tag-input`);
+  const tag = input.value.trim();
+  if (!tag) return;
+  const tags = getNoteTags();
+  if (!tags[matchId]) tags[matchId] = [];
+  if (!tags[matchId].includes(tag)) tags[matchId].push(tag);
+  saveNoteTags(tags);
+  input.value = "";
+  renderNoteTags(matchId, cardId);
+}
+function removeNoteTag(matchId, cardId, tag) {
+  const tags = getNoteTags();
+  tags[matchId] = (tags[matchId] || []).filter(t => t !== tag);
+  saveNoteTags(tags);
+  renderNoteTags(matchId, cardId);
+}
+function renderNoteTags(matchId, cardId) {
+  const el = document.getElementById(`${cardId}-tags`);
+  if (!el) return;
+  const tags = getNoteTags()[matchId] || [];
+  el.innerHTML = tags.map(t => `<span class="badge-chip">${t} <span style="cursor:pointer; color:#E5484D;" onclick="removeNoteTag('${matchId}','${cardId}','${t.replace(/'/g,"\\'")}')">✕</span></span>`).join("");
+}
 function getClvLog() { try { return JSON.parse(localStorage.getItem(CLV_LOG_KEY) || "[]"); } catch(e) { return []; } }
 function saveClvLog(l) { localStorage.setItem(CLV_LOG_KEY, JSON.stringify(l)); }
 function getValueLog() { try { return JSON.parse(localStorage.getItem(VALUE_LOG_KEY) || "[]"); } catch(e) { return []; } }
@@ -667,9 +704,24 @@ async function loadOdds(forceRefresh) {
     renderMatches(data, sport);
   } catch (e) {
     statusEl.textContent = "";
-    contentEl.innerHTML = `<div class="panel" style="color:#E5484D;">Error al cargar cuotas: ${e.message}</div>`;
+    const offline = !navigator.onLine;
+    try {
+      const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+      if (cached) {
+        const minsAgo = Math.round((Date.now() - cached.timestamp) / 60000);
+        contentEl.innerHTML = `<div class="panel" style="border-left:3px solid #F0B429;">
+          ${offline ? "📡 Sin conexión a internet." : "⚠️ No se pudo actualizar."} Mostrando la última caché guardada (hace ${minsAgo} min).
+        </div>`;
+        renderMatches(cached.data, sport);
+        return;
+      }
+    } catch (e2) { /* sin caché disponible tampoco */ }
+    contentEl.innerHTML = `<div class="panel" style="color:#E5484D;">${offline ? "📡 Sin conexión y sin datos guardados todavía." : `Error al cargar cuotas: ${e.message}`}</div>`;
   }
 }
+
+window.addEventListener("offline", () => showToast("📡 Sin conexión. Se mostrarán los últimos datos guardados."));
+window.addEventListener("online", () => showToast("✅ Conexión recuperada."));
 
 const notifiedErrors = new Set();
 let lastTopScorers = [];
@@ -703,6 +755,47 @@ function playTone(freq, duration) {
     osc.connect(gain); gain.connect(audioCtx.destination);
     osc.start(); osc.stop(audioCtx.currentTime + duration);
   } catch (e) { /* audio no disponible en este navegador, seguimos sin sonido */ }
+}
+
+let reminderInterval = null;
+const remindedMatches = new Set();
+
+function enableReminders() {
+  const statusEl = document.getElementById("reminders-status");
+  if (!("Notification" in window)) {
+    statusEl.textContent = "Tu navegador no soporta notificaciones; usaré avisos dentro de la app en su lugar.";
+  } else if (Notification.permission !== "granted") {
+    Notification.requestPermission().then(perm => {
+      statusEl.textContent = perm === "granted" ? "Notificaciones activadas." : "Permiso denegado — usaré avisos dentro de la app en su lugar.";
+    });
+  } else {
+    statusEl.textContent = "Notificaciones ya activadas.";
+  }
+  if (reminderInterval) clearInterval(reminderInterval);
+  reminderInterval = setInterval(checkReminders, 30000);
+  checkReminders();
+  statusEl.textContent += " Comprobando cada 30s mientras esta pestaña esté abierta.";
+}
+
+function checkReminders() {
+  const minutesBefore = Number(document.getElementById("reminderMinutes")?.value) || 30;
+  const favs = getFavorites();
+  if (!favs.size) return;
+  const now = Date.now();
+  lastMatches.forEach(m => {
+    if (!favs.has(m.home_team) && !favs.has(m.away_team)) return;
+    const kickoff = new Date(m.commence_time).getTime();
+    const minsUntil = (kickoff - now) / 60000;
+    if (minsUntil > 0 && minsUntil <= minutesBefore && !remindedMatches.has(m.id)) {
+      remindedMatches.add(m.id);
+      const text = `${m.home_team} vs ${m.away_team} empieza en ${Math.round(minsUntil)} min`;
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("⭐ Recordatorio de partido", { body: text });
+      } else {
+        showToast(`⭐ <b>Recordatorio</b><br/>${text}`);
+      }
+    }
+  });
 }
 
 function fireConfetti() {
@@ -1039,7 +1132,15 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-h2h"></div>
       <div id="${cardId}-montecarlo"></div>
       <div id="${cardId}-ai"></div>
-      <div style="margin-top:10px;"><label class="muted">Notas propias</label><textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea></div>
+      <div style="margin-top:10px;">
+        <label class="muted">Notas propias</label>
+        <textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
+        <div id="${cardId}-tags" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"></div>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <input id="${cardId}-tag-input" type="text" placeholder="Añadir etiqueta (ej: lesión clave)..." style="flex:1; font-size:12px;" onkeydown="if(event.key==='Enter'){addNoteTag('${m.id}','${cardId}'); event.preventDefault();}" />
+          <button class="small ghost" onclick="addNoteTag('${m.id}', '${cardId}')">+ Añadir</button>
+        </div>
+      </div>
     </div>`;
   }).join("");
   document.getElementById("alert-summary").innerHTML = (errorCount + valueCount) ? `<div class="panel" style="display:flex; gap:20px;">
@@ -1051,6 +1152,7 @@ function renderMatches(matches, sport, isFiltered) {
     const cardId = `m${idx}`;
     getTeamBadge(m.home_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-h`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
     getTeamBadge(m.away_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-a`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
+    renderNoteTags(m.id, cardId);
   });
 }
 
