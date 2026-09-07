@@ -109,6 +109,16 @@
   .cmp-fill-right { background:#7F77DD; height:100%; margin-left:auto; transition:width .3s; }
   .rank-bar-track { background:#1A1F26; border-radius:4px; height:6px; overflow:hidden; margin-top:3px; width:100%; }
   .rank-bar-fill { height:100%; border-radius:4px; }
+  details.panel summary { list-style:none; }
+  details.panel summary::-webkit-details-marker { display:none; }
+  details.panel summary::before { content:"▸ "; color:#7C8797; }
+  details.panel[open] summary::before { content:"▾ "; }
+  details.analysis-section { border:1px solid #232A33; border-radius:8px; padding:10px 12px; margin-top:10px; }
+  details.analysis-section summary { cursor:pointer; font-size:12px; color:#7C8797; list-style:none; }
+  details.analysis-section summary::-webkit-details-marker { display:none; }
+  details.analysis-section summary::before { content:"▸ "; }
+  details.analysis-section[open] summary::before { content:"▾ "; }
+  details.analysis-section[open] { border-color:#3ECF8E33; }
   .form-box { display:inline-flex; gap:10px; margin-top:6px; font-size:12px; }
   .badge { font-size:11px; font-weight:600; padding:2px 6px; border-radius:4px; }
   .badge.W { color:#3ECF8E; background:rgba(62,207,142,.12); }
@@ -230,21 +240,22 @@
       </div>
       <div id="today-summary" class="muted">Cargando...</div>
     </div>
-    <div class="panel">
-      <div style="font-weight:600; margin-bottom:8px;">Logros</div>
-      <div id="badges-list" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
-    </div>
-    <div class="panel">
-      <div class="row" style="margin-bottom:8px;">
-        <div style="font-weight:600;">Recordatorios de favoritos ⭐</div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <input id="reminderMinutes" type="number" value="30" style="width:70px;" /> <span class="muted">min. antes</span>
-          <button class="small ghost" onclick="enableReminders()">Activar</button>
+    <details class="panel">
+      <summary style="cursor:pointer; font-weight:600;">🏅 Logros y recordatorios</summary>
+      <div style="margin-top:14px;">
+        <div style="font-weight:600; margin-bottom:8px; font-size:13px;">Logros</div>
+        <div id="badges-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
+        <div class="row" style="margin-bottom:8px;">
+          <div style="font-weight:600; font-size:13px;">Recordatorios de favoritos ⭐</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="reminderMinutes" type="number" value="30" style="width:70px;" /> <span class="muted">min. antes</span>
+            <button class="small ghost" onclick="enableReminders()">Activar</button>
+          </div>
         </div>
+        <div class="muted" style="font-size:11px;">Solo funciona mientras tengas esta pestaña abierta en el navegador (no es una notificación push real en segundo plano).</div>
+        <div id="reminders-status" class="muted" style="margin-top:6px;"></div>
       </div>
-      <div class="muted" style="font-size:11px;">Solo funciona mientras tengas esta pestaña abierta en el navegador (no es una notificación push real en segundo plano). Revisa los partidos de tus favoritos que ya se han cargado en Partidos o en el Calendario de favoritos.</div>
-      <div id="reminders-status" class="muted" style="margin-top:6px;"></div>
-    </div>
+    </details>
     <div class="dash-grid" id="dash-summary"></div>
     <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <label class="muted">Liga</label>
@@ -1126,12 +1137,12 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-study-status"></div>
       <div class="mkt-tabs">${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
-      <div id="${cardId}-extra"></div>
-      <div id="${cardId}-injuries"></div>
-      <div id="${cardId}-form"></div>
-      <div id="${cardId}-h2h"></div>
-      <div id="${cardId}-montecarlo"></div>
-      <div id="${cardId}-ai"></div>
+      <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
+      <details class="analysis-section" id="${cardId}-injuries-d"><summary>Bajas y sanciones</summary><div id="${cardId}-injuries"></div></details>
+      <details class="analysis-section" id="${cardId}-form-d"><summary>Forma reciente</summary><div id="${cardId}-form"></div></details>
+      <details class="analysis-section" id="${cardId}-h2h-d"><summary>Faltas y tarjetas (H2H)</summary><div id="${cardId}-h2h"></div></details>
+      <details class="analysis-section" id="${cardId}-montecarlo-d"><summary>Simulación Monte Carlo</summary><div id="${cardId}-montecarlo"></div></details>
+      <details class="analysis-section" id="${cardId}-ai-d"><summary>Análisis con IA</summary><div id="${cardId}-ai"></div></details>
       <div style="margin-top:10px;">
         <label class="muted">Notas propias</label>
         <textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
@@ -1189,6 +1200,7 @@ document.addEventListener("click", (e) => {
 function switchTab(cardId, idx) { const card = document.getElementById(cardId); card.querySelectorAll(".mkt-tab").forEach((b,i) => b.classList.toggle("active", i===idx)); card.querySelectorAll(".mkt-body").forEach(b => b.classList.toggle("active", Number(b.dataset.idx)===idx)); }
 
 async function loadExtraMarkets(sport, eventId, cardId) {
+  if (document.getElementById(cardId + "-extra-d")) document.getElementById(cardId + "-extra-d").open = true;
   const key = getOddsKey();
   const target = document.getElementById(`${cardId}-extra`);
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Cargando...</div>`;
@@ -1214,6 +1226,7 @@ async function findTeamId(name, footballKey) {
 }
 
 async function loadInjuries(cardId, homeName, awayName) {
+  if (document.getElementById(cardId + "-injuries-d")) document.getElementById(cardId + "-injuries-d").open = true;
   const footballKey = getFootballKey();
   const target = document.getElementById(`${cardId}-injuries`);
   if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba.</div>`; return; }
@@ -1255,6 +1268,7 @@ function computeStreak(fixtures, teamName) {
 }
 
 async function loadForm(cardId, homeName, awayName) {
+  if (document.getElementById(cardId + "-form-d")) document.getElementById(cardId + "-form-d").open = true;
   const footballKey = getFootballKey();
   const target = document.getElementById(`${cardId}-form`);
   if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba.</div>`; return; }
@@ -1309,6 +1323,7 @@ function poissonRandom(lambda) {
 }
 
 async function runMonteCarlo(cardId, homeName, awayName) {
+  if (document.getElementById(cardId + "-montecarlo-d")) document.getElementById(cardId + "-montecarlo-d").open = true;
   const target = document.getElementById(`${cardId}-montecarlo`);
   target.innerHTML = `<div class="muted" style="margin-top:8px;">Simulando 20.000 partidos...</div>`;
   const footballKey = getFootballKey();
@@ -1357,6 +1372,7 @@ async function loadFormSilently(homeName, awayName, footballKey) {
 }
 
 async function loadH2H(cardId, homeName, awayName) {
+  if (document.getElementById(cardId + "-h2h-d")) document.getElementById(cardId + "-h2h-d").open = true;
   const footballKey = getFootballKey();
   const target = document.getElementById(`${cardId}-h2h`);
   if (!footballKey) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu API-Football key arriba.</div>`; return; }
@@ -1394,6 +1410,7 @@ async function loadH2H(cardId, homeName, awayName) {
 }
 
 async function analyzeWithAI(cardId, homeName, awayName) {
+  if (document.getElementById(cardId + "-ai-d")) document.getElementById(cardId + "-ai-d").open = true;
   const key = getAnthropicKey();
   const target = document.getElementById(`${cardId}-ai`);
   if (!key) { target.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">Añade tu Anthropic API key arriba (console.anthropic.com) para usar el análisis con IA. Se guarda solo en tu navegador.</div>`; return; }
