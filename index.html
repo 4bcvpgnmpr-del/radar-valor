@@ -170,6 +170,32 @@
   .radar-logo .ring { position:absolute; border:1px solid #3ECF8E33; border-radius:50%; animation: radar-ping 2.2s ease-out infinite; }
   @keyframes radar-sweep { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
   @keyframes radar-ping { 0% { width:0; height:0; top:50%; left:50%; opacity:.8; } 100% { width:130%; height:130%; top:-15%; left:-15%; opacity:0; } }
+  /* ---- Limpieza visual (estilo BetPractice) ---- */
+  body { background:#0A0D12; }
+  .wrap { max-width:1040px; padding:0 20px 70px; }
+  header { position:sticky; top:0; z-index:20; background:rgba(10,13,18,.92); backdrop-filter:blur(8px); align-items:center; flex-wrap:nowrap; margin:0 -20px 22px; padding:14px 20px; border-bottom:1px solid #161C25; }
+  header h2 { margin:0; font-size:17px; font-weight:600; letter-spacing:.01em; text-align:center; flex:1; }
+  .panel { background:#10151C; border:1px solid #1A212B; border-radius:14px; box-shadow:none; padding:18px; }
+  .panel:hover { border-color:#1F2833; }
+  select, input[type=text], input[type=date], input[type=number], input[type=password] { background:#0D1218; border:1px solid #1F2833; border-radius:999px; padding:8px 14px; color:#E6E9ED; }
+  select { padding-right:10px; }
+  button { border-radius:999px; }
+  button.small { padding:5px 12px; }
+  .dash-grid { grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+  .dash-grid > * { background:#10151C; border:1px solid #1A212B; border-radius:14px; padding:12px 14px; text-align:center; }
+  #today-summary-panel { padding:12px 16px; }
+  .acc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:14px; align-items:start; }
+  .acc-grid details.analysis-section { margin-top:0; border-radius:999px; padding:8px 14px; background:#0D1218; border-color:#1A212B; text-align:center; }
+  .acc-grid details.analysis-section[open] { grid-column:1 / -1; border-radius:14px; text-align:left; background:#10151C; }
+  .acc-grid details.analysis-section summary { text-align:center; }
+  .acc-grid details.analysis-section[open] summary { text-align:left; margin-bottom:8px; }
+  .trtable th, .cptable th { letter-spacing:.05em; }
+  .streak-card { background:#10151C; border-color:#1A212B; border-radius:14px; }
+  .sidebar { background:#0A0D12; border-right-color:#161C25; }
+  .side-btn { border-left:none; border-radius:10px; }
+  .side-btn.active { background:#142B25; color:#3ECF8E; }
+  .side-btn.active svg { stroke:#3ECF8E; }
+  @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -227,10 +253,9 @@
   <div class="main-area">
   <div class="wrap">
   <header>
-    <div>
-      <div class="sub">Cuotas vs. precio justo del mercado. Solo informativo.</div>
-    </div>
-    <div style="display:flex; gap:8px; align-items:center;">
+    <div style="width:40px;"></div>
+    <h2 id="view-title">Partidos y valor</h2>
+    <div style="display:flex; gap:8px; align-items:center; width:40px; justify-content:flex-end;">
       <button class="ghost" onclick="toggleSettingsModal(true)" title="Configuración">⚙️</button>
     </div>
   </header>
@@ -328,7 +353,7 @@
   <div id="view-daydash" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <div style="font-weight:600;">Dashboard del día — equipos que juegan hoy</div>
+        <div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <select id="dayDashLeague">
             <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
@@ -472,7 +497,7 @@
   <div id="view-coupon" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <div style="font-weight:600;">Cupón — partidos y cuotas en una vista</div>
+        <div></div>
         <input id="cpSearch" type="text" placeholder="Buscar equipo..." style="width:150px;" oninput="renderCoupon()" />
       </div>
       <div class="muted" style="font-size:12px; margin-bottom:10px;">Usa las cuotas cargadas en "Partidos y valor" (cambia de liga allí para verla aquí). Celda verde = valor (EV ≥ 2%), roja = posible error (EV ≥ 15%). Pulsa un partido para estudiarlo.</div>
@@ -483,7 +508,7 @@
   <div id="view-trends" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-        <div style="font-weight:600;">Tendencias de equipos</div>
+        <div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <select id="trLeague" onchange="loadTrends()">
             <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option><option value="140">🇪🇸 La Liga</option><option value="135">🇮🇹 Serie A</option><option value="78">🇩🇪 Bundesliga</option><option value="2">🇪🇺 Champions League</option>
@@ -573,7 +598,9 @@ async function getTeamBadge(name) {
   }
 }
 
+const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Cupón", daydash:"Dashboard del día", trends:"Tendencias de equipos", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
+  const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
   document.querySelectorAll(".side-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
   if (v === "historial") renderHistorial();
@@ -1213,12 +1240,14 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-study-status"></div>
       <div class="mkt-tabs">${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
+      <div class="acc-grid">
       <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
       <details class="analysis-section" id="${cardId}-injuries-d"><summary>Bajas y sanciones</summary><div id="${cardId}-injuries"></div></details>
       <details class="analysis-section" id="${cardId}-form-d"><summary>Forma reciente</summary><div id="${cardId}-form"></div></details>
       <details class="analysis-section" id="${cardId}-h2h-d"><summary>Faltas y tarjetas (H2H)</summary><div id="${cardId}-h2h"></div></details>
       <details class="analysis-section" id="${cardId}-montecarlo-d"><summary>Simulación Monte Carlo</summary><div id="${cardId}-montecarlo"></div></details>
       <details class="analysis-section" id="${cardId}-ai-d"><summary>Análisis con IA</summary><div id="${cardId}-ai"></div></details>
+      </div>
       <div style="margin-top:10px;">
         <label class="muted">Notas propias</label>
         <textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
