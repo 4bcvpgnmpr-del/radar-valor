@@ -683,7 +683,7 @@
       <div id="hbBody" style="display:none;">
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:14px;">
           <label>Liga<select id="hbLeague" onchange="hbRender()"></select></label>
-          <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option></select></label>
+          <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
           <label>Cuota a la que apuestas<select id="hbBook" onchange="hbRender()"></select></label>
           <label>Temporadas<details id="hbSeasD" style="position:relative;"><summary id="hbSeasS" style="cursor:pointer; padding:10px 12px; border:1px solid #2A3340; border-radius:12px; background:#0D1117; color:#E6EAF0; font-size:14px;">Todas</summary><div id="hbSeasL" style="position:absolute; z-index:20; left:0; right:0; max-height:240px; overflow:auto; background:#10151C; border:1px solid #2A3340; border-radius:12px; margin-top:4px; padding:8px;"></div></details></label>
           <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
@@ -2353,7 +2353,10 @@ const HB_COLS = {
   avg: { H: ["AvgCH", "AvgH"], D: ["AvgCD", "AvgD"], A: ["AvgCA", "AvgA"], O: ["AvgC>2.5", "Avg>2.5"], U: ["AvgC<2.5", "Avg<2.5"] }
 };
 const HB_BOOKN = { pin: "Pinnacle (cierre)", b365: "Bet365", max: "La mejor cuota del mercado", avg: "Media del mercado" };
-const HB_SELN = { H: "Local gana", D: "Empate", A: "Visitante gana", O: "Más de 2.5", U: "Menos de 2.5" };
+const HB_SELN = { H: "Local gana", D: "Empate", A: "Visitante gana", O: "Más de 2.5", U: "Menos de 2.5", X: "Hándicap asiático local", Y: "Hándicap asiático visitante" };
+const HB_SELS = ["H", "D", "A", "O", "U", "X", "Y"];
+const HB_AH = { pin: [["PCAHH", "PCAHA"], ["PAHH", "PAHA"]], b365: [["B365CAHH", "B365CAHA"], ["B365AHH", "B365AHA"]], max: [["MaxCAHH", "MaxCAHA"], ["MaxAHH", "MaxAHA"]], avg: [["AvgCAHH", "AvgCAHA"], ["AvgAHH", "AvgAHA"]] };
+function hbAhSettle(h, price, diff0) { /* diff0 = goles a favor - en contra del equipo apostado; h = hándicap de ese equipo */ const one = (hh) => { const d = diff0 + hh; return d > 1e-9 ? price - 1 : d < -1e-9 ? -1 : 0; }; const q = Math.abs(h * 4) % 2 === 1; return q ? (one(h - 0.25) + one(h + 0.25)) / 2 : one(h); }
 const HB_ORDER = ["H", "D", "A", "O", "U"];
 let hbData = {};
 function hbDb() { return new Promise((res, rej) => { const r = indexedDB.open("radar-valor-hist", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
@@ -2377,12 +2380,16 @@ function hbFromCsv(text, fname) {
   const iD = col("Date"), iH = col("HomeTeam", "Home"), iA = col("AwayTeam", "Away"), iHG = col("FTHG", "HG"), iAG = col("FTAG", "AG"), iS = col("Season"), iC = col("Country"), iL = col("League"), iDiv = col("Div");
   if (iD < 0 || iH < 0 || iA < 0 || iHG < 0 || iAG < 0) throw new Error("no parece un CSV de football-data.co.uk (faltan Date/Home/Away/goles)");
   const code = (fname || "").replace(/\.csv$/i, "").replace(/\s*\(\d+\)$/, ""), out = {};
+  const iAH = col("AHh"), iAHC = col("AHCh"), ahc = {}; Object.keys(HB_AH).forEach(b => { ahc[b] = HB_AH[b].map(p => [col(p[0]), col(p[1])]); });
   const ocols = {}; Object.keys(HB_COLS).forEach(b => { ocols[b] = HB_ORDER.map(k => col(...HB_COLS[b][k])); });
   for (let r = 1; r < rows.length; r++) {
     const x = rows[r], ts = hbParseDate(x[iD]); const hg = parseInt(x[iHG]), ag = parseInt(x[iAG]); if (ts == null || isNaN(hg) || isNaN(ag)) continue;
     let lg; if (iC >= 0 && iL >= 0 && x[iC]) lg = `${x[iC].trim()} · ${x[iL].trim()}`; else lg = HB_NAMES[(iDiv >= 0 && x[iDiv] ? x[iDiv].trim() : code)] || (iDiv >= 0 && x[iDiv] ? x[iDiv].trim() : code) || "Liga";
     const o = HB_ORDER.map(() => null).length ? {} : {};
-    Object.keys(ocols).forEach(b => { const a = ocols[b].map(i => { const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; }); if (a.some(v => v)) o[b] = a; });
+    Object.keys(ocols).forEach(b => {
+      const a = ocols[b].map(i => { const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; });
+      for (let k = 0; k < 2; k++) { const ix1 = ahc[b][k][0], ix2 = ahc[b][k][1], il = k === 0 ? iAHC : iAH; if (ix1 < 0 || ix2 < 0 || il < 0) continue; const p1 = parseFloat(x[ix1]), p2 = parseFloat(x[ix2]), ln = parseFloat(x[il]); if (p1 > 1 && p2 > 1 && !isNaN(ln)) { a.push(Math.round(p1 * 1000) / 1000, Math.round(p2 * 1000) / 1000, ln); break; } }
+      if (a.some(v => v)) o[b] = a; });
     if (!Object.keys(o).length) continue;
     (out[lg] = out[lg] || []).push([Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o]);
   }
@@ -2421,14 +2428,16 @@ function hbInit() {
   hbRender();
 }
 function hbBets(rows, sel, bk, f) {
-  const si = HB_ORDER.indexOf(sel), out = [];
+  const si = HB_SELS.indexOf(sel), out = [];
   rows.forEach(r => {
     if (f.seas && !f.seas.has(r[5])) return;
     const o = r[6][bk]; if (!o || !o[si]) return; const price = o[si];
     if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
+    const isAH = sel === "X" || sel === "Y", ln = isAH ? o[7] : null; if (isAH && ln == null) return;
     let ev = null; const fo = r[6].pin || r[6].avg;
-    if (fo) { const idx = sel === "O" || sel === "U" ? [3, 4] : [0, 1, 2]; if (idx.every(i => fo[i])) { const inv = idx.map(i => 1 / fo[i]), sum = inv.reduce((a, b) => a + b, 0); ev = price * (inv[idx.indexOf(si)] / sum) - 1; } }
+    if (fo) { const idx = isAH ? [5, 6] : sel === "O" || sel === "U" ? [3, 4] : [0, 1, 2]; if (idx.every(i => fo[i]) && (!isAH || fo[7] === ln)) { const inv = idx.map(i => 1 / fo[i]), sum = inv.reduce((a, b) => a + b, 0); ev = price * (inv[idx.indexOf(si)] / sum) - 1; } }
     if (f.ev != null) { if (ev == null || ev * 100 < f.ev) return; }
+    if (isAH) { const p = sel === "X" ? hbAhSettle(ln, price, r[3] - r[4]) : hbAhSettle(-ln, price, r[4] - r[3]); out.push({ d: r[0], s: r[5], p, win: p > 0, price, ev, t: `${r[1]} - ${r[2]}` }); return; }
     const win = sel === "H" ? r[3] > r[4] : sel === "A" ? r[3] < r[4] : sel === "D" ? r[3] === r[4] : sel === "O" ? r[3] + r[4] > 2.5 : r[3] + r[4] < 2.5;
     out.push({ d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev, t: `${r[1]} - ${r[2]}` });
   });
@@ -2445,6 +2454,8 @@ function hbFilters() { const g = id => document.getElementById(id).value; return
 function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
 let hbGrp = "league", hbTeamF = null;
 const HB_TK = { hl: ["Gana de local", "h", "H"], aw: ["Gana de visitante", "a", "A"], ch: ["Rival gana cuando juega de local", "h", "A"], ca: ["Rival gana cuando juega de visitante", "a", "H"], dr: ["Empate", "any", "D"], ov: ["Más de 2.5 goles", "any", "O"], un: ["Menos de 2.5 goles", "any", "U"] };
+const HB_TKAH = { ahl: ["Hándicap asiático a favor (local)", "h", "X"], aha: ["Hándicap asiático a favor (visitante)", "a", "Y"] };
+Object.assign(HB_TK, HB_TKAH);
 function hbTeamRows(rows, t, side) { return rows.filter(r => side === "h" ? r[1] === t : side === "a" ? r[2] === t : (r[1] === t || r[2] === t)); }
 function hbGroup(g) { hbGrp = g; hbTeamF = null; document.getElementById("hbGL").classList.toggle("active", g === "league"); document.getElementById("hbGT").classList.toggle("active", g === "team"); document.getElementById("hbMinN").value = g === "team" ? 30 : 60; hbRender(); }
 function hbPickTeam(t, k) { hbTeamF = { t, k }; hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
@@ -2483,7 +2494,7 @@ function hbRender() {
       <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de equipo y apuesta: con tantas, muchas salen rentables solo por azar (un equipo tiene pocos partidos). Desconfía de lo que no sea "señal sólida" y de muestras pequeñas. Elige la liga arriba para limitar la lista. Toca una fila para ver su curva.</div>` : `<div class="muted" style="text-align:center;">Ningún equipo llega a ${minN} apuestas con estos filtros (baja la muestra mínima o importa más temporadas).</div>`;
     return;
   }
-  Object.keys(hbData).forEach(l => HB_ORDER.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, f); combos++; if (b.length >= Math.max(1, minN)) { const s2 = hbStats(b); rk.push({ l, sl, s: s2 }); } }));
+  Object.keys(hbData).forEach(l => HB_SELS.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, f); combos++; if (b.length >= Math.max(1, minN)) { const s2 = hbStats(b); rk.push({ l, sl, s: s2 }); } }));
   rk.sort((a, b) => b.s.y - a.s.y);
   document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Liga</th><th>Selección</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
     rk.slice(0, 25).map(x => { const v = hbVerdict(x.s, true); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPick('${x.l.replace(/'/g, "\\'")}','${x.sl}')"><td style="padding:7px 6px;">${x.l}</td><td>${HB_SELN[x.sl]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
