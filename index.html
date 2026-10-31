@@ -528,6 +528,7 @@
       <label class="pv-tg"><input type="checkbox" id="onlyFavs" onchange="applyFilters()" /> ⭐</label>
       <select id="pvSort" onchange="pv.sort=this.value; applyFilters()"><option value="time">Orden: hora</option><option value="ev">Orden: mejor valor</option></select>
       <button onclick="loadOdds(true)">Actualizar cuotas</button>
+      <button class="ghost" onclick="loadAllLeagues()" title="Descarga las cuotas de todas las ligas (gasta unas 6 consultas por liga)">Cargar todas las ligas</button>
     </div>
     <details id="more-filters" class="pv-more"><summary class="muted" style="cursor:pointer; font-size:12px; text-align:center;">Más filtros</summary>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; margin-top:10px;">
@@ -1405,6 +1406,30 @@ async function loadOdds(forceRefresh) {
   }
 }
 
+async function loadAllLeagues() {
+  const key = getOddsKey(); if (!key) { alert("Primero guarda tu Odds API key."); return; }
+  const st = document.getElementById("status");
+  const todo = DD_LEAGUES.filter(l => { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); return !(c && Date.now() - c.timestamp < 6 * 3600000); } catch (e) { return true; } });
+  if (!todo.length) { st.textContent = "Todas las ligas ya tienen cuotas de las últimas 6 horas."; return; }
+  const cost = todo.length * 6;
+  if (!confirm(`Se cargarán ${todo.length} ligas (unas ${cost} consultas de tu cuota mensual de 500). ¿Continuar?`)) return;
+  let ok = 0, fail = 0, left = null;
+  for (let i = 0; i < todo.length; i++) {
+    const l = todo[i]; st.textContent = `Cargando ${l.nm} (${i + 1}/${todo.length})...`;
+    try {
+      const res = await fetch(`https://api.the-odds-api.com/v4/sports/${l.odds}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal`);
+      if (res.status === 401 || res.status === 429) { st.textContent = `Error ${res.status}: revisa tu key o tu cuota. Se detiene la carga.`; fail++; break; }
+      if (!res.ok) { fail++; continue; }
+      left = res.headers.get("x-requests-remaining") || left;
+      const data = await res.json();
+      try { localStorage.setItem(`${ODDS_CACHE_PREFIX}${l.odds}`, JSON.stringify({ data, timestamp: Date.now() })); ok++; } catch (e) { fail++; }
+    } catch (e) { fail++; }
+  }
+  try { renderDdChips(); pvChips(); } catch (e) {}
+  if (st.textContent.startsWith("Error")) return;
+  st.textContent = `Listo: ${ok} ligas cargadas${fail ? `, ${fail} sin datos (fuera de temporada)` : ""}${left ? `. Te quedan ${left} consultas este mes` : ""}.`;
+  try { hbInit(); } catch (e) {}
+}
 window.addEventListener("offline", () => showToast("📡 Sin conexión. Se mostrarán los últimos datos guardados."));
 window.addEventListener("online", () => showToast("✅ Conexión recuperada."));
 
