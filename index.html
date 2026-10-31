@@ -17,6 +17,23 @@
   .sidebar-nav { display:flex; flex-direction:column; gap:4px; overflow-y:auto; }
   .sidebar-section { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#4A525E; padding:14px 12px 4px; }
   .sidebar-section:first-child { padding-top:0; }
+  .seg { display:inline-flex; border:1px solid #232A33; border-radius:8px; overflow:hidden; }
+  .seg-b { background:transparent; border:none; color:#7C8797; padding:6px 12px; font-size:12px; cursor:pointer; }
+  .seg-b.active { background:#1E2630; color:#E6E9ED; }
+  .streak-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:18px; }
+  .streak-card { background:#171C23; border:1px solid #232A33; border-radius:10px; padding:12px; }
+  .streak-card h4 { margin:0 0 8px; font-size:13px; font-weight:600; text-align:center; }
+  .streak-row { display:flex; justify-content:space-between; align-items:center; padding:5px 2px; font-size:12px; border-top:1px solid #1E2630; }
+  .streak-row b { background:#3ECF8E; color:#0B0E11; border-radius:6px; padding:1px 8px; min-width:24px; text-align:center; }
+  .trtable { width:100%; border-collapse:collapse; font-size:13px; }
+  .trtable th { text-align:center; color:#7C8797; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:8px 6px; cursor:pointer; white-space:nowrap; border-bottom:1px solid #232A33; position:sticky; top:0; background:#12161C; }
+  .trtable th:nth-child(1), .trtable th:nth-child(2) { text-align:left; }
+  .trtable td { padding:7px 6px; text-align:center; border-bottom:1px solid #1A2028; }
+  .trtable td.tn { text-align:left; white-space:nowrap; font-weight:500; }
+  .trtable td.rk { text-align:left; color:#7C8797; width:28px; }
+  .trtable tr:hover td { background:#171C23; }
+  .pcell { display:inline-block; min-width:46px; padding:3px 6px; border-radius:6px; font-variant-numeric:tabular-nums; }
+  .fdot { display:inline-block; width:18px; height:18px; line-height:18px; border-radius:50%; font-size:10px; font-weight:600; margin:0 1px; color:#0B0E11; }
   .side-btn { background:transparent; border:none; border-left:3px solid transparent; color:#7C8797; padding:10px 12px; border-radius:6px; font-size:13px; cursor:pointer; text-align:left; display:flex; align-items:center; gap:10px; transition:background .15s, color .15s; }
   .side-btn:hover { background:#171C23; color:#E6E9ED; }
   .side-btn.active { background:#171C23; color:#E6E9ED; border-left-color:#3ECF8E; }
@@ -157,6 +174,7 @@
       <div class="sidebar-section">Partidos</div>
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
       <button class="side-btn" data-v="daydash" onclick="switchView('daydash')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="8"/><rect x="10" y="7" width="4" height="13"/><rect x="17" y="3" width="4" height="17"/></svg> Dashboard del día</button>
+      <button class="side-btn" data-v="trends" onclick="switchView('trends')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M8 3v18"/></svg> Tendencias de equipos</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Formaciones</button>
 
@@ -431,6 +449,28 @@
     </div>
   </div>
 
+  <div id="view-trends" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+        <div style="font-weight:600;">Tendencias de equipos</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="trLeague" onchange="loadTrends()">
+            <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option><option value="140">🇪🇸 La Liga</option><option value="135">🇮🇹 Serie A</option><option value="78">🇩🇪 Bundesliga</option><option value="2">🇪🇺 Champions League</option>
+          </select>
+          <div class="seg" id="trVenue">
+            <button class="seg-b active" data-m="all" onclick="setTrVenue('all')">Todos</button><button class="seg-b" data-m="home" onclick="setTrVenue('home')">Local</button><button class="seg-b" data-m="away" onclick="setTrVenue('away')">Visitante</button>
+          </div>
+          <input id="trSeason" type="number" value="2024" title="Temporada (plan gratuito: hasta 2024)" style="width:80px;" onchange="loadTrends()" />
+          <input id="trSearch" type="text" placeholder="Buscar equipo..." style="width:150px;" oninput="renderTrends()" />
+        </div>
+      </div>
+      <div class="muted" style="margin-bottom:10px; font-size:12px;">Calculado con una sola petición a API-Football (todos los partidos jugados de la temporada). Pulsa una columna para ordenar. Verde = porcentaje alto.</div>
+      <div id="trStatus" class="muted"></div>
+      <div id="trStreaks" class="streak-grid"></div>
+      <div style="overflow-x:auto;"><table class="trtable" id="trTable"></table></div>
+    </div>
+  </div>
+
   <div id="view-widgets" class="view">
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
@@ -508,6 +548,7 @@ function switchView(v) {
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
+  if (v === "trends" && !trData) loadTrends();
   renderDashboard();
 }
 
@@ -1836,6 +1877,56 @@ async function loadFavoritesCalendar() {
     el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el calendario: ${e.message}</span>`;
   }
 }
+
+let trData = null, trVenue = "all", trSort = { k: "ov25", d: -1 };
+function setTrVenue(v) { trVenue = v; document.querySelectorAll("#trVenue .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === v)); renderTrends(); }
+async function loadTrends() {
+  const key = getFootballKey(), st = document.getElementById("trStatus");
+  if (!key) { st.textContent = "Añade tu API-Football key en ⚙️ Configuración."; return; }
+  const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
+  const ck = `radar-trends-${league}-${season}`;
+  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); return; } } catch (e) {}
+  st.textContent = "Cargando partidos de la temporada...";
+  try {
+    const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, key);
+    trData = all.filter(f => f.goals.home != null && f.goals.away != null && ["FT","AET","PEN"].includes(f.fixture.status.short))
+      .map(f => ({ d: f.fixture.date, h: f.teams.home.name, a: f.teams.away.name, hg: f.goals.home, ag: f.goals.away }));
+    try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f: trData })); } catch (e) {}
+    st.textContent = trData.length ? `${trData.length} partidos analizados (temporada ${season}).` : "Sin partidos terminados para esta liga/temporada.";
+    renderTrends();
+  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
+}
+function renderTrends() {
+  const tb = document.getElementById("trTable"); if (!tb) return;
+  if (!trData) { tb.innerHTML = ""; return; }
+  const T = {};
+  const add = (n, gf, ga, venue, d) => { const t = T[n] || (T[n] = { n, rows: [] }); t.rows.push({ gf, ga, venue, d }); };
+  trData.forEach(f => { add(f.h, f.hg, f.ag, "home", f.d); add(f.a, f.ag, f.hg, "away", f.d); });
+  const pct = (a, fn) => a.length ? Math.round(100 * a.filter(fn).length / a.length) : 0;
+  const q = (document.getElementById("trSearch").value || "").toLowerCase();
+  let list = Object.values(T).map(t => {
+    const r = t.rows.filter(x => trVenue === "all" || x.venue === trVenue), n = r.length;
+    const last = [...t.rows].sort((a, b) => b.d.localeCompare(a.d)).slice(0, 5).reverse();
+    return { n: t.n, pj: n, gf: n ? r.reduce((s, x) => s + x.gf, 0) / n : 0, gc: n ? r.reduce((s, x) => s + x.ga, 0) / n : 0,
+      ov15: pct(r, x => x.gf + x.ga > 1), ov25: pct(r, x => x.gf + x.ga > 2), ov35: pct(r, x => x.gf + x.ga > 3),
+      btts: pct(r, x => x.gf > 0 && x.ga > 0), cs: pct(r, x => x.ga === 0), fts: pct(r, x => x.gf === 0), last };
+  }).filter(t => t.pj && (!q || t.n.toLowerCase().includes(q)));
+  list.sort((a, b) => (typeof a[trSort.k] === "string" ? a[trSort.k].localeCompare(b[trSort.k]) : a[trSort.k] - b[trSort.k]) * trSort.d);
+  const defs = [["Más victorias seguidas", x => x.gf > x.ga], ["Más over 1.5 seguidos", x => x.gf + x.ga > 1], ["Más over 2.5 seguidos", x => x.gf + x.ga > 2], ["Más BTTS seguidos", x => x.gf > 0 && x.ga > 0], ["Más sin perder", x => x.gf >= x.ga], ["Más porterías a cero", x => x.ga === 0]];
+  const streakOf = (rows, fn) => { let c = 0; for (let i = rows.length - 1; i >= 0 && fn(rows[i]); i--) c++; return c; };
+  document.getElementById("trStreaks").innerHTML = defs.map(([title, fn]) => {
+    const top = Object.values(T).map(t => ({ n: t.n, c: streakOf([...t.rows].sort((a, b) => a.d.localeCompare(b.d)), fn) })).filter(x => x.c > 0).sort((a, b) => b.c - a.c).slice(0, 5);
+    return `<div class="streak-card"><h4>${title}</h4>${top.map(x => `<div class="streak-row"><span>${x.n}</span><b>${x.c}</b></div>`).join("") || '<div class="muted" style="text-align:center;">Sin rachas</div>'}</div>`;
+  }).join("");
+  const cols = [["n","Equipo"],["pj","PJ"],["gf","GF"],["gc","GC"],["ov15","+1.5"],["ov25","+2.5"],["ov35","+3.5"],["btts","Ambos"],["cs","Portería 0"],["fts","Sin marcar"]];
+  const heat = (v, inv) => { const a = Math.min(1, v / 100) * 0.45; return `background:${inv ? `rgba(224,90,90,${a})` : `rgba(62,207,142,${a})`}`; };
+  const dot = x => { const r = x.gf > x.ga ? ["V","#3ECF8E"] : x.gf < x.ga ? ["D","#E05A5A"] : ["E","#9AA5B1"]; return `<span class="fdot" style="background:${r[1]}" title="${x.gf}-${x.ga}">${r[0]}</span>`; };
+  tb.innerHTML = `<thead><tr><th>#</th>${cols.map(c => `<th onclick="sortTrends('${c[0]}')">${c[1]}${trSort.k === c[0] ? (trSort.d > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}<th style="cursor:default">Forma</th></tr></thead><tbody>` +
+    list.map((t, i) => `<tr><td class="rk">${i + 1}</td><td class="tn">${t.n}</td><td>${t.pj}</td><td>${t.gf.toFixed(2)}</td><td>${t.gc.toFixed(2)}</td>` +
+      ["ov15","ov25","ov35","btts","cs"].map(k => `<td><span class="pcell" style="${heat(t[k])}">${t[k]}%</span></td>`).join("") +
+      `<td><span class="pcell" style="${heat(t.fts, true)}">${t.fts}%</span></td><td>${t.last.map(dot).join("")}</td></tr>`).join("") + "</tbody>";
+}
+function sortTrends(k) { trSort = { k, d: trSort.k === k ? -trSort.d : (k === "n" ? 1 : -1) }; renderTrends(); }
 
 async function loadDayDashboard() {
   const footballKey = getFootballKey();
