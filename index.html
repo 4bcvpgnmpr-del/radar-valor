@@ -1673,15 +1673,45 @@ function dcMatrix(lh, la, rho, N) {
   for (let i = 0; i <= N; i++) { P[i] = []; for (let j = 0; j <= N; j++) { let t = 1; if (i === 0 && j === 0) t = 1 - lh * la * rho; else if (i === 0 && j === 1) t = 1 + lh * rho; else if (i === 1 && j === 0) t = 1 + la * rho; else if (i === 1 && j === 1) t = 1 - rho; const v = ph[i] * pa[j] * Math.max(t, 0); P[i][j] = v; tot += v; } }
   return P.map(r => r.map(v => v / tot));
 }
+/* Filas para el modelo a partir del histórico importado (CSV): busca la liga donde estén los dos equipos */
+function hbModelRows(m) {
+  try {
+    let best = null;
+    Object.keys(hbData || {}).forEach(l => {
+      const rows = hbData[l]; if (!rows || rows.length < 100) return;
+      const last = rows[rows.length - 1][0], recent = rows.filter(r => r[0] >= last - 4 * 365);
+      if (recent.length < 100) return;
+      const names = [...new Set(recent.flatMap(r => [r[1], r[2]]))], h = msFind(m.home_team, names), a = msFind(m.away_team, names);
+      if (!h || !a || h === a) return;
+      const sc = (msNorm(h) === msNorm(m.home_team) ? 1 : 0) + (msNorm(a) === msNorm(m.away_team) ? 1 : 0) + recent.length / 1e6;
+      if (!best || sc > best.sc) best = { sc, l, recent };
+    });
+    if (!best) return null;
+    return { league: best.l, seasons: new Set(best.recent.map(r => r[5])).size, rows: best.recent.map(r => ({ d: new Date(r[0] * 86400000).toISOString().slice(0, 10), h: r[1], a: r[2], hg: r[3], ag: r[4] })) };
+  } catch (e) { return null; }
+}
 async function loadModel(idx) {
   const it = pvItems[idx]; if (!it) return;
   const m = it.m, box = document.getElementById(`${it.cardId}-model`);
-  if (!getFootballKey() && !getFdKey()) { box.innerHTML = `<div class="muted" style="text-align:center;">Añade tu token de football-data.org (o API-Football) en ⚙️ Configuración.</div>`; return; }
+  const hist = hbModelRows(m);
+  if (!hist && !getFootballKey() && !getFdKey()) { box.innerHTML = `<div class="muted" style="text-align:center;">Importa CSV históricos (Backtesting) o añade tu token de football-data.org en ⚙️ Configuración.</div>`; return; }
   box.innerHTML = `<div class="muted" style="text-align:center;">Calculando el modelo con los resultados de la liga...</div>`;
   try {
-    const lg = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0], season = Number(document.getElementById("trSeason").value) || defaultSeason();
-    let rows = await msLeagueData(lg.id, season);
-    try { const prev = await msLeagueData(lg.id, season - 1); if (prev && prev.length) rows = prev.concat(rows); } catch (e) {}
+    let rows, src = "de la liga";
+    if (hist) {
+      rows = hist.rows.slice(); src = `históricos importados (${hist.league}, ${hist.seasons} temporadas)`;
+      const lgx = DD_LEAGUES.find(x => x.odds === lastSport);
+      if (lgx && (getFootballKey() || getFdKey())) { try {
+        const names = [...new Set(rows.flatMap(r => [r.h, r.a]))], last = Date.parse(rows[rows.length - 1].d);
+        const cur = await msLeagueData(lgx.id, Number(document.getElementById("trSeason").value) || defaultSeason()); let add = 0;
+        cur.forEach(r => { if (Date.parse(r.d) > last) { const h = msFind(r.h, names), a = msFind(r.a, names); if (h && a && h !== a) { rows.push({ d: r.d, h, a, hg: r.hg, ag: r.ag }); add++; } } });
+        if (add) src += ` + ${add} partidos recientes`;
+      } catch (e) {} }
+    } else {
+      const lg = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0], season = Number(document.getElementById("trSeason").value) || defaultSeason();
+      rows = await msLeagueData(lg.id, season);
+      try { const prev = await msLeagueData(lg.id, season - 1); if (prev && prev.length) rows = prev.concat(rows); } catch (e) {}
+    }
     if (rows.length < 20) throw new Error("hay muy pocos partidos jugados para estimar el modelo");
     const md = dcModel(rows), hn = msFind(m.home_team, md.teams), an = msFind(m.away_team, md.teams);
     if (!hn || !an || hn === an) throw new Error("no encuentro estos equipos en los datos de la liga");
@@ -1712,7 +1742,7 @@ async function loadModel(idx) {
       <table class="cptable" style="margin-top:10px;"><thead><tr><th>Mercado</th><th>Modelo</th><th>Cuota justa</th><th>Mercado (justa)</th><th>Diferencia</th><th>Mejor cuota</th><th>Edge prudente</th></tr></thead><tbody>${rowsHtml}</tbody></table>
       <div class="ms-h" style="font-size:13px; margin:14px 0 6px;">Marcadores más probables</div>
       <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">${top.slice(0, 6).map(t => `<span class="badge-chip" style="font-size:13px;">${t[0]}-${t[1]} · <b>${(t[2] * 100).toFixed(1)}%</b></span>`).join("")}</div>
-      <div class="muted" style="font-size:11px; margin-top:10px; text-align:center; line-height:1.6;">Modelo tipo Dixon-Coles: ataque y defensa de cada equipo, ventaja de local y más peso a los partidos recientes. Datos: ${md.n} partidos de la liga (${nh} del local, ${na} del visitante). ${Math.min(nh, na) < 8 ? "<b style='color:#F0B429;'>Muestra pequeña: fíate poco.</b> " : ""}El "edge prudente" mezcla 50% modelo y 50% mercado, porque el mercado suele estar mejor calibrado. No tiene en cuenta lesiones ni alineaciones. Es una segunda opinión, no una predicción segura.</div>`;
+      <div class="muted" style="font-size:11px; margin-top:10px; text-align:center; line-height:1.6;">Modelo tipo Dixon-Coles: ataque y defensa de cada equipo, ventaja de local y más peso a los partidos recientes. Datos: ${md.n} partidos ${src} (${nh} del local, ${na} del visitante). ${Math.min(nh, na) < 8 ? "<b style='color:#F0B429;'>Muestra pequeña: fíate poco.</b> " : ""}El "edge prudente" mezcla 50% modelo y 50% mercado, porque el mercado suele estar mejor calibrado. No tiene en cuenta lesiones ni alineaciones. Es una segunda opinión, no una predicción segura.</div>`;
   } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px; text-align:center;">No se pudo calcular el modelo: ${e.message}</div><div style="text-align:center; margin-top:6px;"><button class="small ghost" onclick="loadModel(${idx})">Reintentar</button></div>`; }
 }
 async function loadBet365(idx) {
