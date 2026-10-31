@@ -696,6 +696,8 @@
       <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center;">
         <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;">📂 Importar CSV (varios a la vez)<input type="file" id="hbFile" accept=".csv,text/csv" multiple style="display:none;" onchange="hbImport(event)" /></label>
         <a class="small ghost" href="https://www.football-data.co.uk/data.php" target="_blank" rel="noopener" style="padding:8px 14px; border:1px solid #2A3340; border-radius:10px; color:inherit; text-decoration:none;">🌐 Dónde descargarlos</a>
+        <button class="small ghost" onclick="exportBackup()" title="Descarga un archivo con tus CSV importados, tus sistemas, alarmas y perfiles">💾 Copia de seguridad</button>
+        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;" title="Restaura una copia descargada antes">📥 Restaurar copia<input type="file" accept="application/json" style="display:none;" onchange="importBackup(event)" /></label>
         <button class="small ghost" onclick="hbClear()">🗑 Borrar datos</button>
       </div>
       <div data-help="hist" style="margin-top:12px;"></div>
@@ -2379,30 +2381,34 @@ async function updateClosing(id) {
 
 function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
 
-const BACKUP_KEYS = ["radar-bt-hsystems", 
+const BACKUP_KEYS = ["radar-bt-hsystems", "radar-alarms", "radar-profiles", "radar-profile", "radar-presets", 
   "radar-valor-clv-log", "radar-valor-value-log", "radar-valor-notes", "radar-valor-outcomes",
   "radar-valor-favorites", "radar-valor-formation-stats", "radar-valor-line-history",
   "radar-valor-bankroll", "radar-valor-kelly-fraction",
 ];
-function exportBackup() {
+async function exportBackup() {
   const data = {};
   BACKUP_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v != null) data[k] = v; });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  if (typeof hbData === "object" && Object.keys(hbData).length) data.__hbData = hbData;
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = `radar-valor-backup-${new Date().toISOString().slice(0,10)}.json`;
   document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  const n = data.__hbData ? Object.values(data.__hbData).reduce((x, r) => x + r.length, 0) : 0;
+  const m = document.getElementById("hbMsg"); if (m) m.textContent = `Copia descargada (${(blob.size / 1048576).toFixed(1)} MB${n ? ", con " + n + " partidos históricos" : ""}).`;
 }
 function importBackup(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const data = JSON.parse(reader.result);
-      if (!confirm("Esto reemplazará tu historial actual con el de la copia de seguridad. ¿Continuar?")) return;
+      if (!confirm("Esto reemplazará tus datos actuales (historial, sistemas, alarmas y partidos históricos) con los de la copia. ¿Continuar?")) return;
       Object.keys(data).forEach(k => { if (BACKUP_KEYS.includes(k)) localStorage.setItem(k, data[k]); });
+      if (data.__hbData && typeof data.__hbData === "object") { hbData = data.__hbData; const ok = await hbSave(); if (!ok) alert("Los partidos históricos no se pudieron guardar en el navegador (¿modo privado?)."); }
       alert("Copia restaurada. La página se va a recargar.");
       location.reload();
     } catch (e) {
