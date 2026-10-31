@@ -692,10 +692,13 @@
           <label>Muestra mínima (ranking)<input id="hbMinN" type="number" step="10" value="60" oninput="hbRender()" /></label>
         </div>
         <div class="muted" style="font-size:11px; margin-top:6px;">El valor mínimo compara tu cuota con la probabilidad justa de Pinnacle (o de la media si no hay Pinnacle), sin margen. Stake fijo de 1 unidad.</div>
-        <div class="bt-kpis" id="hbKpis" style="margin-top:14px;"></div>
+        <div id="hbDetail" style="text-align:center; margin-top:12px;"></div>
+        <div class="bt-kpis" id="hbKpis" style="margin-top:8px;"></div>
         <div id="hbChart"></div>
         <div id="hbSeasons" style="margin-top:10px;"></div>
-        <div class="pg-h" style="text-align:center; margin-top:18px;">Ranking: ligas y selecciones más rentables (con tus filtros de casa, cuota y valor)</div>
+        <div class="seg" style="display:flex; width:fit-content; margin:18px auto 8px;"><button class="seg-b active" id="hbGL" onclick="hbGroup('league')">Por liga</button><button class="seg-b" id="hbGT" onclick="hbGroup('team')">Por equipo</button></div>
+        <div class="pg-h" id="hbRankT" style="text-align:center;">Ranking: ligas y selecciones más rentables (con tus filtros de casa, cuota y valor)</div>
+        <input id="hbTeamQ" type="text" placeholder="Buscar equipo..." oninput="hbRender()" style="display:none; width:220px; margin:0 auto 8px;" />
         <div id="hbRank"></div>
       </div>
     </div>
@@ -2431,10 +2434,19 @@ function hbStats(b) {
 }
 function hbFilters() { const g = id => document.getElementById(id).value; return { from: g("hbFrom"), omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
 function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
+let hbGrp = "league", hbTeamF = null;
+const HB_TK = { hl: ["Gana de local", "h", "H"], aw: ["Gana de visitante", "a", "A"], ch: ["Rival gana cuando juega de local", "h", "A"], ca: ["Rival gana cuando juega de visitante", "a", "H"], dr: ["Empate", "any", "D"], ov: ["Más de 2.5 goles", "any", "O"], un: ["Menos de 2.5 goles", "any", "U"] };
+function hbTeamRows(rows, t, side) { return rows.filter(r => side === "h" ? r[1] === t : side === "a" ? r[2] === t : (r[1] === t || r[2] === t)); }
+function hbGroup(g) { hbGrp = g; hbTeamF = null; document.getElementById("hbGL").classList.toggle("active", g === "league"); document.getElementById("hbGT").classList.toggle("active", g === "team"); document.getElementById("hbMinN").value = g === "team" ? 30 : 60; hbRender(); }
+function hbPickTeam(t, k) { hbTeamF = { t, k }; hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
+function hbClearTeam() { hbTeamF = null; hbRender(); }
 function hbRender() {
   const lg = document.getElementById("hbLeague").value, sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters(), minN = parseInt(document.getElementById("hbMinN").value) || 0;
   const rows = (lg ? hbData[lg] || [] : Object.values(hbData).flat()).slice().sort((a, b) => a[0] - b[0]);
-  const bets = hbBets(rows, sel, bk, f), st = hbStats(bets), col = v => v >= 0 ? "#3ECF8E" : "#E5484D", vd = hbVerdict(st);
+  let rowsU = rows, selU = sel;
+  if (hbTeamF) { const k = HB_TK[hbTeamF.k]; rowsU = hbTeamRows(rows, hbTeamF.t, k[1]); selU = k[2]; }
+  document.getElementById("hbDetail").innerHTML = hbTeamF ? `<span style="background:#141A23; border:1px solid #2A3340; border-radius:999px; padding:6px 12px; font-size:13px;">Detalle: <b>${hbTeamF.t}</b> · ${HB_TK[hbTeamF.k][0]} <a href="#" onclick="hbClearTeam();return false;" style="color:#9AA5B1; margin-left:8px;">✕ quitar</a></span>` : "";
+  const bets = hbBets(rowsU, selU, bk, f), st = hbStats(bets), col = v => v >= 0 ? "#3ECF8E" : "#E5484D", vd = hbVerdict(st);
   document.getElementById("hbKpis").innerHTML = !st.n ? `<div class="muted" style="grid-column:1/-1; text-align:center;">Sin apuestas con estos filtros (¿la casa elegida tiene cuotas para esa selección?).</div>` :
     `<div class="bt-kpi"><div class="l">Yield</div><div class="n" style="color:${col(st.y)}">${st.y >= 0 ? "+" : ""}${st.y.toFixed(2)}%</div><div class="sm" style="color:${vd[1]}">${vd[0]}</div></div>` +
     `<div class="bt-kpi"><div class="l">Unidades</div><div class="n" style="color:${col(st.u)}">${st.u >= 0 ? "+" : ""}${st.u.toFixed(2)}</div></div>` +
@@ -2450,6 +2462,18 @@ function hbRender() {
   document.getElementById("hbSeasons").innerHTML = Object.keys(bs).sort().length ? `<div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">` + Object.keys(bs).sort().map(k => { const s2 = hbStats(bs[k]); return `<div style="background:#141A23; border:1px solid #1A212B; border-radius:10px; padding:6px 10px; font-size:12px; text-align:center;"><div class="muted">${k}</div><b style="color:${col(s2.y)}">${s2.y >= 0 ? "+" : ""}${s2.y.toFixed(0)}%</b> <span class="muted">· ${s2.n}</span></div>`; }).join("") + `</div>` : "";
   // ranking
   const rk = []; let combos = 0;
+  document.getElementById("hbTeamQ").style.display = hbGrp === "team" ? "block" : "none";
+  document.getElementById("hbRankT").textContent = hbGrp === "team" ? "Ranking por equipo: qué apostar a cada equipo (con tus filtros de casa, cuota y valor)" : "Ranking: ligas y selecciones más rentables (con tus filtros de casa, cuota y valor)";
+  if (hbGrp === "team") {
+    const q = (document.getElementById("hbTeamQ").value || "").trim().toLowerCase(), by = {};
+    rows.forEach(r => { [r[1], r[2]].forEach(t => { (by[t] = by[t] || []).push(r); }); });
+    Object.keys(by).forEach(t => { if (q && !t.toLowerCase().includes(q)) return; Object.keys(HB_TK).forEach(k => { const b = hbBets(hbTeamRows(by[t], t, HB_TK[k][1]), HB_TK[k][2], bk, f); combos++; if (b.length >= Math.max(1, minN)) rk.push({ t, k, s: hbStats(b) }); }); });
+    rk.sort((a, b) => b.s.y - a.s.y);
+    document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Equipo</th><th>Apuesta</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
+      rk.slice(0, 40).map(x => { const v = hbVerdict(x.s, true); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPickTeam('${x.t.replace(/'/g, "\\'")}','${x.k}')"><td style="padding:7px 6px;">${x.t}</td><td>${HB_TK[x.k][0]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
+      <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de equipo y apuesta: con tantas, muchas salen rentables solo por azar (un equipo tiene pocos partidos). Desconfía de lo que no sea "señal sólida" y de muestras pequeñas. Elige la liga arriba para limitar la lista. Toca una fila para ver su curva.</div>` : `<div class="muted" style="text-align:center;">Ningún equipo llega a ${minN} apuestas con estos filtros (baja la muestra mínima o importa más temporadas).</div>`;
+    return;
+  }
   Object.keys(hbData).forEach(l => HB_ORDER.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, f); combos++; if (b.length >= Math.max(1, minN)) { const s2 = hbStats(b); rk.push({ l, sl, s: s2 }); } }));
   rk.sort((a, b) => b.s.y - a.s.y);
   document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Liga</th><th>Selección</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
