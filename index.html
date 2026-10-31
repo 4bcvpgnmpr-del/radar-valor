@@ -283,6 +283,12 @@
   .bt-period { display:flex; width:fit-content; margin:0 auto 14px; }
   #hb-panel label { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:12px; color:#9AA5B1; }
   #hb-panel select, #hb-panel input[type=number] { width:100%; box-sizing:border-box; min-width:0; }
+  details.help { margin:0 0 14px; border:1px solid #1A212B; border-radius:12px; background:#0F141B; }
+  details.help > summary { cursor:pointer; padding:9px 14px; font-size:12px; color:#9AA5B1; list-style:none; text-align:center; }
+  details.help > summary::-webkit-details-marker { display:none; }
+  details.help[open] > summary { color:#3ECF8E; border-bottom:1px solid #1A212B; }
+  details.help .hp { padding:12px 16px; font-size:13px; line-height:1.65; color:#C5CCD6; text-align:left; }
+  details.help .hp b { color:#E6EAF0; } details.help .hp ul { margin:6px 0 0; padding-left:18px; } details.help .hp li { margin:3px 0; }
   .bt-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
   .bt-kpi { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px; text-align:center; }
   .bt-kpi .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#7C8797; }
@@ -505,6 +511,7 @@
 
 
   <div id="view-partidos" class="view active">
+    <div data-help="partidos"></div>
     <select id="sport" onchange="loadOdds()" style="display:none;">
       <option value="soccer_epl">Premier League</option><option value="soccer_spain_la_liga">La Liga</option><option value="soccer_italy_serie_a">Serie A</option><option value="soccer_germany_bundesliga">Bundesliga</option><option value="soccer_uefa_champs_league">Champions League</option>
     </select>
@@ -551,6 +558,7 @@
   </div>
 
   <div id="view-daydash" class="view">
+    <div data-help="daydash"></div>
     <div class="dd-title">Partidos por liga</div>
     <div class="chip-row" id="dd-chips"></div>
     <div class="dd-title" style="margin-top:26px;">Rachas de la liga</div>
@@ -579,6 +587,7 @@
   </div>
 
   <div id="view-live" class="view">
+    <div data-help="live"></div>
     <div class="lv-bar">
       <button onclick="loadLiveScores()">Actualizar en vivo</button>
       <label class="pg-ck"><input type="checkbox" id="lvAuto" onchange="lvToggleAuto()" /> Auto (cada 90 s)</label>
@@ -595,6 +604,7 @@
   </div>
 
   <div id="view-lineups" class="view">
+    <div data-help="lineups"></div>
     <select id="lineupLeague" style="display:none;"><option value="39">PL</option><option value="140">LL</option><option value="135">SA</option><option value="78">BL</option><option value="2">CL</option></select>
     <div class="chip-row mini" id="luChips"></div>
     <div class="lv-bar">
@@ -612,6 +622,7 @@
   </div>
 
   <div id="view-arbitrage" class="view">
+    <div data-help="arbitrage"></div>
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Detector de arbitraje (surebets)</div>
       <div class="muted" style="margin-bottom:10px;">Busca combinaciones entre TODAS las casas que trae la API (no solo William Hill) donde, apostando a todos los resultados posibles repartiendo el stake, ganas seguro sin importar el resultado. Se calcula con los partidos ya cargados en la pestaña Partidos — visita esa pestaña primero.</div>
@@ -625,6 +636,7 @@
   </div>
 
   <div id="view-calendar" class="view">
+    <div data-help="calendar"></div>
     <div class="panel">
       <div class="row" style="margin-bottom:10px;">
         <div style="font-weight:600;">Calendario de tus equipos favoritos</div>
@@ -636,6 +648,7 @@
   </div>
 
   <div id="view-historial" class="view">
+    <div data-help="historial"></div>
     <div class="panel">
       <div class="row" style="margin-bottom:8px;">
         <div style="font-weight:600;">Apuestas registradas (seguimiento de CLV)</div>
@@ -680,6 +693,7 @@
         <a class="small ghost" href="https://www.football-data.co.uk/data.php" target="_blank" rel="noopener" style="padding:8px 14px; border:1px solid #2A3340; border-radius:10px; color:inherit; text-decoration:none;">🌐 Dónde descargarlos</a>
         <button class="small ghost" onclick="hbClear()">🗑 Borrar datos</button>
       </div>
+      <div data-help="hist" style="margin-top:12px;"></div>
       <div id="hbMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
       <div id="hbBody" style="display:none;">
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:14px;">
@@ -706,6 +720,7 @@
       </div>
     </div>
     <div class="panel" id="bt-system">
+      <div data-help="sistema"></div>
       <div class="seg bt-period" id="btPeriod">
         <button class="seg-b active" data-p="all" onclick="btSetPeriod('all')">Todo</button><button class="seg-b" data-p="7" onclick="btSetPeriod('7')">7 días</button><button class="seg-b" data-p="30" onclick="btSetPeriod('30')">30 días</button>
       </div>
@@ -767,6 +782,7 @@
   </div>
 
   <div id="view-coupon" class="view">
+    <div data-help="coupon"></div>
     <div class="pg-day">
       <button class="pg-nav" onclick="cpDay(-1)" title="Día anterior">‹</button>
       <b id="cpDayLabel">Todos los días</b>
@@ -807,6 +823,7 @@
   </div>
 
   <div id="view-explore" class="view">
+    <div data-help="explore"></div>
     <div style="display:flex; justify-content:center; margin-bottom:14px;">
       <div class="seg" id="exModeSeg"><button class="seg-b active" data-m="league" onclick="setExMode('league')">Modo liga</button><button class="seg-b" data-m="game" onclick="setExMode('game')">Modo partido</button></div>
     </div>
@@ -826,6 +843,7 @@
   </div>
 
   <div id="view-profile" class="view">
+    <div data-help="profile"></div>
     <div class="pf-wrap">
       <div class="pf-side">
         <div class="pf-av">👤</div>
@@ -853,6 +871,7 @@
   </div>
 
   <div id="view-alarms" class="view">
+    <div data-help="alarms"></div>
     <div class="ex-block" style="margin-top:0;">
       <h3>Nueva alarma</h3>
       <div class="muted" style="text-align:center; font-size:12px; margin-bottom:12px;">Todas las condiciones que rellenes deben cumplirse a la vez para que salte. Las alarmas se comprueban cuando la app carga cuotas o partidos en vivo, y solo funcionan con la pestaña abierta.</div>
@@ -933,6 +952,7 @@
   </div>
 
   <div id="view-trends" class="view">
+    <div data-help="trends"></div>
     <div class="panel">
       <div class="row" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
         <div></div>
@@ -955,6 +975,7 @@
   </div>
 
   <div id="view-widgets" class="view">
+    <div data-help="widgets"></div>
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
       <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>API-Football gratis solo llega a 2024</b>; con el token de football-data.org la temporada actual se carga desde allí.</div>
@@ -1026,6 +1047,10 @@ async function getTeamBadge(name) {
   }
 }
 
+const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con las cuotas de varias casas. Los números sobre cada liga son los partidos con cuotas cargadas (o, en gris, los programados esta semana).\n<ul><li><b>Cuota justa / probabilidad justa:</b> es el promedio de lo que creen las casas, quitando su margen de beneficio. Es la mejor estimación de la probabilidad real.</li>\n<li><b>Valor (EV):</b> cuánto ganarías de media por cada unidad si la probabilidad justa es correcta. Se calcula cuota × probabilidad justa − 1.</li>\n<li><b>Colores:</b> verde = valor (EV de +2% o más). Rojo = EV de +15% o más: casi siempre es un <b>posible error</b> de una casa o un dato desfasado, compruébalo antes de fiarte.</li>\n<li>Toca un partido para abrir su ficha con todos los mercados, el modelo de probabilidades y Bet365.</li></ul>", "model": "<b>Modelo:</b> probabilidad calculada con los resultados históricos (ataque, defensa y ventaja de local de cada equipo). <b>Cuota justa:</b> la cuota que corresponde a esa probabilidad (1 ÷ prob.): si te pagan más, el modelo ve valor.\n<ul><li><b>Mercado (justa):</b> la probabilidad que implican las casas, sin margen.</li>\n<li><b>Diferencia:</b> modelo − mercado en puntos porcentuales. Verde = el modelo lo ve más probable que el mercado.</li>\n<li><b>Mejor cuota:</b> la más alta entre todas las casas. <b>Edge prudente:</b> ventaja usando 50% modelo y 50% mercado (el mercado suele acertar más).</li>\n<li><b>Ojo:</b> diferencias enormes (más de 15-20 puntos) suelen ser datos mal emparejados o cuotas erróneas, no oportunidades. El modelo no sabe de lesiones ni alineaciones.</li></ul>", "coupon": "<b>Qué es:</b> comparador de cuotas (\"Pregame\") por casa para los próximos partidos, mercado a mercado.\n<ul><li>Cada columna es una casa; la mejor cuota de cada fila va resaltada.</li><li>El porcentaje junto a la cuota es el valor (EV) frente a la probabilidad justa del mercado.</li><li>Usa los filtros de liga, día y mercado para acotar. Las cuotas se actualizan al pulsar el botón (gasta créditos de The Odds API).</li></ul>", "daydash": "<b>Qué es:</b> un resumen de la jornada por liga: los partidos del día y las rachas de los equipos (por ejemplo, partidos seguidos marcando o con más de 2.5 goles).\n<ul><li>Una racha larga indica una tendencia reciente, no una garantía: contrástala con las cuotas.</li><li>Las estadísticas vienen de API-Football y football-data.org; la temporada actual necesita el token de football-data.org.</li></ul>", "live": "<b>Qué es:</b> partidos que se están jugando ahora, con marcador y minuto. Pulsa <b>Actualizar en vivo</b>, o activa Auto para refrescar cada 90 s.\n<ul><li>Cada actualización gasta peticiones de API-Football (plan gratis: 100 al día).</li><li>\"Solo con cuotas\" deja los partidos para los que hay cuotas cargadas.</li></ul>", "lineups": "<b>Qué es:</b> alineaciones y formaciones de los partidos, con la ficha de cada jugador al tocarlo. Debajo, los líderes de la liga.\n<ul><li>Las alineaciones solo están disponibles poco antes del partido (normalmente 1 hora).</li><li>Elige liga y día arriba. Los datos vienen de API-Football.</li></ul>", "arbitrage": "<b>Qué es:</b> busca combinaciones entre casas donde, apostando a todos los resultados, ganarías algo seguro (surebet).\n<ul><li><b>Margen:</b> el beneficio garantizado sobre lo apostado. Si ves más de un 3-5%, desconfía: suele ser una cuota errónea o desfasada que la casa corregirá o anulará.</li><li>Revisa siempre las cuotas en la casa antes de nada; cambian en segundos.</li></ul>", "calendar": "<b>Qué es:</b> los próximos partidos de tus equipos favoritos (márcalos con la ⭐ en Partidos y valor).\n<ul><li>Sirve para planificar la semana sin buscar liga por liga.</li></ul>", "hist": "<b>Qué es:</b> una simulación. La app toma todos los partidos pasados que cumplen tus filtros, supone que apostaste 1 unidad a cada uno y compara con el resultado real.\n<ul><li><b>Yield:</b> ganancia por cada unidad apostada, en %. +5% significa 5 céntimos de beneficio por euro.</li><li><b>Unidades:</b> beneficio total (cada acierto suma cuota − 1, cada fallo resta 1).</li>\n<li><b>Fiabilidad:</b> \"señal sólida\" = yield positivo, muestra grande y positivo en las dos mitades del periodo. \"Probable azar\" = positivo pero poco convincente. En el ranking se exige más evidencia porque se prueban muchas combinaciones.</li>\n<li><b>1ª / 2ª mitad:</b> yield en la primera y segunda mitad de los partidos. Si el signo cambia, desconfía.</li>\n<li><b>Drawdown máx.:</b> la peor caída seguida de unidades. Indica cuánto habrías sufrido.</li>\n<li><b>CLV medio</b> (con \"Apertura\"): cuánto mejor era tu cuota que la probabilidad justa del cierre. Positivo y sostenido = ventaja real.</li>\n<li><b>Mercados \"sin cuota\":</b> el archivo no trae cuotas, así que se mide la frecuencia y la <b>cuota mínima</b>: si tu casa paga más que esa cuota, el mercado habría dado beneficio.</li></ul>", "sistema": "<b>Qué es:</b> tus apuestas reales. Aquí solo cuentan las que marcas tú como ganada o perdida en la lista de más abajo; la app no sabe si apostaste.\n<ul><li>Stake fijo de 1 unidad. Puedes filtrar por liga, mercado, casa, cuota y valor, y guardar combinaciones como \"sistema\".</li><li>Las pestañas Liga / Equipo / Mercado / Casa agrupan los resultados para ver dónde ganas o pierdes.</li></ul>", "historial": "<b>Qué es:</b> las apuestas que registras, con su cuota y el <b>CLV</b>: compara tu cuota con la cuota justo antes del partido.\n<ul><li>CLV positivo y sostenido en muchas apuestas = ventaja real, aunque algunas pierdan.</li><li>CLV negativo continuado = tus cuotas son peores que las del cierre.</li></ul>", "explore": "<b>Qué es:</b> frecuencias históricas de mercados concretos (goles, ambos marcan, hándicap, mitades…) para contrastar con las cuotas.\n<ul><li>Modo liga: cuántas veces ocurrió en la liga. Modo partido: se centra en un partido y sus equipos.</li><li>Una frecuencia alta no es valor por sí sola: compárala con la cuota (cuota mínima = 1 ÷ frecuencia).</li></ul>", "alarms": "<b>Qué es:</b> avisos que saltan cuando se cumple lo que pones.\n<ul><li><b>Pregame:</b> avisa cuando aparece valor o una cuota que cumple tus condiciones.</li><li><b>En vivo:</b> marcador, minuto o conteos dentro de un tramo (por ejemplo 3 tiros a puerta entre el 60' y el 75').</li><li>Todas las condiciones que rellenes deben cumplirse a la vez. Solo funcionan con la app abierta y gastan peticiones de API-Football.</li></ul>", "trends": "<b>Qué es:</b> tendencias recientes de los equipos de una liga: rachas, goles y resultados.\n<ul><li>Son datos pasados; úsalos para contrastar, no como predicción segura.</li><li>La temporada actual necesita el token de football-data.org.</li></ul>", "widgets": "<b>Qué es:</b> clasificación, máximos goleadores y tarjetas de la temporada para contrastar con lo que dicen las cuotas.\n<ul><li>Con API-Football gratis solo llega a la temporada 2024; con el token de football-data.org se carga la actual.</li></ul>", "profile": "<b>Qué es:</b> tu perfil de apostador: ligas y casas que sigues y ajustes que se aplican al resto de la app (por ejemplo, el orden de las ligas).\n<ul><li>Puedes tener varios perfiles y cambiar de uno a otro.</li></ul>"};
+function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
+function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
+helpInit();
 const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
@@ -1754,7 +1779,7 @@ async function loadModel(idx) {
     const top = []; for (let i = 0; i <= 5; i++) for (let j = 0; j <= 5; j++) top.push([i, j, P[i][j]]);
     top.sort((a, b) => b[2] - a[2]);
     const nh = md.cnt[hn], na = md.cnt[an];
-    box.innerHTML = `<div class="ms-h" style="margin:6px 0 4px;">Probabilidades del modelo</div>
+    box.innerHTML = `<div class="ms-h" style="margin:6px 0 4px;">Probabilidades del modelo</div>${helpHtml("model")}
       <div class="ms-sub">Goles esperados: ${m.home_team} <b style="color:#3ECF8E">${lh.toFixed(2)}</b> · ${m.away_team} <b style="color:#3ECF8E">${la.toFixed(2)}</b> · ventaja de local ×${md.hfa.toFixed(2)}</div>
       ${big && Math.abs(big.diff) >= 3 ? `<div class="ms-note">Mayor discrepancia con el mercado: <b>${big.lab}</b> (${big.diff >= 0 ? "el modelo la ve más probable" : "el modelo la ve menos probable"}, ${big.diff >= 0 ? "+" : ""}${big.diff.toFixed(1)} pp).</div>` : ""}
       <table class="cptable" style="margin-top:10px;"><thead><tr><th>Mercado</th><th>Modelo</th><th>Cuota justa</th><th>Mercado (justa)</th><th>Diferencia</th><th>Mejor cuota</th><th>Edge prudente</th></tr></thead><tbody>${rowsHtml}</tbody></table>
