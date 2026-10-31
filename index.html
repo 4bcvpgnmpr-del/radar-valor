@@ -687,6 +687,7 @@
           <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><optgroup label="Sin cuota en el CSV (solo frecuencia)"><option value="Pbs">Ambos marcan: Sí</option><option value="Pbn">Ambos marcan: No</option><option value="Po5">Más de 0.5 goles</option><option value="Pu5">Menos de 0.5 goles</option><option value="Po15">Más de 1.5 goles</option><option value="Pu15">Menos de 1.5 goles</option><option value="1To5">1T: más de 0.5 goles</option><option value="1Tu5">1T: menos de 0.5 goles</option><option value="1To15">1T: más de 1.5 goles</option><option value="1Tu15">1T: menos de 1.5 goles</option><option value="1Tbs">1T: ambos marcan</option><option value="2To5">2T: más de 0.5 goles</option><option value="2Tu5">2T: menos de 0.5 goles</option><option value="2To15">2T: más de 1.5 goles</option><option value="2Tu15">2T: menos de 1.5 goles</option></optgroup><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
           <label>Cuota a la que apuestas<select id="hbBook" onchange="hbRender()"></select></label>
           <label>Temporadas<details id="hbSeasD" style="position:relative;"><summary id="hbSeasS" style="cursor:pointer; padding:10px 12px; border:1px solid #2A3340; border-radius:12px; background:#0D1117; color:#E6EAF0; font-size:14px;">Todas</summary><div id="hbSeasL" style="position:absolute; z-index:20; left:0; right:0; max-height:240px; overflow:auto; background:#10151C; border:1px solid #2A3340; border-radius:12px; margin-top:4px; padding:8px;"></div></details></label>
+          <label>Momento de la cuota<select id="hbWhen" onchange="hbRender()"><option value="close">Cierre (o la que traiga el archivo)</option><option value="open">Apertura (para medir el CLV)</option></select></label>
           <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
           <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRender()" /></label>
           <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRender()" /></label>
@@ -2399,6 +2400,7 @@ const HB_COLS = {
   max: { H: ["MaxCH", "MaxH"], D: ["MaxCD", "MaxD"], A: ["MaxCA", "MaxA"], O: ["MaxC>2.5", "Max>2.5"], U: ["MaxC<2.5", "Max<2.5"] },
   avg: { H: ["AvgCH", "AvgH"], D: ["AvgCD", "AvgD"], A: ["AvgCA", "AvgA"], O: ["AvgC>2.5", "Avg>2.5"], U: ["AvgC<2.5", "Avg<2.5"] }
 };
+const HB_OPEN = { pin: { H: "PSH", D: "PSD", A: "PSA", O: "P>2.5", U: "P<2.5" }, b365: { H: "B365H", D: "B365D", A: "B365A", O: "B365>2.5", U: "B365<2.5" }, max: { H: "MaxH", D: "MaxD", A: "MaxA", O: "Max>2.5", U: "Max<2.5" }, avg: { H: "AvgH", D: "AvgD", A: "AvgA", O: "Avg>2.5", U: "Avg<2.5" } };
 const HB_BOOKN = { pin: "Pinnacle (cierre)", b365: "Bet365", max: "La mejor cuota del mercado", avg: "Media del mercado" };
 const HB_SELN = { H: "Local gana", D: "Empate", A: "Visitante gana", O: "Más de 2.5", U: "Menos de 2.5", X: "Hándicap asiático local", Y: "Hándicap asiático visitante" };
 const HB_SELS = ["H", "D", "A", "O", "U", "X", "Y"];
@@ -2436,7 +2438,9 @@ function hbFromCsv(text, fname) {
     Object.keys(ocols).forEach(b => {
       const a = ocols[b].map(i => { const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; });
       for (let k = 0; k < 2; k++) { const ix1 = ahc[b][k][0], ix2 = ahc[b][k][1], il = k === 0 ? iAHC : iAH; if (ix1 < 0 || ix2 < 0 || il < 0) continue; const p1 = parseFloat(x[ix1]), p2 = parseFloat(x[ix2]), ln = parseFloat(x[il]); if (p1 > 1 && p2 > 1 && !isNaN(ln)) { a.push(Math.round(p1 * 1000) / 1000, Math.round(p2 * 1000) / 1000, ln); break; } }
-      if (a.some(v => v)) o[b] = a; });
+      if (a.some(v => v)) o[b] = a;
+      const op = HB_ORDER.map(k => { const i = col(HB_OPEN[b][k]); const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; });
+      if (op.some(v => v) && HB_COLS[b].H.some(n => col(n) >= 0 && n !== HB_OPEN[b].H)) { (o.op = o.op || {})[b] = op; } });
     const hth = iHTH >= 0 ? parseInt(x[iHTH]) : NaN, hta = iHTA >= 0 ? parseInt(x[iHTA]) : NaN, ht = isNaN(hth) || isNaN(hta) ? null : [hth, hta];
     (out[lg] = out[lg] || []).push([Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o, ht]);
   }
@@ -2478,7 +2482,7 @@ function hbBets(rows, sel, bk, f) {
   const si = HB_SELS.indexOf(sel), out = [];
   rows.forEach(r => {
     if (f.seas && !f.seas.has(r[5])) return;
-    const o = r[6][bk]; if (!o || !o[si]) return; const price = o[si];
+    const o = f.open ? (r[6].op && r[6].op[bk] && r[6].op[bk].concat([0, 0, null])) : r[6][bk]; if (!o || !o[si]) return; const price = o[si];
     if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
     const isAH = sel === "X" || sel === "Y", ln = isAH ? o[7] : null; if (isAH && ln == null) return;
     let ev = null; const fo = r[6].pin || r[6].avg;
@@ -2495,9 +2499,10 @@ function hbStats(b) {
   const u = b.reduce((a, x) => a + x.p, 0), mean = u / n, sd = Math.sqrt(b.reduce((a, x) => a + (x.p - mean) ** 2, 0) / Math.max(1, n - 1)), t = sd ? mean / (sd / Math.sqrt(n)) : 0;
   const half = Math.floor(n / 2), y1 = half ? b.slice(0, half).reduce((a, x) => a + x.p, 0) / half : 0, y2 = (n - half) ? b.slice(half).reduce((a, x) => a + x.p, 0) / (n - half) : 0;
   let pk = 0, cu = 0, dd = 0; b.forEach(x => { cu += x.p; pk = Math.max(pk, cu); dd = Math.max(dd, pk - cu); });
-  return { n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
+  const evs = b.filter(x => x.ev != null), clv = evs.length >= Math.max(10, n * 0.5) ? evs.reduce((a, x) => a + x.ev, 0) / evs.length * 100 : null;
+  return { clv, n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
 }
-function hbFilters() { const g = id => document.getElementById(id).value; return { seas: hbSeasSel, omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
+function hbFilters() { const g = id => document.getElementById(id).value; return { open: g("hbWhen") === "open", seas: hbSeasSel, omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
 function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
 const HB_FREQ = (() => {
   const T = r => r[3] + r[4], T1 = r => r[7][0] + r[7][1], T2 = r => T(r) - T1(r), o = {};
@@ -2551,7 +2556,7 @@ function hbRender() {
     `<div class="bt-kpi"><div class="l">Yield</div><div class="n" style="color:${col(st.y)}">${st.y >= 0 ? "+" : ""}${st.y.toFixed(2)}%</div><div class="sm" style="color:${vd[1]}">${vd[0]}</div></div>` +
     `<div class="bt-kpi"><div class="l">Unidades</div><div class="n" style="color:${col(st.u)}">${st.u >= 0 ? "+" : ""}${st.u.toFixed(2)}</div></div>` +
     `<div class="bt-kpi"><div class="l">% acierto</div><div class="n">${Math.round(st.wins / st.n * 100)}%</div><div class="sm">${st.wins} de ${st.n}</div></div>` +
-    `<div class="bt-kpi"><div class="l">Cuota media</div><div class="n">${st.odds.toFixed(2)}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Cuota media</div><div class="n">${st.odds.toFixed(2)}</div>${st.clv != null && f.open ? `<div class="sm">CLV medio <b style="color:${col(st.clv)}">${st.clv >= 0 ? "+" : ""}${st.clv.toFixed(1)}%</b></div>` : ""}</div>` +
     `<div class="bt-kpi"><div class="l">Drawdown máx.</div><div class="n" style="color:#E5484D">-${st.dd.toFixed(1)}</div><div class="sm">1ª mitad ${st.y1 >= 0 ? "+" : ""}${st.y1.toFixed(0)}% · 2ª ${st.y2 >= 0 ? "+" : ""}${st.y2.toFixed(0)}%</div></div>`;
   // curva
   const ch = document.getElementById("hbChart");
