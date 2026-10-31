@@ -333,6 +333,24 @@
   .ld-row { display:flex; justify-content:space-between; gap:8px; padding:5px 0; font-size:13px; cursor:pointer; } .ld-row:hover span:first-child { color:#3ECF8E; }
   .ld-row small { color:#7C8797; }
   @media (max-width:700px) { .lu-wrap { grid-template-columns:1fr; } .pl-kpis { grid-template-columns:repeat(3,1fr); } .pl-grid { grid-template-columns:1fr; } }
+  #pv-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:290; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+  .pv-tg { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:#9AA5B1; cursor:pointer; }
+  .pv-more { max-width:860px; margin:0 auto; }
+  .pv-row { display:grid; grid-template-columns:96px minmax(0,1.5fr) minmax(0,1.1fr) minmax(0,1.2fr); gap:12px; align-items:center; background:#10151C; border:1px solid #1A212B; border-left:3px solid #1A212B; border-radius:14px; padding:10px 14px; cursor:pointer; }
+  .pv-row:hover { border-color:#2A3441; }
+  .pv-row.has-value { border-left-color:#F0B429; } .pv-row.has-error { border-left-color:#E5484D; }
+  .pv-row .lv-odds { grid-template-columns:repeat(3,1fr); }
+  .pv-best { text-align:center; font-size:11px; color:#7C8797; line-height:1.5; }
+  .pv-pill { display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; font-size:12px; background:#2A2410; color:#F0B429; }
+  .pv-pill.e { background:#2E1416; color:#E5484D; } .pv-pill.n { background:#1A212B; color:#9AA5B1; }
+  .pv-day { font-size:12px; font-weight:600; color:#7C8797; padding:8px 4px 0; }
+  .pv-day::first-letter { text-transform:uppercase; }
+  .pv-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:12px 0; }
+  #pv-body details.analysis-section:not([open]) { display:none; }
+  #pv-body .acc-grid { display:block; margin-top:6px; }
+  #pv-body details.analysis-section { margin-top:10px; border-radius:14px; background:#10151C; border-color:#1A212B; }
+  #pv-body .mkt-tabs { justify-content:center; }
+  @media (max-width:900px) { .pv-row { grid-template-columns:1fr; } }
   /* ---- Ficha del partido ---- */
   #match-overlay, #alq-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:300; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
   .ms-box { position:relative; background:#0D1218; border:1px solid #1A212B; border-radius:18px; width:100%; max-width:980px; padding:26px 24px 30px; }
@@ -397,17 +415,18 @@
     </div>
     <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
       Herramienta informativa. No procesa apuestas ni dinero real.
-      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.7.0 — ver novedades</span></div>
+      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.8.0 — ver novedades</span></div>
     </div>
   </div>
 
   <div id="changelog-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center;" onclick="if(event.target===this) toggleChangelog(false)">
     <div class="panel" style="width:380px; max-height:75vh; overflow-y:auto; background:#171C23;">
       <div class="row" style="margin-bottom:10px;">
-        <div style="font-weight:600;">Novedades — v1.7.0</div>
+        <div style="font-weight:600;">Novedades — v1.8.0</div>
         <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
       </div>
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
         <li>Formaciones renovadas: ficha de jugador con datos por 90 min, suplentes y líderes de jugadores</li>
         <li>Perfil: ligas, mercados, rachas y casas favoritas, con varios perfiles</li>
         <li>Nuevo formato visual: cabecera con título centrado, píldoras y tablas más limpias</li>
@@ -474,46 +493,36 @@
 
 
   <div id="view-partidos" class="view active">
-    <div class="panel" id="today-summary-panel">
-      <div class="row" style="margin-bottom:8px;">
-        <div style="font-weight:600;">Resumen del día</div>
-        <button class="small ghost" onclick="downloadDaySummaryImage()" title="Descargar informe (PNG)">⬇ PNG</button>
+    <select id="sport" onchange="loadOdds()" style="display:none;">
+      <option value="soccer_epl">Premier League</option><option value="soccer_spain_la_liga">La Liga</option><option value="soccer_italy_serie_a">Serie A</option><option value="soccer_germany_bundesliga">Bundesliga</option><option value="soccer_uefa_champs_league">Champions League</option>
+    </select>
+    <div class="chip-row mini" id="pvChips"></div>
+    <div class="lv-bar">
+      <input id="teamSearch" type="text" placeholder="Buscar equipo..." style="width:170px;" oninput="applyFilters()" />
+      <div class="seg" id="pvDay"><button class="seg-b active" data-d="null" onclick="pvSetDay(null)">Todos</button><button class="seg-b" data-d="0" onclick="pvSetDay(0)">Hoy</button><button class="seg-b" data-d="1" onclick="pvSetDay(1)">Mañana</button></div>
+      <label class="pv-tg"><input type="checkbox" id="pvValue" onchange="pv.onlyValue=this.checked; applyFilters()" /> Solo valor</label>
+      <label class="pv-tg"><input type="checkbox" id="onlyFavs" onchange="applyFilters()" /> ⭐</label>
+      <select id="pvSort" onchange="pv.sort=this.value; applyFilters()"><option value="time">Orden: hora</option><option value="ev">Orden: mejor valor</option></select>
+      <button onclick="loadOdds(true)">Actualizar cuotas</button>
+    </div>
+    <details id="more-filters" class="pv-more"><summary class="muted" style="cursor:pointer; font-size:12px; text-align:center;">Más filtros</summary>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; margin-top:10px;">
+        <input id="dateFilter" type="date" oninput="applyFilters()" />
+        <select id="marketFilter" onchange="applyFilters()"><option value="all">Todos los mercados</option><option value="h2h">Solo 1X2</option><option value="spreads">Solo hándicap</option><option value="totals">Solo más/menos goles</option></select>
+        <button class="ghost" onclick="document.getElementById('teamSearch').value=''; document.getElementById('dateFilter').value=''; document.getElementById('onlyFavs').checked=false; document.getElementById('pvValue').checked=false; pv.onlyValue=false; document.getElementById('marketFilter').value='all'; pvSetDay(null);">Limpiar filtros</button>
+        <button class="ghost" onclick="showAllLeaguesValue()">Mejores oportunidades (todas las ligas)</button>
+        <button class="ghost" onclick="downloadDaySummaryImage()">⬇ Informe PNG</button>
       </div>
-      <div id="today-summary" class="muted">Cargando...</div>
-    </div>
-    <div class="dash-grid" id="dash-summary"></div>
-    <div class="panel" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <label class="muted">Liga</label>
-      <select id="sport" onchange="loadOdds()">
-        <option value="soccer_epl">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
-        <option value="soccer_spain_la_liga">🇪🇸 La Liga</option>
-        <option value="soccer_italy_serie_a">🇮🇹 Serie A</option>
-        <option value="soccer_germany_bundesliga">🇩🇪 Bundesliga</option>
-        <option value="soccer_uefa_champs_league">🇪🇺 Champions League</option>
-      </select>
-      <button onclick="loadOdds()">Actualizar cuotas</button>
-      <input id="teamSearch" type="text" placeholder="Buscar equipo..." style="width:160px;" oninput="applyFilters()" />
-      <details id="more-filters" style="flex-basis:100%;"><summary class="muted" style="cursor:pointer; font-size:12px;">Más filtros</summary>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px;">
-      <input id="dateFilter" type="date" oninput="applyFilters()" />
-      <select id="marketFilter" onchange="applyFilters()">
-        <option value="all">Todos los mercados</option>
-        <option value="h2h">Solo 1X2</option>
-        <option value="spreads">Solo hándicap</option>
-        <option value="totals">Solo más/menos goles</option>
-      </select>
-      <button class="ghost" onclick="document.getElementById('teamSearch').value=''; document.getElementById('dateFilter').value=''; document.getElementById('onlyFavs').checked=false; document.getElementById('marketFilter').value='all'; applyFilters();">Limpiar filtros</button>
-      <label class="muted" style="display:flex; align-items:center; gap:4px;"><input type="checkbox" id="onlyFavs" onchange="applyFilters()" /> Solo favoritos ⭐</label>
-      <button class="ghost" onclick="showAllLeaguesValue()">Comparar todas las ligas (caché)</button>
-      </div></details>
-      <span id="status" class="muted"></span>
-    </div>
+    </details>
+    <div id="status" class="muted" style="text-align:center; font-size:12px; margin:6px 0 12px;"></div>
+    <div class="panel" id="today-summary-panel" style="display:none; max-width:860px; margin:0 auto 12px;"><div id="today-summary" class="muted"></div></div>
     <div id="all-leagues-panel"></div>
     <div id="alert-summary"></div>
-    <div id="content"></div>
-    <details class="panel">
-      <summary style="cursor:pointer; font-weight:600;">🏅 Logros y recordatorios</summary>
+    <div id="content" class="lv-list" style="margin:0 auto;"></div>
+    <details class="panel" style="max-width:860px; margin:18px auto 0;">
+      <summary style="cursor:pointer; font-weight:600;">Mi resumen, logros y recordatorios</summary>
       <div style="margin-top:14px;">
+        <div class="dash-grid" id="dash-summary"></div>
         <div style="font-weight:600; margin-bottom:8px; font-size:13px;">Logros</div>
         <div id="badges-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
         <div class="row" style="margin-bottom:8px;">
@@ -857,6 +866,9 @@
     </div>
   </div>
 
+  <div id="pv-overlay" style="display:none;" onclick="if(event.target===this) closePv()">
+    <div class="ms-box"><button class="ms-close" onclick="closePv()" aria-label="Cerrar">✕</button><div id="pv-body"></div></div>
+  </div>
   <div id="match-overlay" style="display:none;" onclick="if(event.target===this) closeMatchSheet()">
     <div class="ms-box">
       <button class="ms-close" onclick="closeMatchSheet()" aria-label="Cerrar">✕</button>
@@ -1114,7 +1126,8 @@ function renderDashboard() {
     let html = "";
     if (best) html += `<div class="live-row"><div>🏆 Mejor value de hoy: ${best.home} vs ${best.away} — ${best.selection}</div><div class="mono tag-value">+${pct(best.ev)}</div></div>`;
     if (favMatchesToday.length) favMatchesToday.forEach(m => html += `<div class="live-row"><div>⭐ ${m.home_team} vs ${m.away_team}</div><div class="muted">hoy</div></div>`);
-    summaryPanel.innerHTML = html || `<span class="muted">Sin novedades destacadas todavía hoy — actualiza cuotas en Partidos.</span>`;
+    summaryPanel.innerHTML = html;
+    const sp = document.getElementById("today-summary-panel"); if (sp) sp.style.display = html ? "" : "none";
   }
 }
 
@@ -1160,7 +1173,7 @@ async function loadOdds(forceRefresh) {
         const minsAgo = Math.round((Date.now() - cached.timestamp) / 60000);
         const seenBookies = new Set();
         cached.data.forEach(m => m.bookmakers.forEach(bk => seenBookies.add(bk.key)));
-        statusEl.innerHTML = `${cached.data.length} partidos (caché, hace ${minsAgo} min). Casas: ${[...seenBookies].join(", ") || "ninguna"}. <button class="small ghost" onclick="loadOdds(true)">Forzar actualización</button>`;
+        statusEl.innerHTML = `${cached.data.length} partidos (caché, hace ${minsAgo} min).`;
         renderMatches(cached.data, sport);
         return;
       }
@@ -1177,7 +1190,7 @@ async function loadOdds(forceRefresh) {
     try { localStorage.setItem(cacheKey, JSON.stringify({ data, timestamp: Date.now() })); } catch (e) { /* localStorage lleno, seguimos igual */ }
     const seenBookies = new Set();
     data.forEach(m => m.bookmakers.forEach(bk => seenBookies.add(bk.key)));
-    statusEl.innerHTML = `${data.length} partidos cargados (nuevo). Casas detectadas: ${[...seenBookies].join(", ") || "ninguna"}. <button class="small ghost" onclick="loadOdds(true)">Forzar actualización</button>`;
+    statusEl.innerHTML = `${data.length} partidos cargados (nuevo).`;
     renderMatches(data, sport);
   } catch (e) {
     statusEl.textContent = "";
@@ -1396,7 +1409,7 @@ function buildMarketTable(market, matchMeta) {
   const fair = {};
   Object.keys(groups).forEach(gk => { let sum = 0, n = 0; bookieKeys.forEach(bk => { if (probsByBookie[bk] && probsByBookie[bk][gk] != null) { sum += probsByBookie[bk][gk]; n++; } }); fair[gk] = n >= 2 ? sum/n : null; });
 
-  let flagLevel = "none";
+  let flagLevel = "none", bestSel = null;
   const bankroll = getBankroll(), kf = getKellyFraction();
   const rows = Object.keys(groups).map(gk => {
     const allOdds = groups[gk];
@@ -1417,6 +1430,7 @@ function buildMarketTable(market, matchMeta) {
     const isError = ev != null && ev >= ERROR_THRESHOLD;
     const isValue = ev != null && ev >= VALUE_THRESHOLD && !isError;
     if (isError) flagLevel = "error"; else if (isValue && flagLevel !== "error") flagLevel = "value";
+    if (ev != null && !usingFallback && (!bestSel || ev > bestSel.ev)) bestSel = { gk, ev, odds: best, bk: bestBk, mk: market.key };
     const evClass = ev == null ? "val-low" : isError ? "val-error" : isValue ? "val-high" : ev > 0 ? "val-mid" : "val-low";
     const stake = ((isValue || isError) && fair[gk] != null) ? kellyStake(fair[gk], best, bankroll, kf) : null;
     const tag = isError ? `<span class="tag-error">POSIBLE ERROR</span>` : isValue ? `<span class="tag-value">VALOR</span>` : "";
@@ -1447,7 +1461,7 @@ function buildMarketTable(market, matchMeta) {
     const bookieLabel = usingFallback ? `<span class="bk-tag" title="Referencia: William Hill sin precio aún">${bestBk} · ref.</span>` : `<span class="bk-tag">${bestBk}</span>`;
     return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${trendArrow} ${bookieLabel}</td><td class="mono"><span class="epill ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</span></td><td class="mono">${stake != null ? money(stake) : "—"}</td><td style="display:flex; gap:4px;">${regBtn}<button class="small ghost" title="Añadir a combinada" onclick="addToParlay('${parlayRid}')">➕</button></td></tr>`;
   }).filter(Boolean);
-  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa <span class="tooltip" title="Probabilidad real estimada promediando el mercado (sin el margen de la casa). No es la cuota, es la probabilidad que implica.">ⓘ</span></th><th>Cuota</th><th>Edge <span class="tooltip" title="Ventaja esperada: cuánto más alta es la cuota respecto a la probabilidad justa. Positivo = valor a tu favor a largo plazo.">ⓘ</span></th><th>Stake Kelly <span class="tooltip" title="Cuánto apostar según tu bankroll y edge, usando la fracción de Kelly que elegiste en Configuración.">ⓘ</span></th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
+  return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa <span class="tooltip" title="Probabilidad real estimada promediando el mercado (sin el margen de la casa). No es la cuota, es la probabilidad que implica.">ⓘ</span></th><th>Cuota</th><th>Edge <span class="tooltip" title="Ventaja esperada: cuánto más alta es la cuota respecto a la probabilidad justa. Positivo = valor a tu favor a largo plazo.">ⓘ</span></th><th>Stake Kelly <span class="tooltip" title="Cuánto apostar según tu bankroll y edge, usando la fracción de Kelly que elegiste en Configuración.">ⓘ</span></th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel, bestSel };
 }
 
 function extractFeaturedMarkets(m) {
@@ -1541,6 +1555,15 @@ function renderArbitrage() {
     </div>`).join("");
 }
 
+let pv = { day: null, onlyValue: false, sort: "time" }, pvItems = {};
+function pvSetDay(d) { pv.day = d; document.querySelectorAll("#pvDay .seg-b").forEach(b => b.classList.toggle("active", b.dataset.d === String(d))); applyFilters(); }
+function pvPickLeague(odds) { document.getElementById("sport").value = odds; loadOdds(); }
+function pvChips() {
+  const el = document.getElementById("pvChips"); if (!el) return;
+  const cur = document.getElementById("sport").value, now = Date.now();
+  el.innerHTML = pfLeaguesOrdered().map(l => { let n = 0; try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) n = c.data.filter(m => Date.parse(m.commence_time) >= now - 3 * 3600000).length; } catch (e) {}
+    return `<div class="chip ${l.odds === cur ? "active" : ""}" onclick="pvPickLeague('${l.odds}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span><span class="ct ${n ? "" : "zero"}">${n}</span></div>`; }).join("");
+}
 function applyFilters() {
   const term = (document.getElementById("teamSearch")?.value || "").toLowerCase().trim();
   const dateVal = document.getElementById("dateFilter")?.value || "";
@@ -1550,88 +1573,104 @@ function applyFilters() {
   let filtered = lastMatches;
   if (term) filtered = filtered.filter(m => m.home_team.toLowerCase().includes(term) || m.away_team.toLowerCase().includes(term));
   if (dateVal) filtered = filtered.filter(m => m.commence_time.slice(0,10) === dateVal);
+  if (pv.day != null) { const d0 = new Date(); d0.setHours(0, 0, 0, 0); const t0 = d0.getTime() + pv.day * 86400000; filtered = filtered.filter(m => { const t = Date.parse(m.commence_time); return t >= t0 && t < t0 + 86400000; }); }
   if (onlyFavs) filtered = filtered.filter(m => favs.has(m.home_team) || favs.has(m.away_team));
   if (marketFilter !== "all") filtered = filtered.filter(m => Object.keys(extractFeaturedMarkets(m)).includes(marketFilter));
   renderMatches(filtered, lastSport, true);
 }
+function closePv() { document.getElementById("pv-overlay").style.display = "none"; document.body.style.overflow = ""; }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePv(); });
+function pvOpen(idx) {
+  const it = pvItems[idx]; if (!it) return;
+  document.getElementById("pv-body").innerHTML = it.card;
+  document.getElementById("pv-overlay").style.display = "flex"; document.body.style.overflow = "hidden";
+  const c = it.cardId;
+  getTeamBadge(it.m.home_team).then(u => { const e = document.getElementById(`${c}-badge-h`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
+  getTeamBadge(it.m.away_team).then(u => { const e = document.getElementById(`${c}-badge-a`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
+  renderNoteTags(it.m.id, c);
+}
+function pvStats(idx) { const it = pvItems[idx]; if (!it) return; const l = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0]; closePv(); openMatchSheet(it.m.home_team, it.m.away_team, l.id, l.nm); }
 
 function renderMatches(matches, sport, isFiltered) {
   if (!isFiltered) { lastMatches = matches; lastSport = sport; setTimeout(() => { try { runAlarms(matches, sport); } catch (e) {} }, 300); }
+  pvChips();
   const contentEl = document.getElementById("content");
-  const notes = getNotes();
-  const favs = getFavorites();
+  const notes = getNotes(), favs = getFavorites();
   const marketFilter = document.getElementById("marketFilter")?.value || "all";
-  if (!matches.length) { contentEl.innerHTML = `<div class="panel muted">No hay partidos próximos con cuotas para esta liga en este momento.</div>`; document.getElementById("alert-summary").innerHTML = ""; return; }
+  if (!matches.length) { contentEl.innerHTML = `<div class="muted" style="padding:24px; text-align:center;">No hay partidos con estos filtros o con cuotas en este momento.</div>`; document.getElementById("alert-summary").innerHTML = ""; return; }
+  const lg = DD_LEAGUES.find(x => x.odds === sport) || { fl: "⚽", nm: "" };
   let errorCount = 0, valueCount = 0;
-  const cards = matches.map((m, idx) => {
+  pvItems = {};
+  const q = n => n.replace(/'/g, "\\'");
+  let items = matches.map((m, idx) => {
     const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, sport, eventId: m.id };
     let byMarket = extractFeaturedMarkets(m);
     lastFullMarketsByMatch[m.id] = { matchMeta, byMarket };
     if (marketFilter !== "all" && byMarket[marketFilter]) byMarket = { [marketFilter]: byMarket[marketFilter] };
     else if (marketFilter !== "all") byMarket = {};
-    let cardFlag = "none";
-    const tabs = Object.keys(byMarket).map((mkKey) => {
+    let cardFlag = "none", best = null;
+    const tabs = Object.keys(byMarket).map(mkKey => {
       const built = buildMarketTable(byMarket[mkKey], matchMeta);
       if (built.flagLevel === "error") { cardFlag = "error"; errorCount++; }
       else if (built.flagLevel === "value" && cardFlag !== "error") { cardFlag = "value"; valueCount++; }
+      if (built.bestSel && (!best || built.bestSel.ev > best.ev)) best = built.bestSel;
       return { key: mkKey, label: MARKET_LABELS[mkKey] || mkKey, html: built.table };
     });
-    const date = new Date(m.commence_time);
-    const dateStr = date.toLocaleString("es-ES", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
-    const searchQuery = encodeURIComponent(`${m.home_team} vs ${m.away_team} preview news injuries`);
-    const cardId = `m${idx}`;
-    const cardClass = cardFlag === "error" ? "has-error" : cardFlag === "value" ? "has-value" : "";
-    return `<div class="panel match-card ${cardClass}" id="${cardId}">
-      <div class="row">
-        <div><div style="font-weight:600; display:flex; align-items:center; gap:10px; font-size:15px;"><img id="${cardId}-badge-h" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /> ${m.home_team} <span style="cursor:pointer;" onclick="toggleFavorite('${m.home_team.replace(/'/g,"\\'")}')">${favs.has(m.home_team) ? "⭐" : "☆"}</span> vs <span style="cursor:pointer;" onclick="toggleFavorite('${m.away_team.replace(/'/g,"\\'")}')">${favs.has(m.away_team) ? "⭐" : "☆"}</span> ${m.away_team} <img id="${cardId}-badge-a" class="team-badge" style="width:26px; height:26px; object-fit:contain; display:none;" /></div><div class="muted">${dateStr}</div></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button onclick="studyMatch('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar este partido</button>
-          <button class="small" onclick="analyzeWithAI('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}')">Analizar con IA</button>
-          <div class="dropdown" id="${cardId}-dropdown">
-            <button class="small ghost" onclick="toggleDropdown('${cardId}-dropdown')">⋮ Más opciones</button>
-            <div class="dropdown-menu">
-              <button onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}'); toggleDropdown('${cardId}-dropdown')">Más mercados</button>
-              <button onclick="loadInjuries('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}'); toggleDropdown('${cardId}-dropdown')">Bajas y sanciones</button>
-              <button onclick="loadForm('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}'); toggleDropdown('${cardId}-dropdown')">Forma reciente</button>
-              <button onclick="loadH2H('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}'); toggleDropdown('${cardId}-dropdown')">Faltas y tarjetas (H2H)</button>
-              <button onclick="runMonteCarlo('${cardId}', '${m.home_team.replace(/'/g,"\\'")}', '${m.away_team.replace(/'/g,"\\'")}'); toggleDropdown('${cardId}-dropdown')">Simular (Monte Carlo)</button>
-              <a class="link-btn" style="display:block; padding:8px 10px;" href="https://www.google.com/search?q=${searchQuery}" target="_blank">Buscar noticias →</a>
-            </div>
-          </div>
-        </div>
+    const date = new Date(m.commence_time), cardId = `m${idx}`, H = q(m.home_team), A = q(m.away_team);
+    const dateStr = date.toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    const card = `<div id="${cardId}">
+      <div class="ms-title" style="display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;"><img id="${cardId}-badge-h" class="team-badge" style="width:28px; height:28px; object-fit:contain; display:none;" />${m.home_team} <span style="color:#3ECF8E">vs</span> ${m.away_team}<img id="${cardId}-badge-a" class="team-badge" style="width:28px; height:28px; object-fit:contain; display:none;" /></div>
+      <div class="ms-sub">${lg.fl} ${lg.nm} · ${dateStr}</div>
+      <div class="pv-actions">
+        <button onclick="studyMatch('${cardId}', '${H}', '${A}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar partido</button>
+        <button class="small ghost" onclick="pvStats(${idx})">📊 Estadísticas</button>
+        <button class="small ghost" onclick="loadForm('${cardId}', '${H}', '${A}')">Forma</button>
+        <button class="small ghost" onclick="loadInjuries('${cardId}', '${H}', '${A}')">Bajas</button>
+        <button class="small ghost" onclick="loadH2H('${cardId}', '${H}', '${A}')">Tarjetas H2H</button>
+        <button class="small ghost" onclick="runMonteCarlo('${cardId}', '${H}', '${A}')">Simular</button>
+        <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
+        <button class="small ghost" onclick="analyzeWithAI('${cardId}', '${H}', '${A}')">Analizar con IA</button>
       </div>
       <div id="${cardId}-study-status"></div>
-      <div class="mkt-tabs">${tabs.map((t,i) => `<button class="mkt-tab ${i===0?'active':''}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
-      ${tabs.map((t,i) => `<div class="mkt-body ${i===0?'active':''}" data-idx="${i}">${t.html}</div>`).join("")}
+      <div class="mkt-tabs">${tabs.map((t, i) => `<button class="mkt-tab ${i === 0 ? "active" : ""}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
+      ${tabs.map((t, i) => `<div class="mkt-body ${i === 0 ? "active" : ""}" data-idx="${i}">${t.html}</div>`).join("")}
       <div class="acc-grid">
-      <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
-      <details class="analysis-section" id="${cardId}-injuries-d"><summary>Bajas y sanciones</summary><div id="${cardId}-injuries"></div></details>
-      <details class="analysis-section" id="${cardId}-form-d"><summary>Forma reciente</summary><div id="${cardId}-form"></div></details>
-      <details class="analysis-section" id="${cardId}-h2h-d"><summary>Faltas y tarjetas (H2H)</summary><div id="${cardId}-h2h"></div></details>
-      <details class="analysis-section" id="${cardId}-montecarlo-d"><summary>Simulación Monte Carlo</summary><div id="${cardId}-montecarlo"></div></details>
-      <details class="analysis-section" id="${cardId}-ai-d"><summary>Análisis con IA</summary><div id="${cardId}-ai"></div></details>
+        <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
+        <details class="analysis-section" id="${cardId}-injuries-d"><summary>Bajas y sanciones</summary><div id="${cardId}-injuries"></div></details>
+        <details class="analysis-section" id="${cardId}-form-d"><summary>Forma reciente</summary><div id="${cardId}-form"></div></details>
+        <details class="analysis-section" id="${cardId}-h2h-d"><summary>Faltas y tarjetas (H2H)</summary><div id="${cardId}-h2h"></div></details>
+        <details class="analysis-section" id="${cardId}-montecarlo-d"><summary>Simulación Monte Carlo</summary><div id="${cardId}-montecarlo"></div></details>
+        <details class="analysis-section" id="${cardId}-ai-d"><summary>Análisis con IA</summary><div id="${cardId}-ai"></div></details>
       </div>
-      <div style="margin-top:10px;">
-        <label class="muted">Notas propias</label>
-        <textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)">${notes[m.id] || ""}</textarea>
+      <details class="analysis-section" style="display:block !important; margin-top:14px;"><summary>Notas y etiquetas</summary>
+        <textarea placeholder="Otros factores..." onchange="saveNote('${m.id}', this.value)" style="margin-top:8px;">${notes[m.id] || ""}</textarea>
         <div id="${cardId}-tags" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;"></div>
-        <div style="display:flex; gap:6px; margin-top:6px;">
-          <input id="${cardId}-tag-input" type="text" placeholder="Añadir etiqueta (ej: lesión clave)..." style="flex:1; font-size:12px;" onkeydown="if(event.key==='Enter'){addNoteTag('${m.id}','${cardId}'); event.preventDefault();}" />
-          <button class="small ghost" onclick="addNoteTag('${m.id}', '${cardId}')">+ Añadir</button>
-        </div>
-      </div>
+        <div style="display:flex; gap:6px; margin-top:6px;"><input id="${cardId}-tag-input" type="text" placeholder="Añadir etiqueta..." style="flex:1; font-size:12px;" onkeydown="if(event.key==='Enter'){addNoteTag('${m.id}','${cardId}'); event.preventDefault();}" /><button class="small ghost" onclick="addNoteTag('${m.id}', '${cardId}')">+ Añadir</button></div>
+      </details>
     </div>`;
+    const cells = [["home", m.home_team], ["Draw", "Draw"], ["away", m.away_team]].map(([lab, key]) => ({ lab: lab === "home" ? "1" : lab === "away" ? "2" : "X", r: cpPick(m.bookmakers, "h2h", key) }));
+    pvItems[idx] = { m, cardId, card };
+    return { m, idx, cardFlag, best, cells, date };
+  });
+  if (pv.onlyValue) items = items.filter(i => i.cardFlag !== "none");
+  items.sort((a, b) => pv.sort === "ev" ? (b.best ? b.best.ev : -9) - (a.best ? a.best.ev : -9) : a.m.commence_time.localeCompare(b.m.commence_time));
+  let day = "";
+  const html = items.map(({ m, idx, cardFlag, best, cells, date }) => {
+    const dk = date.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+    const head = pv.sort === "time" && dk !== day ? (day = dk, `<div class="pv-day">${dk}</div>`) : "";
+    const cls = best && best.ev >= ERROR_THRESHOLD ? "e" : best && best.ev >= VALUE_THRESHOLD ? "" : "n";
+    const pill = best ? `<span class="pv-pill ${cls}">${cls === "e" ? "POSIBLE ERROR" : cls === "" ? "VALOR" : "Sin valor"} ${best.ev >= 0 ? "+" : ""}${(best.ev * 100).toFixed(1)}%</span><div>${best.gk} @ ${best.odds.toFixed(2)}<br/><span style="font-size:10px;">${(PF_BOOKS.find(x => x[0] === best.bk) || [0, best.bk.replace("_eu", "")])[1]}</span></div>` : `<span class="muted">–</span>`;
+    return head + `<div class="pv-row ${cardFlag === "error" ? "has-error" : cardFlag === "value" ? "has-value" : ""}" onclick="pvOpen(${idx})" title="Ver cuotas y análisis">
+      <div class="lv-lg"><b>${lg.fl} ${lg.nm.slice(0, 8)}</b><span class="lv-st">${date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span></div>
+      <div class="lv-teams"><div class="lv-team"><img id="pvb-h${idx}" style="display:none;" />${m.home_team}<span style="margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); toggleFavorite('${q(m.home_team)}')">${favs.has(m.home_team) ? "⭐" : "☆"}</span></div><div class="lv-team"><img id="pvb-a${idx}" style="display:none;" />${m.away_team}<span style="margin-left:auto; cursor:pointer;" onclick="event.stopPropagation(); toggleFavorite('${q(m.away_team)}')">${favs.has(m.away_team) ? "⭐" : "☆"}</span></div></div>
+      <div class="lv-odds">${cells.map(c => `<div><div class="h">${c.lab}</div>${c.r ? `<span class="codd ${c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""}" style="min-width:0; padding:3px 6px;">${c.r.price.toFixed(2)}</span>` : '<span class="muted">–</span>'}</div>`).join("")}</div>
+      <div class="pv-best">${pill}</div></div>`;
   }).join("");
-  document.getElementById("alert-summary").innerHTML = (errorCount + valueCount) ? `<div class="panel" style="display:flex; gap:20px;">
-    ${errorCount ? `<div><span class="tag-error">${errorCount} posible(s) error(es) de cuotas</span></div>` : ""}
-    ${valueCount ? `<div><span class="tag-value">${valueCount} selección(es) con valor</span></div>` : ""}
-  </div>` : "";
-  contentEl.innerHTML = cards;
-  matches.forEach((m, idx) => {
-    const cardId = `m${idx}`;
-    getTeamBadge(m.home_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-h`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
-    getTeamBadge(m.away_team).then(url => { if (url) { const el = document.getElementById(`${cardId}-badge-a`); if (el) { el.src = url; el.style.display = "inline-block"; } } });
-    renderNoteTags(m.id, cardId);
+  document.getElementById("alert-summary").innerHTML = (errorCount + valueCount) ? `<div style="display:flex; gap:14px; justify-content:center; margin-bottom:12px;">${errorCount ? `<span class="tag-error">${errorCount} posible(s) error(es)</span>` : ""}${valueCount ? `<span class="tag-value">${valueCount} selección(es) con valor</span>` : ""}</div>` : "";
+  contentEl.innerHTML = html || `<div class="muted" style="padding:24px; text-align:center;">Ningún partido con valor en estos filtros.</div>`;
+  items.forEach(({ m, idx }) => {
+    getTeamBadge(m.home_team).then(u => { const e = document.getElementById(`pvb-h${idx}`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
+    getTeamBadge(m.away_team).then(u => { const e = document.getElementById(`pvb-a${idx}`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
   });
 }
 
