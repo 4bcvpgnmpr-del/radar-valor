@@ -564,7 +564,7 @@
     <div class="dd-title" style="margin-top:26px;">Rachas de la liga</div>
     <div id="dd-streak-status" class="muted" style="text-align:center; margin-bottom:12px; font-size:12px;"></div>
     <div id="dd-streaks" class="streak-grid dd-grid"></div>
-    <details class="panel" style="margin-top:22px;"><summary style="cursor:pointer; font-weight:600; text-align:center;">Equipos que juegan hoy (goles y tarjetas)</summary>
+    <details class="panel" style="margin-top:22px;"><summary style="cursor:pointer; font-weight:600; text-align:center;">Próximos partidos y estadísticas de sus equipos</summary>
     <div style="margin-top:14px;">
       <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <div></div>
@@ -1047,7 +1047,7 @@ async function getTeamBadge(name) {
   }
 }
 
-const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con las cuotas de varias casas. Los números sobre cada liga son los partidos con cuotas cargadas (o, en gris, los programados esta semana).\n<ul><li><b>Cuota justa / probabilidad justa:</b> es el promedio de lo que creen las casas, quitando su margen de beneficio. Es la mejor estimación de la probabilidad real.</li>\n<li><b>Valor (EV):</b> cuánto ganarías de media por cada unidad si la probabilidad justa es correcta. Se calcula cuota × probabilidad justa − 1.</li>\n<li><b>Colores:</b> verde = valor (EV de +2% o más). Rojo = EV de +15% o más: casi siempre es un <b>posible error</b> de una casa o un dato desfasado, compruébalo antes de fiarte.</li>\n<li>Toca un partido para abrir su ficha con todos los mercados, el modelo de probabilidades y Bet365.</li></ul>", "model": "<b>Modelo:</b> probabilidad calculada con los resultados históricos (ataque, defensa y ventaja de local de cada equipo). <b>Cuota justa:</b> la cuota que corresponde a esa probabilidad (1 ÷ prob.): si te pagan más, el modelo ve valor.\n<ul><li><b>Mercado (justa):</b> la probabilidad que implican las casas, sin margen.</li>\n<li><b>Diferencia:</b> modelo − mercado en puntos porcentuales. Verde = el modelo lo ve más probable que el mercado.</li>\n<li><b>Mejor cuota:</b> la más alta entre todas las casas. <b>Edge prudente:</b> ventaja usando 50% modelo y 50% mercado (el mercado suele acertar más).</li>\n<li><b>Ojo:</b> diferencias enormes (más de 15-20 puntos) suelen ser datos mal emparejados o cuotas erróneas, no oportunidades. El modelo no sabe de lesiones ni alineaciones.</li></ul>", "coupon": "<b>Qué es:</b> comparador de cuotas (\"Pregame\") por casa para los próximos partidos, mercado a mercado.\n<ul><li>Cada columna es una casa; la mejor cuota de cada fila va resaltada.</li><li>El porcentaje junto a la cuota es el valor (EV) frente a la probabilidad justa del mercado.</li><li>Usa los filtros de liga, día y mercado para acotar. Las cuotas se actualizan al pulsar el botón (gasta créditos de The Odds API).</li></ul>", "daydash": "<b>Qué es:</b> un resumen de la jornada por liga: los partidos del día y las rachas de los equipos (por ejemplo, partidos seguidos marcando o con más de 2.5 goles).\n<ul><li>Una racha larga indica una tendencia reciente, no una garantía: contrástala con las cuotas.</li><li>Las estadísticas vienen de API-Football y football-data.org; la temporada actual necesita el token de football-data.org.</li></ul>", "live": "<b>Qué es:</b> partidos que se están jugando ahora, con marcador y minuto. Pulsa <b>Actualizar en vivo</b>, o activa Auto para refrescar cada 90 s.\n<ul><li>Cada actualización gasta peticiones de API-Football (plan gratis: 100 al día).</li><li>\"Solo con cuotas\" deja los partidos para los que hay cuotas cargadas.</li></ul>", "lineups": "<b>Qué es:</b> alineaciones y formaciones de los partidos, con la ficha de cada jugador al tocarlo. Debajo, los líderes de la liga.\n<ul><li>Las alineaciones solo están disponibles poco antes del partido (normalmente 1 hora).</li><li>Elige liga y día arriba. Los datos vienen de API-Football.</li></ul>", "arbitrage": "<b>Qué es:</b> busca combinaciones entre casas donde, apostando a todos los resultados, ganarías algo seguro (surebet).\n<ul><li><b>Margen:</b> el beneficio garantizado sobre lo apostado. Si ves más de un 3-5%, desconfía: suele ser una cuota errónea o desfasada que la casa corregirá o anulará.</li><li>Revisa siempre las cuotas en la casa antes de nada; cambian en segundos.</li></ul>", "calendar": "<b>Qué es:</b> los próximos partidos de tus equipos favoritos (márcalos con la ⭐ en Partidos y valor).\n<ul><li>Sirve para planificar la semana sin buscar liga por liga.</li></ul>", "hist": "<b>Qué es:</b> una simulación. La app toma todos los partidos pasados que cumplen tus filtros, supone que apostaste 1 unidad a cada uno y compara con el resultado real.\n<ul><li><b>Yield:</b> ganancia por cada unidad apostada, en %. +5% significa 5 céntimos de beneficio por euro.</li><li><b>Unidades:</b> beneficio total (cada acierto suma cuota − 1, cada fallo resta 1).</li>\n<li><b>Fiabilidad:</b> \"señal sólida\" = yield positivo, muestra grande y positivo en las dos mitades del periodo. \"Probable azar\" = positivo pero poco convincente. En el ranking se exige más evidencia porque se prueban muchas combinaciones.</li>\n<li><b>1ª / 2ª mitad:</b> yield en la primera y segunda mitad de los partidos. Si el signo cambia, desconfía.</li>\n<li><b>Drawdown máx.:</b> la peor caída seguida de unidades. Indica cuánto habrías sufrido.</li>\n<li><b>CLV medio</b> (con \"Apertura\"): cuánto mejor era tu cuota que la probabilidad justa del cierre. Positivo y sostenido = ventaja real.</li>\n<li><b>Mercados \"sin cuota\":</b> el archivo no trae cuotas, así que se mide la frecuencia y la <b>cuota mínima</b>: si tu casa paga más que esa cuota, el mercado habría dado beneficio.</li></ul>", "sistema": "<b>Qué es:</b> tus apuestas reales. Aquí solo cuentan las que marcas tú como ganada o perdida en la lista de más abajo; la app no sabe si apostaste.\n<ul><li>Stake fijo de 1 unidad. Puedes filtrar por liga, mercado, casa, cuota y valor, y guardar combinaciones como \"sistema\".</li><li>Las pestañas Liga / Equipo / Mercado / Casa agrupan los resultados para ver dónde ganas o pierdes.</li></ul>", "historial": "<b>Qué es:</b> las apuestas que registras, con su cuota y el <b>CLV</b>: compara tu cuota con la cuota justo antes del partido.\n<ul><li>CLV positivo y sostenido en muchas apuestas = ventaja real, aunque algunas pierdan.</li><li>CLV negativo continuado = tus cuotas son peores que las del cierre.</li></ul>", "explore": "<b>Qué es:</b> frecuencias históricas de mercados concretos (goles, ambos marcan, hándicap, mitades…) para contrastar con las cuotas.\n<ul><li>Modo liga: cuántas veces ocurrió en la liga. Modo partido: se centra en un partido y sus equipos.</li><li>Una frecuencia alta no es valor por sí sola: compárala con la cuota (cuota mínima = 1 ÷ frecuencia).</li></ul>", "alarms": "<b>Qué es:</b> avisos que saltan cuando se cumple lo que pones.\n<ul><li><b>Pregame:</b> avisa cuando aparece valor o una cuota que cumple tus condiciones.</li><li><b>En vivo:</b> marcador, minuto o conteos dentro de un tramo (por ejemplo 3 tiros a puerta entre el 60' y el 75').</li><li>Todas las condiciones que rellenes deben cumplirse a la vez. Solo funcionan con la app abierta y gastan peticiones de API-Football.</li></ul>", "trends": "<b>Qué es:</b> tendencias recientes de los equipos de una liga: rachas, goles y resultados.\n<ul><li>Son datos pasados; úsalos para contrastar, no como predicción segura.</li><li>La temporada actual necesita el token de football-data.org.</li></ul>", "widgets": "<b>Qué es:</b> clasificación, máximos goleadores y tarjetas de la temporada para contrastar con lo que dicen las cuotas.\n<ul><li>Con API-Football gratis solo llega a la temporada 2024; con el token de football-data.org se carga la actual.</li></ul>", "profile": "<b>Qué es:</b> tu perfil de apostador: ligas y casas que sigues y ajustes que se aplican al resto de la app (por ejemplo, el orden de las ligas).\n<ul><li>Puedes tener varios perfiles y cambiar de uno a otro.</li></ul>"};
+const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con las cuotas de varias casas. Los números sobre cada liga son los partidos con cuotas cargadas (o, en gris, los programados esta semana).\n<ul><li><b>Cuota justa / probabilidad justa:</b> es el promedio de lo que creen las casas, quitando su margen de beneficio. Es la mejor estimación de la probabilidad real.</li>\n<li><b>Valor (EV):</b> cuánto ganarías de media por cada unidad si la probabilidad justa es correcta. Se calcula cuota × probabilidad justa − 1.</li>\n<li><b>Colores:</b> verde = valor (EV de +2% o más). Rojo = EV de +15% o más: casi siempre es un <b>posible error</b> de una casa o un dato desfasado, compruébalo antes de fiarte.</li>\n<li>Toca un partido para abrir su ficha con todos los mercados, el modelo de probabilidades y Bet365.</li></ul>", "model": "<b>Modelo:</b> probabilidad calculada con los resultados históricos (ataque, defensa y ventaja de local de cada equipo). <b>Cuota justa:</b> la cuota que corresponde a esa probabilidad (1 ÷ prob.): si te pagan más, el modelo ve valor.\n<ul><li><b>Mercado (justa):</b> la probabilidad que implican las casas, sin margen.</li>\n<li><b>Diferencia:</b> modelo − mercado en puntos porcentuales. Verde = el modelo lo ve más probable que el mercado.</li>\n<li><b>Mejor cuota:</b> la más alta entre todas las casas. <b>Edge prudente:</b> ventaja usando 50% modelo y 50% mercado (el mercado suele acertar más).</li>\n<li><b>Ojo:</b> diferencias enormes (más de 15-20 puntos) suelen ser datos mal emparejados o cuotas erróneas, no oportunidades. El modelo no sabe de lesiones ni alineaciones.</li></ul>", "coupon": "<b>Qué es:</b> comparador de cuotas (\"Pregame\") por casa para los próximos partidos, mercado a mercado.\n<ul><li>Cada columna es una casa; la mejor cuota de cada fila va resaltada.</li><li>El porcentaje junto a la cuota es el valor (EV) frente a la probabilidad justa del mercado.</li><li>Usa los filtros de liga, día y mercado para acotar. Las cuotas se actualizan al pulsar el botón (gasta créditos de The Odds API).</li></ul>", "daydash": "<b>Qué es:</b> los partidos de la liga en los próximos 3 días con las estadísticas de cada equipo esta temporada.<ul><li><b>GF / GC:</b> goles a favor y en contra por partido. <b>+2.5 / Ambos:</b> % de sus partidos con más de 2.5 goles y con ambos marcando.</li><li><b>Últimos 5:</b> G ganó, E empató, P perdió.</li><li><b>Goles esperados:</b> referencia rápida (lo que marca uno más lo que encaja el otro). No es una probabilidad: para eso usa el modelo en la ficha del partido.</li><li>Los datos salen de football-data.org (gratis). No hay tarjetas por equipo (necesitan el plan de pago de API-Football).</li></ul>", "live": "<b>Qué es:</b> partidos que se están jugando ahora, con marcador y minuto. Pulsa <b>Actualizar en vivo</b>, o activa Auto para refrescar cada 90 s.\n<ul><li>Cada actualización gasta peticiones de API-Football (plan gratis: 100 al día).</li><li>\"Solo con cuotas\" deja los partidos para los que hay cuotas cargadas.</li></ul>", "lineups": "<b>Qué es:</b> alineaciones y formaciones de los partidos, con la ficha de cada jugador al tocarlo. Debajo, los líderes de la liga.\n<ul><li>Las alineaciones solo están disponibles poco antes del partido (normalmente 1 hora).</li><li>Elige liga y día arriba. Los datos vienen de API-Football.</li></ul>", "arbitrage": "<b>Qué es:</b> busca combinaciones entre casas donde, apostando a todos los resultados, ganarías algo seguro (surebet).\n<ul><li><b>Margen:</b> el beneficio garantizado sobre lo apostado. Si ves más de un 3-5%, desconfía: suele ser una cuota errónea o desfasada que la casa corregirá o anulará.</li><li>Revisa siempre las cuotas en la casa antes de nada; cambian en segundos.</li></ul>", "calendar": "<b>Qué es:</b> los próximos partidos de tus equipos favoritos (márcalos con la ⭐ en Partidos y valor).\n<ul><li>Sirve para planificar la semana sin buscar liga por liga.</li></ul>", "hist": "<b>Qué es:</b> una simulación. La app toma todos los partidos pasados que cumplen tus filtros, supone que apostaste 1 unidad a cada uno y compara con el resultado real.\n<ul><li><b>Yield:</b> ganancia por cada unidad apostada, en %. +5% significa 5 céntimos de beneficio por euro.</li><li><b>Unidades:</b> beneficio total (cada acierto suma cuota − 1, cada fallo resta 1).</li>\n<li><b>Fiabilidad:</b> \"señal sólida\" = yield positivo, muestra grande y positivo en las dos mitades del periodo. \"Probable azar\" = positivo pero poco convincente. En el ranking se exige más evidencia porque se prueban muchas combinaciones.</li>\n<li><b>1ª / 2ª mitad:</b> yield en la primera y segunda mitad de los partidos. Si el signo cambia, desconfía.</li>\n<li><b>Drawdown máx.:</b> la peor caída seguida de unidades. Indica cuánto habrías sufrido.</li>\n<li><b>CLV medio</b> (con \"Apertura\"): cuánto mejor era tu cuota que la probabilidad justa del cierre. Positivo y sostenido = ventaja real.</li>\n<li><b>Mercados \"sin cuota\":</b> el archivo no trae cuotas, así que se mide la frecuencia y la <b>cuota mínima</b>: si tu casa paga más que esa cuota, el mercado habría dado beneficio.</li></ul>", "sistema": "<b>Qué es:</b> tus apuestas reales. Aquí solo cuentan las que marcas tú como ganada o perdida en la lista de más abajo; la app no sabe si apostaste.\n<ul><li>Stake fijo de 1 unidad. Puedes filtrar por liga, mercado, casa, cuota y valor, y guardar combinaciones como \"sistema\".</li><li>Las pestañas Liga / Equipo / Mercado / Casa agrupan los resultados para ver dónde ganas o pierdes.</li></ul>", "historial": "<b>Qué es:</b> las apuestas que registras, con su cuota y el <b>CLV</b>: compara tu cuota con la cuota justo antes del partido.\n<ul><li>CLV positivo y sostenido en muchas apuestas = ventaja real, aunque algunas pierdan.</li><li>CLV negativo continuado = tus cuotas son peores que las del cierre.</li></ul>", "explore": "<b>Qué es:</b> frecuencias históricas de mercados concretos (goles, ambos marcan, hándicap, mitades…) para contrastar con las cuotas.\n<ul><li>Modo liga: cuántas veces ocurrió en la liga. Modo partido: se centra en un partido y sus equipos.</li><li>Una frecuencia alta no es valor por sí sola: compárala con la cuota (cuota mínima = 1 ÷ frecuencia).</li></ul>", "alarms": "<b>Qué es:</b> avisos que saltan cuando se cumple lo que pones.\n<ul><li><b>Pregame:</b> avisa cuando aparece valor o una cuota que cumple tus condiciones.</li><li><b>En vivo:</b> marcador, minuto o conteos dentro de un tramo (por ejemplo 3 tiros a puerta entre el 60' y el 75').</li><li>Todas las condiciones que rellenes deben cumplirse a la vez. Solo funcionan con la app abierta y gastan peticiones de API-Football.</li></ul>", "trends": "<b>Qué es:</b> tendencias recientes de los equipos de una liga: rachas, goles y resultados.\n<ul><li>Son datos pasados; úsalos para contrastar, no como predicción segura.</li><li>La temporada actual necesita el token de football-data.org.</li></ul>", "widgets": "<b>Qué es:</b> clasificación, máximos goleadores y tarjetas de la temporada para contrastar con lo que dicen las cuotas.\n<ul><li>Con API-Football gratis solo llega a la temporada 2024; con el token de football-data.org se carga la actual.</li></ul>", "profile": "<b>Qué es:</b> tu perfil de apostador: ligas y casas que sigues y ajustes que se aplican al resto de la app (por ejemplo, el orden de las ligas).\n<ul><li>Puedes tener varios perfiles y cambiar de uno a otro.</li></ul>"};
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
@@ -2961,12 +2961,12 @@ function fillLeagueSelects() {
   });
 }
 function renderDdChips() {
-  const el = document.getElementById("dd-chips"); if (!el) return;
+  const el = document.getElementById("dd-chips"); if (!el) return; fdSchedLoad();
   const cur = document.getElementById("trLeague").value, now = Date.now(), lim = now + 3 * 86400000;
   el.innerHTML = pfLeaguesOrdered().map(l => {
     let n = 0;
     try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) n = c.data.filter(m => { const t = Date.parse(m.commence_time); return t >= now - 3 * 3600000 && t <= lim; }).length; } catch (e) {}
-    return `<div class="chip ${l.id === cur ? "active" : ""}" onclick="pickDdLeague('${l.id}')"><div class="fl">${l.fl}</div><div class="nm">${l.nm}</div><div class="ct ${n ? "" : "zero"}" title="Partidos en los próximos 3 días (según cuotas cargadas)">${n}</div></div>`;
+    return `<div class="chip ${l.id === cur ? "active" : ""}" onclick="pickDdLeague('${l.id}')"><div class="fl">${l.fl}</div><div class="nm">${l.nm}</div><div class="ct ${n ? "" : fdSched && fdSched[l.id] ? "sched" : "zero"}" title="Partidos en los próximos días (cuotas cargadas o calendario de football-data.org)">${n || (fdSched && fdSched[l.id]) || 0}</div></div>`;
   }).join("");
 }
 function pickDdLeague(id) {
@@ -3433,67 +3433,50 @@ function pfApply() {
 }
 function sortTrends(k) { trSort = { k, d: trSort.k === k ? -trSort.d : (k === "n" ? 1 : -1) }; renderTrends(); }
 
-async function loadDayDashboard() {
-  const footballKey = getFootballKey();
-  const statusEl = document.getElementById("daydash-status");
-  const contentEl = document.getElementById("daydash-content");
-  if (!footballKey) { statusEl.innerHTML = `Añade tu API-Football key arriba.`; return; }
-  const league = document.getElementById("dayDashLeague").value;
-  const today = new Date().toISOString().slice(0,10);
-  statusEl.textContent = "Buscando partidos de hoy...";
-  contentEl.innerHTML = "";
-  try {
-    const fixtures = await apiFootball(`/fixtures?league=${league}&season=${currentSeason()}&date=${today}`, footballKey);
-    if (!fixtures.length) { statusEl.innerHTML = `<span class="muted">No hay partidos de esta liga hoy.</span>`; return; }
-    const teams = new Map();
-    fixtures.forEach(f => {
-      teams.set(f.teams.home.id, { name: f.teams.home.name, vs: f.teams.away.name, logo: f.teams.home.logo });
-      teams.set(f.teams.away.id, { name: f.teams.away.name, vs: f.teams.home.name, logo: f.teams.away.logo });
-    });
-    statusEl.textContent = `Consultando estadísticas de ${teams.size} equipos (temporada 2024)...`;
-    const statsSeason = 2024;
-    const results = [];
-    for (const [teamId, info] of teams) {
-      try {
-        const stats = await apiFootball(`/teams/statistics?team=${teamId}&league=${league}&season=${statsSeason}`, footballKey);
-        const s = Array.isArray(stats) ? stats[0] : stats;
-        if (!s || !s.fixtures) continue;
-        const avgGoals = parseFloat(s.goals?.for?.average?.total) || 0;
-        let totalYellow = 0, totalRed = 0;
-        if (s.cards?.yellow) Object.values(s.cards.yellow).forEach(v => totalYellow += v.total || 0);
-        if (s.cards?.red) Object.values(s.cards.red).forEach(v => totalRed += v.total || 0);
-        const played = s.fixtures.played.total || 1;
-        results.push({ name: info.name, vs: info.vs, logo: info.logo, avgGoals, cardsPerGame: (totalYellow + totalRed) / played, totalYellow, totalRed });
-      } catch (e) { /* seguimos con el resto aunque un equipo falle */ }
-    }
-    statusEl.textContent = `${results.length}/${teams.size} equipos con datos disponibles (temporada 2024).`;
-    if (!results.length) { contentEl.innerHTML = `<div class="muted">No se pudieron obtener estadísticas para estos equipos.</div>`; return; }
-
-    const byGoals = results.slice().sort((a,b) => b.avgGoals - a.avgGoals).slice(0, 10);
-    const byCards = results.slice().sort((a,b) => b.cardsPerGame - a.cardsPerGame).slice(0, 10);
-
-    contentEl.innerHTML = `
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
-        <div>
-          <div style="font-weight:600; margin-bottom:10px;">⚽ Más goles por partido (jugando hoy)</div>
-          ${byGoals.map(t => `<div style="margin-bottom:10px;">
-            <div class="row" style="margin-bottom:2px;"><span>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name} <span class="muted">vs ${t.vs}</span></span><span class="mono">${t.avgGoals.toFixed(2)}</span></div>
-            <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.min(100, t.avgGoals/Math.max(...byGoals.map(x=>x.avgGoals),1)*100)}%; background:#3ECF8E;"></div></div>
-          </div>`).join("")}
-        </div>
-        <div>
-          <div style="font-weight:600; margin-bottom:10px;">🟨 Más tarjetas por partido (jugando hoy)</div>
-          ${byCards.map(t => `<div style="margin-bottom:10px;">
-            <div class="row" style="margin-bottom:2px;"><span>${t.logo ? `<img src="${t.logo}" style="width:16px; height:16px; object-fit:contain; vertical-align:-3px; margin-right:4px;" />` : ""}${t.name} <span class="muted">vs ${t.vs}</span></span><span class="mono">${t.cardsPerGame.toFixed(2)}</span></div>
-            <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.min(100, t.cardsPerGame/Math.max(...byCards.map(x=>x.cardsPerGame),1)*100)}%; background:#F0B429;"></div></div>
-          </div>`).join("")}
-        </div>
-      </div>
-    `;
-  } catch (e) {
-    statusEl.innerHTML = "";
-    contentEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar el dashboard: ${e.message}</div>`;
+async function ddTodayMatches(league) {
+  const code = FD_CODES[String(league)], lg = DD_LEAGUES.find(x => x.id === String(league)), out = [];
+  const d0 = new Date(), iso = d => d.toISOString().slice(0, 10);
+  if (code && getFdKey()) {
+    const res = await fetch(`${fdBase()}/v4/competitions/${code}/matches?dateFrom=${iso(d0)}&dateTo=${iso(new Date(Date.now() + 3 * 86400000))}`, { headers: fdHeaders() });
+    if (res.status === 429) throw new Error("football-data.org: límite de 10 peticiones por minuto, espera un momento");
+    if (!res.ok) throw new Error(`football-data.org ${res.status}`);
+    const j = await res.json(); (j.matches || []).filter(x => !["FINISHED", "CANCELLED", "POSTPONED"].includes(x.status)).forEach(x => out.push({ t: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name }));
+    return out;
   }
+  if (lg) { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${lg.odds}`) || "null"); if (c) c.data.forEach(m => { const t = Date.parse(m.commence_time); if (t >= Date.now() - 3 * 3600000 && t <= Date.now() + 3 * 86400000) out.push({ t: m.commence_time, h: m.home_team, a: m.away_team }); }); } catch (e) {} }
+  return out;
+}
+function ddTeamStats(rows, team) {
+  const g = rows.filter(r => r.h === team || r.a === team).sort((a, b) => a.d.localeCompare(b.d));
+  if (!g.length) return null;
+  const x = g.map(r => r.h === team ? { gf: r.hg, ga: r.ag, home: true } : { gf: r.ag, ga: r.hg, home: false });
+  const n = x.length, pct = f => Math.round(x.filter(f).length / n * 100), last = x.slice(-5);
+  return { n, gpm: x.reduce((a, c) => a + c.gf + c.ga, 0) / n, gf: x.reduce((a, c) => a + c.gf, 0) / n, ga: x.reduce((a, c) => a + c.ga, 0) / n, o25: pct(c => c.gf + c.ga > 2), btts: pct(c => c.gf > 0 && c.ga > 0), form: last.map(c => c.gf > c.ga ? "W" : c.gf < c.ga ? "L" : "D"), pts: last.reduce((a, c) => a + (c.gf > c.ga ? 3 : c.gf === c.ga ? 1 : 0), 0) };
+}
+async function loadDayDashboard() {
+  const statusEl = document.getElementById("daydash-status"), contentEl = document.getElementById("daydash-content");
+  const league = document.getElementById("dayDashLeague").value, season = defaultSeason();
+  if (!getFdKey() && !getFootballKey()) { statusEl.innerHTML = `Añade el token de football-data.org (o la key de API-Football) en ⚙️ Configuración.`; return; }
+  statusEl.textContent = "Buscando próximos partidos y calculando estadísticas..."; contentEl.innerHTML = "";
+  try {
+    const games = await ddTodayMatches(league); let rows = [];
+    try { rows = await msLeagueData(league, season); } catch (e) { statusEl.textContent = "No se pudieron cargar los resultados de la liga: " + e.message; }
+    if (!games.length) { statusEl.innerHTML = `<span class="muted">No hay partidos de esta liga en los próximos 3 días${getFdKey() ? "" : " (con cuotas cargadas). Añade el token de football-data.org para ver el calendario completo"}.</span>`; return; }
+    if (!rows.length) { statusEl.innerHTML = `<span class="muted">Sin resultados de la temporada ${season} para calcular estadísticas.</span>`; return; }
+    const names = [...new Set(rows.flatMap(r => [r.h, r.a]))], fn = n => names.includes(n) ? n : msFind(n, names);
+    const cards = games.sort((a, b) => a.t.localeCompare(b.t)).map(g => {
+      const h = fn(g.h), a = fn(g.a), sh = h && ddTeamStats(rows, h), sa = a && ddTeamStats(rows, a);
+      return { g, sh, sa, exp: sh && sa ? (sh.gf + sa.ga) / 2 + (sa.gf + sh.ga) / 2 : null };
+    });
+    const fm = f => f.map(c => `<span style="display:inline-block; width:18px; height:18px; line-height:18px; border-radius:5px; text-align:center; font-size:11px; font-weight:700; margin-right:2px; background:${c === "W" ? "#1F6F4A" : c === "L" ? "#7A2E31" : "#3A4250"}; color:#fff;">${c === "W" ? "G" : c === "L" ? "P" : "E"}</span>`).join("");
+    const row = (nm, st) => st ? `<tr><td style="padding:5px 4px;">${nm}</td><td style="text-align:center;">${st.n}</td><td style="text-align:center;">${st.gf.toFixed(2)}</td><td style="text-align:center;">${st.ga.toFixed(2)}</td><td style="text-align:center;">${st.o25}%</td><td style="text-align:center;">${st.btts}%</td><td>${fm(st.form)}</td></tr>` : `<tr><td style="padding:5px 4px;">${nm}</td><td colspan="6" class="muted">sin datos</td></tr>`;
+    const top = cards.filter(c => c.exp != null).sort((a, b) => b.exp - a.exp).slice(0, 5);
+    statusEl.textContent = `${games.length} partidos en los próximos 3 días · estadísticas de la temporada ${season} (${rows.length} partidos jugados).`;
+    contentEl.innerHTML = (top.length ? `<div class="panel" style="margin-bottom:14px;"><div style="font-weight:600; margin-bottom:8px;">⚽ Partidos con más goles esperados</div>${top.map(c => `<div class="row" style="margin-bottom:6px;"><span>${c.g.h} <span class="muted">vs</span> ${c.g.a}</span><b style="color:#3ECF8E;">${c.exp.toFixed(2)}</b></div>`).join("")}<div class="muted" style="font-size:11px; margin-top:6px;">Media de lo que marca un equipo y lo que encaja el rival, sumando ambos. Es una referencia rápida, no un cálculo de probabilidad.</div></div>` : "") +
+      cards.map(c => `<div class="panel" style="margin-bottom:12px;"><div class="row" style="margin-bottom:8px;"><b>${c.g.h} <span class="muted">vs</span> ${c.g.a}</b><span class="muted" style="font-size:12px;">${new Date(c.g.t).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+        <div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:13px; min-width:420px;"><tr class="muted" style="font-size:11px; text-align:left;"><th style="padding:4px;">Equipo</th><th>PJ</th><th>GF</th><th>GC</th><th>+2.5</th><th>Ambos</th><th>Últimos 5</th></tr>${row(c.g.h, c.sh)}${row(c.g.a, c.sa)}</table></div></div>`).join("") +
+      `<div class="muted" style="font-size:11px; text-align:center; line-height:1.6;">PJ: partidos jugados · GF/GC: goles a favor y en contra por partido · +2.5 y Ambos: % de sus partidos con más de 2.5 goles y con ambos marcando · Últimos 5: G ganó, E empató, P perdió. Las tarjetas por equipo ya no se muestran (requieren el plan de pago de API-Football).</div>`;
+  } catch (e) { statusEl.innerHTML = ""; contentEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar el dashboard: ${e.message}</div>`; }
 }
 
 let luDay = 0, luSel = null;
