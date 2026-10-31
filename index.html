@@ -223,6 +223,33 @@
   .dd-grid .streak-card h4 { font-size:15px; margin-bottom:12px; }
   .dd-grid .streak-row { font-size:13px; padding:8px 4px; }
   @media (max-width:720px) { .dd-grid { grid-template-columns:1fr; } }
+  /* ---- Pregame ---- */
+  .pg-day { display:flex; align-items:center; justify-content:center; gap:12px; margin:4px 0 14px; }
+  .pg-day b { min-width:150px; text-align:center; font-size:18px; }
+  .pg-nav { width:34px; height:34px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#E6E9ED; font-size:18px; cursor:pointer; line-height:1; }
+  .pg-nav:hover { border-color:#3ECF8E; }
+  .chip-row.mini { gap:8px; margin-bottom:6px; }
+  .chip-row.mini .chip { display:inline-flex; align-items:center; gap:8px; min-width:0; padding:7px 14px; border-radius:999px; }
+  .chip-row.mini .chip .fl { font-size:18px; }
+  .chip-row.mini .chip .ct { font-size:16px; margin:0; }
+  .chip-row.mini .chip .nm { margin:0; font-size:12px; }
+  .pg-count { text-align:center; color:#7C8797; font-size:12px; margin:8px 0 16px; }
+  .pg-count b { color:#3ECF8E; }
+  .pg-layout { display:grid; grid-template-columns:230px minmax(0,1fr); gap:20px; align-items:start; }
+  .pg-side { position:sticky; top:84px; display:flex; flex-direction:column; gap:12px; }
+  .pg-box { background:#10151C; border:1px solid #1A212B; border-radius:14px; padding:12px 14px; }
+  .pg-h { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:#7C8797; margin-bottom:8px; font-weight:600; }
+  .pg-ck { display:flex; align-items:center; gap:8px; font-size:13px; padding:3px 0; cursor:pointer; }
+  .pg-main { background:#10151C; border:1px solid #1A212B; border-radius:16px; padding:12px 14px; min-height:200px; }
+  .pgm { display:flex; flex-direction:column; gap:1px; min-width:170px; }
+  .pgm-top { display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:11px; color:#7C8797; margin-bottom:3px; }
+  .lgtag { background:#161E27; border-radius:999px; padding:2px 8px; font-size:10px; text-transform:uppercase; letter-spacing:.03em; }
+  .pgm-t { font-weight:600; font-size:13px; }
+  .pgm-vs { font-size:10px; color:#3ECF8E; }
+  .pg-pages { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:16px; }
+  .pg-pages button { width:32px; height:32px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#9AA5B1; cursor:pointer; padding:0; font-size:12px; }
+  .pg-pages button.on { background:#3ECF8E; color:#06231A; border-color:#3ECF8E; font-weight:700; }
+  @media (max-width:900px) { .pg-layout { grid-template-columns:1fr; } .pg-side { position:static; } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -237,7 +264,7 @@
     <div class="sidebar-nav">
       <div class="sidebar-section">Partidos</div>
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
-      <button class="side-btn" data-v="coupon" onclick="switchView('coupon')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> Cupón</button>
+      <button class="side-btn" data-v="coupon" onclick="switchView('coupon')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> Pregame</button>
       <button class="side-btn" data-v="daydash" onclick="switchView('daydash')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="8"/><rect x="10" y="7" width="4" height="13"/><rect x="17" y="3" width="4" height="17"/></svg> Dashboard del día</button>
       <button class="side-btn" data-v="trends" onclick="switchView('trends')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M8 3v18"/></svg> Tendencias de equipos</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
@@ -530,13 +557,42 @@
   </div>
 
   <div id="view-coupon" class="view">
-    <div class="panel">
-      <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <div></div>
-        <input id="cpSearch" type="text" placeholder="Buscar equipo..." style="width:150px;" oninput="renderCoupon()" />
+    <div class="pg-day">
+      <button class="pg-nav" onclick="cpDay(-1)" title="Día anterior">‹</button>
+      <b id="cpDayLabel">Todos los días</b>
+      <button class="pg-nav" onclick="cpDay(1)" title="Día siguiente">›</button>
+      <button class="small ghost" onclick="cpDay(null)">Todos</button>
+    </div>
+    <div class="chip-row mini" id="cpChips"></div>
+    <div class="pg-count" id="cpCount"></div>
+    <div class="pg-layout">
+      <aside class="pg-side">
+        <div class="pg-box"><div class="pg-h">Buscar</div><input id="cpSearch" type="text" placeholder="Equipo..." style="width:100%;" oninput="cpRead()" /></div>
+        <div class="pg-box"><div class="pg-h">Mercados (columnas)</div>
+          <label class="pg-ck"><input type="checkbox" class="cpcol" value="1" checked onchange="cpRead()" /> 1 (local)</label>
+          <label class="pg-ck"><input type="checkbox" class="cpcol" value="X" checked onchange="cpRead()" /> X (empate)</label>
+          <label class="pg-ck"><input type="checkbox" class="cpcol" value="2" checked onchange="cpRead()" /> 2 (visitante)</label>
+          <label class="pg-ck"><input type="checkbox" class="cpcol" value="+2.5" checked onchange="cpRead()" /> Más de 2.5</label>
+          <label class="pg-ck"><input type="checkbox" class="cpcol" value="-2.5" checked onchange="cpRead()" /> Menos de 2.5</label>
+        </div>
+        <div class="pg-box"><div class="pg-h">Ordenar</div>
+          <select id="cpSort" style="width:100%;" onchange="cpRead()"><option value="time">Por hora</option><option value="ev">Mayor valor (EV)</option><option value="name">Por equipo</option></select>
+        </div>
+        <div class="pg-box"><div class="pg-h">Filtros</div>
+          <label class="pg-ck"><input type="checkbox" id="cpValue" onchange="cpRead()" /> Solo con valor</label>
+          <label class="pg-ck"><input type="checkbox" id="cpFavs" onchange="cpRead()" /> Solo favoritos ⭐</label>
+          <div style="display:flex; gap:6px; margin-top:8px;"><input id="cpMin" type="number" step="0.05" placeholder="Mín." style="width:50%;" oninput="cpRead()" /><input id="cpMax" type="number" step="0.05" placeholder="Máx." style="width:50%;" oninput="cpRead()" /></div>
+        </div>
+        <div class="pg-box"><div class="pg-h">Presets</div>
+          <select id="cpPreset" style="width:100%;" onchange="cpLoadPreset(this.value)"><option value="">Sin preset cargado</option></select>
+          <div style="display:flex; gap:6px; margin-top:8px;"><button class="small ghost" style="flex:1;" onclick="cpSavePreset()">Guardar actual</button><button class="small ghost" onclick="cpDeletePreset()" title="Borrar preset">🗑</button></div>
+        </div>
+        <div class="pg-box"><button class="small ghost" style="width:100%;" onclick="enableReminders()">⏰ Recordatorios de favoritos</button></div>
+      </aside>
+      <div class="pg-main">
+        <div id="coupon-content"></div>
+        <div class="pg-pages" id="cpPages"></div>
       </div>
-      <div class="muted" style="font-size:12px; margin-bottom:10px;">Usa las cuotas cargadas en "Partidos y valor" (cambia de liga allí para verla aquí). Celda verde = valor (EV ≥ 2%), roja = posible error (EV ≥ 15%). Pulsa un partido para estudiarlo.</div>
-      <div id="coupon-content"></div>
     </div>
   </div>
 
@@ -633,7 +689,7 @@ async function getTeamBadge(name) {
   }
 }
 
-const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Cupón", daydash:"Dashboard del día", trends:"Tendencias de equipos", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -641,7 +697,7 @@ function switchView(v) {
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
-  if (v === "coupon") renderCoupon();
+  if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
@@ -2046,34 +2102,96 @@ function pickDdLeague(id) {
   document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
   trData = null; renderDdChips(); loadTrends();
 }
+const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"]];
+const CP_PAGE = 15;
+let cp = { dayOff: null, leagues: [], sort: "time", onlyValue: false, onlyFavs: false, minO: "", maxO: "", cols: ["1","X","2","+2.5","-2.5"], q: "", page: 0 };
+function cpAll() {
+  const out = [];
+  DD_LEAGUES.forEach(l => {
+    let data = null;
+    if (lastSport === l.odds && lastMatches.length) data = lastMatches;
+    else { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) data = c.data; } catch (e) {} }
+    (data || []).forEach(m => out.push({ m, l }));
+  });
+  return out;
+}
+function cpPick(bks, mk, key) {
+  const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: mk === "totals" ? m.outcomes.filter(x => x.point === 2.5) : m.outcomes } : null; }).filter(Boolean);
+  const fairs = [];
+  rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
+  const shown = rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b));
+  if (!shown) return null;
+  const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
+  const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
+  return { price: o.price, ev: fair ? o.price * fair - 1 : null };
+}
+function cpRead() {
+  cp.q = (document.getElementById("cpSearch").value || "").toLowerCase().trim();
+  cp.sort = document.getElementById("cpSort").value;
+  cp.onlyValue = document.getElementById("cpValue").checked;
+  cp.onlyFavs = document.getElementById("cpFavs").checked;
+  cp.minO = document.getElementById("cpMin").value; cp.maxO = document.getElementById("cpMax").value;
+  cp.cols = [...document.querySelectorAll(".cpcol")].filter(c => c.checked).map(c => c.value);
+  cp.page = 0; renderCoupon();
+}
+function cpWriteDom() {
+  document.getElementById("cpSearch").value = cp.q; document.getElementById("cpSort").value = cp.sort;
+  document.getElementById("cpValue").checked = cp.onlyValue; document.getElementById("cpFavs").checked = cp.onlyFavs;
+  document.getElementById("cpMin").value = cp.minO; document.getElementById("cpMax").value = cp.maxO;
+  document.querySelectorAll(".cpcol").forEach(c => c.checked = cp.cols.includes(c.value));
+}
+function cpDay(d) { cp.dayOff = d === null ? null : Math.max(0, (cp.dayOff == null ? 0 : cp.dayOff) + d); cp.page = 0; renderCoupon(); }
+function cpToggleLeague(id) { const i = cp.leagues.indexOf(id); if (i >= 0) cp.leagues.splice(i, 1); else cp.leagues.push(id); cp.page = 0; renderCoupon(); }
+function cpGetPresets() { try { return JSON.parse(localStorage.getItem("radar-presets") || "{}"); } catch (e) { return {}; } }
+function cpFillPresets(sel) {
+  const p = cpGetPresets(), el = document.getElementById("cpPreset");
+  el.innerHTML = '<option value="">Sin preset cargado</option>' + Object.keys(p).map(n => `<option value="${n.replace(/"/g, "&quot;")}">${n}</option>`).join("");
+  el.value = sel || "";
+}
+function cpSavePreset() {
+  const n = (prompt("Nombre del preset:") || "").trim(); if (!n) return;
+  const p = cpGetPresets(); p[n] = { ...cp, page: 0, dayOff: null };
+  try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {}
+  cpFillPresets(n); showToast(`Preset "${n}" guardado`);
+}
+function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...p, page: 0 }; cpWriteDom(); renderCoupon(); }
+function cpDeletePreset() { const n = document.getElementById("cpPreset").value; if (!n) return; const p = cpGetPresets(); delete p[n]; try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {} cpFillPresets(""); }
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
-  if (!lastMatches.length) { el.innerHTML = '<div class="muted">Aún no hay cuotas cargadas. Ve a "Partidos y valor" y pulsa "Actualizar cuotas".</div>'; return; }
-  const q = (document.getElementById("cpSearch").value || "").toLowerCase();
-  const cols = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"]];
-  const pick = (bks, mk, key) => { // cuota mostrada + probabilidad justa
-    const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: mk === "totals" ? m.outcomes.filter(x => x.point === 2.5) : m.outcomes } : null; }).filter(Boolean);
-    const fairs = [];
-    rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
-    const shown = rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b));
-    if (!shown) return null;
-    const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
-    const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
-    return { price: o.price, ev: fair ? o.price * fair - 1 : null };
-  };
-  const list = lastMatches.filter(m => !q || m.home_team.toLowerCase().includes(q) || m.away_team.toLowerCase().includes(q)).sort((a, b) => a.commence_time.localeCompare(b.commence_time));
-  let day = "", html = '<table class="cptable"><thead><tr><th>Partido</th><th>1</th><th>X</th><th>2</th><th>+2.5</th><th>-2.5</th></tr></thead><tbody>';
-  list.forEach(m => {
-    const d = new Date(m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-    if (dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="6">${dk}</td></tr>`; }
-    const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
-    const safe = m.home_team.replace(/'/g, "\\'");
-    html += `<tr><td class="cm" onclick="document.getElementById('teamSearch').value='${safe}'; switchView('partidos'); applyFilters();"><span class="muted">${hm}</span> &nbsp;${m.home_team} <span class="muted">vs</span> ${m.away_team}</td>` +
-      cols.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; const r = pick(m.bookmakers, c[0], key);
-        if (!r) return '<td class="muted">–</td>'; const cls = r.ev != null && r.ev >= 0.15 ? "e" : r.ev != null && r.ev >= 0.02 ? "v" : "";
-        return `<td><span class="codd ${cls}" title="${r.ev != null ? "EV " + (r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>";
+  const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+  const lbl = cp.dayOff == null ? "Todos los días" : cp.dayOff === 0 ? "Hoy" : cp.dayOff === 1 ? "Mañana" : new Date(day0.getTime() + cp.dayOff * 86400000).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
+  document.getElementById("cpDayLabel").textContent = lbl;
+  const now = Date.now(), favs = getFavorites();
+  let base = cpAll().filter(x => Date.parse(x.m.commence_time) >= now - 3 * 3600000);
+  if (cp.dayOff != null) { const t0 = day0.getTime() + cp.dayOff * 86400000; base = base.filter(x => { const t = Date.parse(x.m.commence_time); return t >= t0 && t < t0 + 86400000; }); }
+  if (cp.q) base = base.filter(x => x.m.home_team.toLowerCase().includes(cp.q) || x.m.away_team.toLowerCase().includes(cp.q));
+  document.getElementById("cpChips").innerHTML = DD_LEAGUES.map(l => { const n = base.filter(x => x.l.id === l.id).length; return `<div class="chip ${cp.leagues.includes(l.id) ? "active" : ""}" onclick="cpToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span><span class="ct ${n ? "" : "zero"}">${n}</span></div>`; }).join("");
+  if (!cpAll().length) { document.getElementById("cpCount").textContent = ""; document.getElementById("cpPages").innerHTML = ""; el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Aún no hay cuotas cargadas. Ve a "Partidos y valor" y pulsa "Actualizar cuotas" (cada liga que cargues se guarda aquí).</div>'; return; }
+  let rows = base.filter(x => !cp.leagues.length || cp.leagues.includes(x.l.id)).map(x => {
+    const cells = CP_COLS.filter(c => cp.cols.includes(c[2])).map(c => { const key = c[1] === "home" ? x.m.home_team : c[1] === "away" ? x.m.away_team : c[1]; return { lab: c[2], r: cpPick(x.m.bookmakers, c[0], key) }; });
+    const evs = cells.map(c => c.r && c.r.ev).filter(v => v != null);
+    return { ...x, cells, maxEv: evs.length ? Math.max(...evs) : -1 };
+  });
+  if (cp.onlyValue) rows = rows.filter(r => r.maxEv >= 0.02);
+  if (cp.onlyFavs) rows = rows.filter(r => favs.has(r.m.home_team) || favs.has(r.m.away_team));
+  const mn = parseFloat(cp.minO), mx = parseFloat(cp.maxO);
+  if (!isNaN(mn) || !isNaN(mx)) rows = rows.filter(r => r.cells.some(c => c.r && (isNaN(mn) || c.r.price >= mn) && (isNaN(mx) || c.r.price <= mx)));
+  rows.sort((a, b) => cp.sort === "ev" ? b.maxEv - a.maxEv : cp.sort === "name" ? a.m.home_team.localeCompare(b.m.home_team) : a.m.commence_time.localeCompare(b.m.commence_time));
+  const leaguesN = new Set(rows.map(r => r.l.id)).size, pages = Math.max(1, Math.ceil(rows.length / CP_PAGE));
+  if (cp.page >= pages) cp.page = 0;
+  document.getElementById("cpCount").innerHTML = `Mostrando <b>${rows.length}</b> partidos en <b>${leaguesN}</b> ligas · Celda verde = valor (EV ≥ 2%), roja = posible error (EV ≥ 15%)`;
+  if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>'; document.getElementById("cpPages").innerHTML = ""; return; }
+  const vis = rows.slice(cp.page * CP_PAGE, (cp.page + 1) * CP_PAGE), nc = vis[0].cells.length;
+  let day = "", html = `<table class="cptable"><thead><tr><th>Partido</th>${vis[0].cells.map(c => `<th>${c.lab}</th>`).join("")}</tr></thead><tbody>`;
+  vis.forEach(r => {
+    const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+    if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1}">${dk}</td></tr>`; }
+    const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
+    html += `<tr><td class="cm" onclick="document.getElementById('teamSearch').value='${safe}'; switchView('partidos'); applyFilters();"><div class="pgm"><div class="pgm-top"><span class="lgtag">${r.l.fl} ${r.l.nm}</span><span>${hm}</span></div><div class="pgm-t">${r.m.home_team}</div><div class="pgm-vs">vs</div><div class="pgm-t">${r.m.away_team}</div></div></td>` +
+      r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""; return `<td><span class="codd ${cls}" title="${c.r.ev != null ? "EV " + (c.r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${c.r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>";
   });
   el.innerHTML = html + "</tbody></table>";
+  document.getElementById("cpPages").innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `<button class="${i === cp.page ? "on" : ""}" onclick="cp.page=${i}; renderCoupon();">${i + 1}</button>`).join("") : "";
 }
 function sortTrends(k) { trSort = { k, d: trSort.k === k ? -trSort.d : (k === "n" ? 1 : -1) }; renderTrends(); }
 
