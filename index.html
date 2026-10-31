@@ -267,7 +267,7 @@
   .exbar i { display:block; height:100%; background:#3ECF8E; }
   /* ---- Backtesting sistema ---- */
   .bt-period { display:flex; width:fit-content; margin:0 auto 14px; }
-  .bt-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+  .bt-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
   .bt-kpi { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px; text-align:center; }
   .bt-kpi .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#7C8797; }
   .bt-kpi .n { font-size:24px; font-weight:700; margin-top:4px; font-family:'IBM Plex Mono',monospace; }
@@ -277,6 +277,8 @@
   .bt-fgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
   .bt-fgrid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
   .bt-fgrid select, .bt-fgrid input { width:100%; }
+  .bt-res { margin-top:16px; }
+  .bt-res-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .bt-two { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px; }
   @media (max-width:900px) { .bt-kpis, .bt-fgrid { grid-template-columns:repeat(2,1fr); } .bt-two { grid-template-columns:1fr; } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
@@ -312,17 +314,23 @@
     </div>
     <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
       Herramienta informativa. No procesa apuestas ni dinero real.
-      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.5.0 — ver novedades</span></div>
+      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.6.0 — ver novedades</span></div>
     </div>
   </div>
 
   <div id="changelog-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center;" onclick="if(event.target===this) toggleChangelog(false)">
     <div class="panel" style="width:380px; max-height:75vh; overflow-y:auto; background:#171C23;">
       <div class="row" style="margin-bottom:10px;">
-        <div style="font-weight:600;">Novedades — v1.5.0</div>
+        <div style="font-weight:600;">Novedades — v1.6.0</div>
         <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
       </div>
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li>Nuevo formato visual: cabecera con título centrado, píldoras y tablas más limpias</li>
+        <li>Pregame: partidos por día y liga, filtros, presets, orden y paginación</li>
+        <li>Dashboard: chips de ligas y rachas (victorias, over, BTTS, sin perder)</li>
+        <li>Tendencias de equipos y Explorar mercados (modo liga y modo partido)</li>
+        <li>Backtesting: yield, unidades, % acierto, filtros y curva</li>
+        <li>Mi perfil: liga y mercado favoritos al arrancar</li>
         <li>Configuración movida a un panel aparte, header más limpio</li>
         <li>Tooltips explicativos en Edge, Prob. justa, Kelly y CLV</li>
         <li>Exportar a Excel (.xlsx) además de CSV</li>
@@ -580,10 +588,27 @@
           <label>Valor (EV %) desde<input id="btEMin" type="number" step="1" placeholder="2" oninput="renderBacktestSystem()" /></label>
           <label>Valor (EV %) hasta<input id="btEMax" type="number" step="1" placeholder="100" oninput="renderBacktestSystem()" /></label>
         </div>
-        <button class="small ghost" style="margin-top:8px;" onclick="btResetFilters()">Limpiar filtros</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+          <button class="small ghost" onclick="btResetFilters()">Limpiar filtros</button>
+          <select id="btSystem" onchange="btLoadSystem(this.value)" style="min-width:160px;"><option value="">Sistemas guardados</option></select>
+          <button class="small ghost" onclick="btSaveSystem()">Guardar como sistema</button>
+          <button class="small ghost" onclick="btDeleteSystem()" title="Borrar sistema">🗑</button>
+        </div>
       </details>
+      <div class="seg" id="btChartSeg" style="display:flex; width:fit-content; margin:0 auto 8px;">
+        <button class="seg-b active" data-m="units" onclick="btSetChart('units')">Unidades</button><button class="seg-b" data-m="yield" onclick="btSetChart('yield')">Yield %</button>
+      </div>
       <div id="btChart"></div>
-      <div class="bt-two"><div id="btByMarket"></div><div id="btByLeague"></div></div>
+      <div id="btPicksBox" class="bt-res"></div>
+      <div class="bt-res">
+        <div class="bt-res-head">
+          <div class="seg" id="btGroupSeg">
+            <button class="seg-b active" data-g="league" onclick="btSetGroup('league')">Liga</button><button class="seg-b" data-g="team" onclick="btSetGroup('team')">Equipo</button><button class="seg-b" data-g="market" onclick="btSetGroup('market')">Mercado</button><button class="seg-b" data-g="bookie" onclick="btSetGroup('bookie')">Casa</button>
+          </div>
+          <input id="btSearch" type="text" placeholder="Buscar..." oninput="renderBacktestSystem()" style="width:170px;" />
+        </div>
+        <div id="btResults"></div>
+      </div>
       <div class="muted" style="font-size:11px; margin-top:10px; text-align:center;">Stake fijo de 1 unidad por apuesta. Solo cuentan las apuestas que marcas como ganada o perdida en la lista de abajo.</div>
     </div>
     <div class="panel">
@@ -1932,10 +1957,24 @@ function markOutcome(key, result) {
 
 let btPeriod = "all";
 function btSetPeriod(p) { btPeriod = p; document.querySelectorAll("#btPeriod .seg-b").forEach(b => b.classList.toggle("active", b.dataset.p === p)); renderBacktestSystem(); }
+let btChartMode = "units", btGroup = "league";
+function btSetChart(m) { btChartMode = m; document.querySelectorAll("#btChartSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); renderBacktestSystem(); }
+function btSetGroup(g) { btGroup = g; document.querySelectorAll("#btGroupSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.g === g)); renderBacktestSystem(); }
+function btGetSystems() { try { return JSON.parse(localStorage.getItem("radar-systems") || "{}"); } catch (e) { return {}; } }
+const BT_FIELDS = ["btLeague","btMarket","btBookie","btKind","btOMin","btOMax","btEMin","btEMax"];
+function btFillSystems(sel) { const el = document.getElementById("btSystem"); el.innerHTML = '<option value="">Sistemas guardados</option>' + Object.keys(btGetSystems()).map(n => `<option value="${n.replace(/"/g, "&quot;")}">${n}</option>`).join(""); el.value = sel || ""; }
+function btSaveSystem() {
+  const n = (prompt("Nombre del sistema (ej. Premier – cuotas 1.8 a 2.5):") || "").trim(); if (!n) return;
+  const sys = btGetSystems(); sys[n] = { period: btPeriod }; BT_FIELDS.forEach(id => sys[n][id] = document.getElementById(id).value);
+  try { localStorage.setItem("radar-systems", JSON.stringify(sys)); } catch (e) {} btFillSystems(n); showToast(`Sistema "${n}" guardado`);
+}
+function btLoadSystem(n) { if (!n) return; const sys = btGetSystems()[n]; if (!sys) return; BT_FIELDS.forEach(id => { document.getElementById(id).value = sys[id] || ""; }); btSetPeriod(sys.period || "all"); }
+function btDeleteSystem() { const n = document.getElementById("btSystem").value; if (!n) return; const sys = btGetSystems(); delete sys[n]; try { localStorage.setItem("radar-systems", JSON.stringify(sys)); } catch (e) {} btFillSystems(""); }
 function btResetFilters() { ["btLeague","btMarket","btBookie","btKind"].forEach(id => document.getElementById(id).value = ""); ["btOMin","btOMax","btEMin","btEMax"].forEach(id => document.getElementById(id).value = ""); renderBacktestSystem(); }
 function btLeagueName(sport) { const l = DD_LEAGUES.find(x => x.odds === sport); return l ? `${l.fl} ${l.nm}` : (sport || "—"); }
 function renderBacktestSystem() {
   const root = document.getElementById("bt-system"); if (!root) return;
+  if (!document.getElementById("btSystem").options.length || document.getElementById("btSystem").options.length === 1) btFillSystems(document.getElementById("btSystem").value);
   const log = getValueLog(), outcomes = getOutcomesLog();
   const fillSel = (id, vals, lab) => { const el = document.getElementById(id), cur = el.value; el.innerHTML = '<option value="">Todas</option>' + vals.map(v => `<option value="${String(v).replace(/"/g, "&quot;")}">${lab ? lab(v) : v}</option>`).join(""); el.value = vals.includes(cur) ? cur : ""; };
   fillSel("btLeague", [...new Set(log.map(e => e.sport).filter(Boolean))], btLeagueName);
@@ -1952,27 +1991,38 @@ function renderBacktestSystem() {
   const yld = N ? units / N * 100 : null, col = v => v == null ? "" : v >= 0 ? "#3ECF8E" : "#E5484D";
   document.getElementById("btKpis").innerHTML =
     `<div class="bt-kpi"><div class="l">Yield</div><div class="n" style="color:${col(yld)}">${yld == null ? "—" : (yld >= 0 ? "+" : "") + yld.toFixed(2) + "%"}</div></div>` +
-    `<div class="bt-kpi"><div class="l">Unidades</div><div class="n" style="color:${col(N ? units : null)}">${N ? (units >= 0 ? "+" : "") + units.toFixed(2) : "—"}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Unidades</div><div class="n" style="color:${col(N ? units : null)}">${N ? (units >= 0 ? "+" : "") + units.toFixed(2) : "—"}</div>${N ? `<div class="sm">(${(units + N).toFixed(2)} − ${N.toFixed(2)})</div>` : ""}</div>` +
     `<div class="bt-kpi"><div class="l">% acierto</div><div class="n">${N ? Math.round(wins / N * 100) + "%" : "—"}</div><div class="sm">${wins} ganadas de ${N}</div></div>` +
-    `<div class="bt-kpi"><div class="l">Muestra</div><div class="n">${N}</div><div class="sm">${all.length - N} pendientes</div></div>`;
+    `<div class="bt-kpi"><div class="l">Muestra</div><div class="n">${N}</div><div class="sm">${all.length - N} pendientes</div></div>` +
+    `<div class="bt-kpi"><div class="l">Cuota media</div><div class="n">${N ? (settled.reduce((a, x) => a + x.e.odds, 0) / N).toFixed(2) : "—"}</div></div>`;
+  let pk = 0, cu = 0, dd = 0; settled.forEach(x => { cu += profit(x); pk = Math.max(pk, cu); dd = Math.max(dd, pk - cu); });
+  document.getElementById("btKpis").insertAdjacentHTML("afterend", "");
+  document.getElementById("btKpis").innerHTML += `<div class="bt-dd" style="grid-column:1/-1; text-align:center; font-size:12px; color:#7C8797;">Máximo drawdown: <b style="color:${dd > 0 ? "#E5484D" : "#9AA5B1"}">${dd > 0 ? "-" : ""}${dd.toFixed(2)} unidades</b></div>`;
   // curva de unidades
   const ch = document.getElementById("btChart");
   if (!N) { ch.innerHTML = `<div class="muted" style="text-align:center; padding:26px 0;">Marca apuestas como ganada o perdida (lista de abajo) para ver tu curva de unidades.</div>`; }
   else {
-    let c = 0; const pts = [0].concat(settled.map(x => (c += profit(x)))), W = 800, H = 220, P = 30;
+    let c = 0; const cum = settled.map(x => (c += profit(x))); const pts = [0].concat(btChartMode === "yield" ? cum.map((v, i) => v / (i + 1) * 100) : cum), W = 800, H = 220, P = 34;
     const mn = Math.min(0, ...pts), mx = Math.max(0, ...pts), rg = (mx - mn) || 1;
     const X = i => P + (i / Math.max(1, pts.length - 1)) * (W - 2 * P), Y = v => H - P - ((v - mn) / rg) * (H - 2 * P);
     const line = pts.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" "), up = pts[pts.length - 1] >= 0, clr = up ? "#3ECF8E" : "#E5484D";
     const ticks = [mn, (mn + mx) / 2, mx].map(v => `<line x1="${P}" x2="${W - P}" y1="${Y(v)}" y2="${Y(v)}" stroke="#1A212B"/><text x="4" y="${Y(v) + 4}" fill="#7C8797" font-size="11">${v.toFixed(1)}</text>`).join("");
     ch.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto;">${ticks}<line x1="${P}" x2="${W - P}" y1="${Y(0)}" y2="${Y(0)}" stroke="#4A525E" stroke-dasharray="4 4"/><polygon points="${X(0)},${Y(0)} ${line} ${X(pts.length - 1)},${Y(0)}" fill="${clr}" opacity=".12"/><polyline points="${line}" fill="none" stroke="${clr}" stroke-width="2.5" stroke-linejoin="round"/><circle cx="${X(pts.length - 1)}" cy="${Y(pts[pts.length - 1])}" r="4" fill="${clr}"/></svg>`;
   }
-  const grp = (keyFn, title) => {
-    const g = {}; settled.forEach(x => { const k = keyFn(x.e); (g[k] = g[k] || []).push(x); });
-    const rows = Object.entries(g).map(([k, a]) => { const u = a.reduce((s2, x) => s2 + profit(x), 0); return { k, n: a.length, w: a.filter(x => x.r === "ganada").length, u, y: u / a.length * 100 }; }).sort((a, b) => b.u - a.u);
-    return `<div class="muted" style="font-weight:600; margin-bottom:6px; text-align:center;">${title}</div>` + (rows.length ? `<table class="extable"><thead><tr><th>${title.replace("Por ", "")}</th><th>N</th><th>Acierto</th><th>Unid.</th><th>Yield</th></tr></thead><tbody>${rows.map(r => `<tr><td class="exm">${r.k}</td><td>${r.n}</td><td>${Math.round(r.w / r.n * 100)}%</td><td style="color:${col(r.u)}">${r.u >= 0 ? "+" : ""}${r.u.toFixed(2)}</td><td style="color:${col(r.y)}">${r.y >= 0 ? "+" : ""}${r.y.toFixed(1)}%</td></tr>`).join("")}</tbody></table>` : `<div class="muted" style="text-align:center;">Sin datos</div>`);
-  };
-  document.getElementById("btByMarket").innerHTML = grp(e => e.marketLabel || "—", "Por mercado");
-  document.getElementById("btByLeague").innerHTML = grp(e => btLeagueName(e.sport), "Por liga");
+  const pend = all.filter(e => { const r = outcomes[`${e.matchId}|${e.marketKey}|${e.selection}|${e.day}`]; return r !== "ganada" && r !== "perdida"; }).slice(0, 12);
+  document.getElementById("btPicksBox").innerHTML = `<div class="muted" style="font-weight:600; text-align:center; margin-bottom:8px;">Picks del sistema (pendientes de resultado)</div>` + (pend.length
+    ? `<table class="extable"><thead><tr><th>Fecha</th><th>Liga</th><th>Partido</th><th>Selección</th><th>Cuota</th><th>Valor</th></tr></thead><tbody>${pend.map(e => `<tr><td>${e.day}</td><td>${btLeagueName(e.sport)}</td><td class="exm">${e.home} vs ${e.away}</td><td>${e.selection}</td><td><span class="codd">${e.odds.toFixed(2)}</span></td><td><span class="epill ${e.kind === "error" ? "val-error" : "val-high"}">+${(e.ev * 100).toFixed(1)}%</span></td></tr>`).join("")}</tbody></table>`
+    : `<div class="muted" style="text-align:center; padding:8px;">Ningún pick pendiente con estos filtros.</div>`);
+  const keyFns = { league: e => btLeagueName(e.sport), market: e => e.marketLabel || "—", bookie: e => e.bookie || "—",
+    team: e => e.selection === e.home ? e.home : e.selection === e.away ? e.away : null };
+  const titles = { league: "Liga", market: "Mercado", bookie: "Casa", team: "Equipo" };
+  const q = (document.getElementById("btSearch").value || "").toLowerCase().trim();
+  const g = {}; settled.forEach(x => { const k = keyFns[btGroup](x.e); if (k == null) return; (g[k] = g[k] || []).push(x); });
+  let rows = Object.entries(g).map(([k, a]) => { const u = a.reduce((s2, x) => s2 + profit(x), 0); return { k, n: a.length, w: a.filter(x => x.r === "ganada").length, u, y: u / a.length * 100 }; }).filter(r => !q || r.k.toLowerCase().includes(q)).sort((a, b) => b.y - a.y);
+  const best = rows.length > 1 ? rows[0].k : null, worst = rows.length > 1 ? rows[rows.length - 1].k : null;
+  document.getElementById("btResults").innerHTML = rows.length
+    ? `<table class="extable"><thead><tr><th>${titles[btGroup]}</th><th>Muestra</th><th>Acierto</th><th>Stake</th><th>Ganancias</th><th>Yield</th></tr></thead><tbody>${rows.map(r => `<tr><td class="exm">${r.k}${r.k === best && r.y > 0 ? ' <span class="tag-value">TOP</span>' : r.k === worst && r.y < 0 ? ' <span class="tag-error">EVITAR</span>' : ""}</td><td>${r.n}</td><td>${Math.round(r.w / r.n * 100)}%</td><td>${r.n}u</td><td style="color:${col(r.u)}">${r.u >= 0 ? "+" : ""}${r.u.toFixed(2)}u</td><td><span class="epill" style="color:${col(r.y)}">${r.y >= 0 ? "+" : ""}${r.y.toFixed(1)}%</span></td></tr>`).join("")}</tbody></table>${btGroup === "team" ? '<div class="muted" style="font-size:11px; margin-top:6px; text-align:center;">Equipo = apuestas a su favor (selección igual al equipo). Los mercados de goles o empate no se asignan a ningún equipo.</div>' : ""}${settled.length < 30 ? '<div class="muted" style="font-size:11px; margin-top:6px; text-align:center;">Con menos de 30 apuestas marcadas, estos rankings son poco fiables: un par de aciertos mueven mucho el yield.</div>' : ""}`
+    : `<div class="muted" style="text-align:center; padding:14px;">${q ? "Sin resultados para esa búsqueda." : "Sin datos todavía: marca apuestas como ganada o perdida."}</div>`;
 }
 function renderStats() {
   const valueLog = getValueLog();
