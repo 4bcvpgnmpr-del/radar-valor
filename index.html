@@ -281,6 +281,26 @@
   .bt-res-head { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
   .bt-two { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px; }
   @media (max-width:900px) { .bt-kpis, .bt-fgrid { grid-template-columns:repeat(2,1fr); } .bt-two { grid-template-columns:1fr; } }
+  /* ---- En vivo (Live Coupon) ---- */
+  .lv-bar { display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; margin-bottom:6px; }
+  .lv-layout { display:grid; grid-template-columns:90px minmax(0,1fr); gap:16px; align-items:start; }
+  .lv-rail { display:flex; flex-direction:column; gap:8px; position:sticky; top:84px; }
+  .lv-rail .chip { min-width:0; padding:8px 4px; }
+  .lv-rail .chip .fl { font-size:20px; } .lv-rail .chip .nm { font-size:10px; } .lv-rail .chip .ct { font-size:16px; }
+  .lv-list { display:flex; flex-direction:column; gap:10px; max-width:860px; }
+  .lv-row { display:grid; grid-template-columns:96px minmax(0,1.6fr) minmax(0,1.5fr); gap:12px; align-items:center; background:#10151C; border:1px solid #1A212B; border-radius:14px; padding:10px 14px; }
+  .lv-row:hover { border-color:#2A3441; }
+  .lv-lg { text-align:center; font-size:11px; color:#7C8797; }
+  .lv-lg b { display:block; color:#E6E9ED; font-size:11px; margin-bottom:3px; }
+  .lv-st { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; background:#142B25; color:#3ECF8E; }
+  .lv-st.ft { background:#1A212B; color:#9AA5B1; }
+  .lv-teams { display:flex; flex-direction:column; gap:4px; }
+  .lv-team { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; }
+  .lv-team img { width:20px; height:20px; object-fit:contain; }
+  .lv-team .sc { margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:16px; }
+  .lv-odds { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; text-align:center; }
+  .lv-odds .h { font-size:9px; color:#7C8797; text-transform:uppercase; margin-bottom:3px; }
+  @media (max-width:900px) { .lv-layout { grid-template-columns:1fr; } .lv-rail { flex-direction:row; flex-wrap:wrap; position:static; } .lv-row { grid-template-columns:1fr; } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -472,16 +492,19 @@
   </div>
 
   <div id="view-live" class="view">
-    <div class="panel">
-      <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <div style="font-weight:600;">Marcador en vivo</div>
-        <div style="display:flex; gap:8px;">
-          <button class="small ghost" onclick="loadLiveScores()">Actualizar en vivo (API-Football)</button>
-          <button class="small ghost" onclick="loadIsportsLive()">Actualizar en vivo (iSports API)</button>
-        </div>
-      </div>
-      <div id="live-scores" class="muted">Pulsa un botón para ver los partidos que se están jugando ahora mismo.</div>
+    <div class="lv-bar">
+      <button onclick="loadLiveScores()">Actualizar en vivo</button>
+      <label class="pg-ck"><input type="checkbox" id="lvAuto" onchange="lvToggleAuto()" /> Auto (cada 90 s)</label>
+      <select id="lvSort" onchange="renderLive()"><option value="time">Orden: hora</option><option value="min">Orden: minuto</option><option value="league">Orden: liga</option></select>
+      <label class="pg-ck"><input type="checkbox" id="lvOdds" onchange="renderLive()" /> Solo con cuotas</label>
+      <button class="small ghost" onclick="loadIsportsLive()" title="Fuente alternativa">iSports</button>
     </div>
+    <div class="pg-count" id="lvCount">Pulsa "Actualizar en vivo" para ver los partidos que se juegan ahora mismo.</div>
+    <div class="lv-layout">
+      <div class="lv-rail" id="lvRail"></div>
+      <div id="live-scores" class="lv-list"></div>
+    </div>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:12px;">Las cuotas de cada fila son las pre-partido que tengas cargadas (no cambian en directo). Cada actualización usa 1 petición de API-Football.</div>
   </div>
 
   <div id="view-lineups" class="view">
@@ -2151,24 +2174,45 @@ async function loadIsportsLive() {
   }
 }
 
+let liveData = [], lvLeagues = [], lvTimer = null;
+function lvNorm(n) { return (n || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\b(fc|cf|afc|ac|sc|cd|ud|rc|us|ssc|as|fk|sk)\b/g, "").replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim(); }
+function lvOddsFor(f) {
+  const h = lvNorm(f.teams.home.name), a = lvNorm(f.teams.away.name); if (!h || !a) return null;
+  const hit = cpAll().find(x => { const mh = lvNorm(x.m.home_team), ma = lvNorm(x.m.away_team); return (mh.includes(h) || h.includes(mh)) && (ma.includes(a) || a.includes(ma)); });
+  if (!hit) return null;
+  return CP_COLS.map(c => { const key = c[1] === "home" ? hit.m.home_team : c[1] === "away" ? hit.m.away_team : c[1]; return { lab: c[2], r: cpPick(hit.m.bookmakers, c[0], key) }; });
+}
+function lvToggleAuto() { clearInterval(lvTimer); lvTimer = null; if (document.getElementById("lvAuto").checked) lvTimer = setInterval(() => { if (document.getElementById("view-live").classList.contains("active")) loadLiveScores(); }, 90000); }
+function lvToggleLeague(id) { const i = lvLeagues.indexOf(id); if (i >= 0) lvLeagues.splice(i, 1); else lvLeagues.push(id); renderLive(); }
+function renderLive() {
+  const el = document.getElementById("live-scores"); if (!el) return;
+  if (!liveData.length) { document.getElementById("lvRail").innerHTML = ""; return; }
+  const onlyOdds = document.getElementById("lvOdds").checked, sort = document.getElementById("lvSort").value;
+  let rows = liveData.map(f => ({ f, odds: lvOddsFor(f) }));
+  const leagues = {}; rows.forEach(r => { const id = r.f.league.id; leagues[id] = leagues[id] || { n: 0, flag: r.f.league.flag, name: r.f.league.name }; leagues[id].n++; });
+  document.getElementById("lvRail").innerHTML = Object.entries(leagues).map(([id, l]) => `<div class="chip ${lvLeagues.includes(id) ? "active" : ""}" onclick="lvToggleLeague('${id}')" title="${l.name}"><div class="fl">${l.flag ? `<img src="${l.flag}" style="width:24px; height:16px; object-fit:cover; border-radius:3px;" />` : "⚽"}</div><div class="ct">${l.n}</div></div>`).join("");
+  if (lvLeagues.length) rows = rows.filter(r => lvLeagues.includes(String(r.f.league.id)));
+  if (onlyOdds) rows = rows.filter(r => r.odds);
+  rows.sort((a, b) => sort === "league" ? a.f.league.name.localeCompare(b.f.league.name) : sort === "min" ? (b.f.fixture.status.elapsed || 0) - (a.f.fixture.status.elapsed || 0) : a.f.fixture.date.localeCompare(b.f.fixture.date));
+  document.getElementById("lvCount").innerHTML = `Mostrando <b style="color:#3ECF8E">${rows.length}</b> partidos en <b style="color:#3ECF8E">${new Set(rows.map(r => r.f.league.id)).size}</b> ligas`;
+  const stTxt = f => { const s2 = f.fixture.status; return ["FT", "AET", "PEN"].includes(s2.short) ? ["Final", true] : s2.short === "HT" ? ["Descanso", false] : s2.elapsed != null ? [`${s2.elapsed}'`, false] : [s2.short || "—", false]; };
+  el.innerHTML = rows.map(({ f, odds }) => { const [t, fin] = stTxt(f);
+    return `<div class="lv-row"><div class="lv-lg"><b>${(f.league.country || "").slice(0, 3).toUpperCase()}-${f.league.name.slice(0, 6)}</b><span class="lv-st ${fin ? "ft" : ""}">${t}</span><div style="margin-top:4px;">${new Date(f.fixture.date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div></div>
+      <div class="lv-teams"><div class="lv-team">${f.teams.home.logo ? `<img src="${f.teams.home.logo}" />` : ""}${f.teams.home.name}<span class="sc">${f.goals.home ?? 0}</span></div><div class="lv-team">${f.teams.away.logo ? `<img src="${f.teams.away.logo}" />` : ""}${f.teams.away.name}<span class="sc">${f.goals.away ?? 0}</span></div></div>
+      ${odds ? `<div class="lv-odds">${odds.map(c => `<div><div class="h">${c.lab}</div>${c.r ? `<span class="codd ${c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""}" style="min-width:0; padding:3px 6px;">${c.r.price.toFixed(2)}</span>` : '<span class="muted">–</span>'}</div>`).join("")}</div>` : `<div class="muted" style="text-align:center; font-size:11px;">Sin cuotas cargadas para este partido</div>`}</div>`; }).join("") || `<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>`;
+}
 async function loadLiveScores() {
   const footballKey = getFootballKey();
   const el = document.getElementById("live-scores");
-  if (!footballKey) { el.innerHTML = `Añade tu API-Football key arriba para ver el marcador en vivo.`; return; }
-  el.innerHTML = `<span class="muted">Buscando partidos en vivo...</span>`;
+  if (!footballKey) { el.innerHTML = `<div class="muted" style="padding:14px;">Añade tu API-Football key en ⚙️ Configuración para ver el marcador en vivo.</div>`; return; }
+  document.getElementById("lvCount").textContent = "Buscando partidos en vivo...";
   try {
-    const live = await apiFootball(`/fixtures?live=all`, footballKey);
-    if (!live.length) { el.innerHTML = `<span class="muted">No hay partidos en juego ahora mismo.</span>`; return; }
-    el.innerHTML = live.slice(0, 15).map(f => {
-      return `<div class="live-row">
-        <div style="display:flex; align-items:center; gap:6px;"><span class="live-min">${f.fixture.status.elapsed ?? "—"}'</span> ${f.league.flag ? `<img src="${f.league.flag}" style="width:16px; height:11px; object-fit:cover; border-radius:2px;" />` : "⚽"} <span class="muted">${f.league.name}</span></div>
-        <div class="mono" style="display:flex; align-items:center; gap:6px;">
-          ${f.teams.home.logo ? `<img src="${f.teams.home.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""} ${f.teams.home.name} <b>${f.goals.home ?? 0}</b> - <b>${f.goals.away ?? 0}</b> ${f.teams.away.name} ${f.teams.away.logo ? `<img src="${f.teams.away.logo}" style="width:18px; height:18px; object-fit:contain;" />` : ""}
-        </div>
-      </div>`;
-    }).join("");
+    liveData = await apiFootball(`/fixtures?live=all`, footballKey);
+    if (!liveData.length) { document.getElementById("lvRail").innerHTML = ""; document.getElementById("lvCount").textContent = ""; el.innerHTML = `<div class="muted" style="padding:20px;">No hay partidos en juego ahora mismo.</div>`; return; }
+    renderLive();
   } catch (e) {
-    el.innerHTML = `<span style="color:#7C8797;">No se pudo cargar el marcador en vivo: ${e.message}</span>`;
+    document.getElementById("lvCount").textContent = "";
+    el.innerHTML = `<div class="muted" style="padding:14px;">No se pudo cargar el marcador en vivo: ${e.message}</div>`;
   }
 }
 
