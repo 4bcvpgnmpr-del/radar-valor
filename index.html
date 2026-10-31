@@ -426,6 +426,7 @@
         <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
       </div>
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
         <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
         <li>Formaciones renovadas: ficha de jugador con datos por 90 min, suplentes y líderes de jugadores</li>
         <li>Perfil: ligas, mercados, rachas y casas favoritas, con varios perfiles</li>
@@ -1589,6 +1590,36 @@ function pvOpen(idx) {
   getTeamBadge(it.m.away_team).then(u => { const e = document.getElementById(`${c}-badge-a`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
   renderNoteTags(it.m.id, c);
 }
+async function loadBet365(idx) {
+  const it = pvItems[idx]; if (!it) return;
+  const m = it.m, box = document.getElementById(`${it.cardId}-b365`), key = getFootballKey();
+  if (!key) { box.innerHTML = `<div class="muted">Añade tu API-Football key en ⚙️ Configuración.</div>`; return; }
+  box.innerHTML = `<div class="muted">Buscando el partido y la cuota de Bet365...</div>`;
+  try {
+    const lg = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0], day = m.commence_time.slice(0, 10), ck = `radar-b365-${m.id}`;
+    let od = null;
+    try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 30 * 60000) od = c.d; } catch (e) {}
+    if (!od) {
+      const fx = await apiFootball(`/fixtures?league=${lg.id}&season=${currentSeason()}&date=${day}`, key);
+      const hn = msFind(m.home_team, fx.map(x => x.teams.home.name)), f = fx.find(x => x.teams.home.name === hn);
+      if (!f) throw new Error("no encuentro este partido en API-Football (¿temporada no incluida en tu plan?)");
+      const r = await apiFootball(`/odds?fixture=${f.fixture.id}&bookmaker=8`, key);
+      od = r[0] && r[0].bookmakers && r[0].bookmakers[0] ? r[0].bookmakers[0].bets : null;
+      if (!od) throw new Error("Bet365 todavía no tiene cuotas publicadas para este partido");
+      try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: od })); } catch (e) {}
+    }
+    const mw = od.find(b => b.name === "Match Winner"), ou = od.find(b => b.name === "Goals Over/Under");
+    const val = (b, v) => { const x = b && b.values.find(y => y.value === v); return x ? parseFloat(x.odd) : null; };
+    const lines = [["h2h", m.home_team, "1 · " + m.home_team, val(mw, "Home")], ["h2h", "Draw", "X · Empate", val(mw, "Draw")], ["h2h", m.away_team, "2 · " + m.away_team, val(mw, "Away")], ["totals", "Over +2.5", "Más de 2.5 goles", val(ou, "Over 2.5")], ["totals", "Under +2.5", "Menos de 2.5 goles", val(ou, "Under 2.5")]].filter(l => l[3] != null);
+    if (!lines.length) throw new Error("Bet365 no devolvió 1X2 ni goles para este partido");
+    const rows = lines.map(([mk, k, lab, o]) => {
+      const r = cpPick(m.bookmakers, mk, k), fair = r && r.fair, ev = fair ? o * fair - 1 : null, others = r && r.all.length ? Math.max(...r.all.map(x => x.price)) : null;
+      const cls = ev == null ? "" : ev >= ERROR_THRESHOLD ? "e" : ev >= VALUE_THRESHOLD ? "v" : "";
+      return `<tr><td style="text-align:left;">${lab}</td><td><span class="codd ${cls}">${o.toFixed(2)}</span></td><td>${others ? others.toFixed(2) : "–"}</td><td>${fair ? (fair * 100).toFixed(1) + "%" : "–"}</td><td>${ev != null ? (ev >= 0 ? "+" : "") + (ev * 100).toFixed(1) + "%" : "–"}</td></tr>`;
+    }).join("");
+    box.innerHTML = `<div class="ms-h" style="margin:6px 0 8px;">Bet365</div><table class="cptable" style="max-width:640px; margin:0 auto;"><thead><tr><th>Selección</th><th>Bet365</th><th>Mejor otra casa</th><th>Prob. justa</th><th>Edge Bet365</th></tr></thead><tbody>${rows}</tbody></table><div class="muted" style="font-size:11px; margin-top:6px;">Cuota de Bet365 vía API-Football; la probabilidad justa sale del promedio de las demás casas.</div>`;
+  } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px;">No se pudo cargar Bet365: ${e.message}</div><button class="small ghost" style="margin-top:6px;" onclick="loadBet365(${idx})">Reintentar</button>`; }
+}
 function pvStats(idx) { const it = pvItems[idx]; if (!it) return; const l = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0]; closePv(); openMatchSheet(it.m.home_team, it.m.away_team, l.id, l.nm); }
 
 function renderMatches(matches, sport, isFiltered) {
@@ -1634,6 +1665,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-study-status"></div>
       <div class="mkt-tabs">${tabs.map((t, i) => `<button class="mkt-tab ${i === 0 ? "active" : ""}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t, i) => `<div class="mkt-body ${i === 0 ? "active" : ""}" data-idx="${i}">${t.html}</div>`).join("")}
+      <div id="${cardId}-b365" style="text-align:center; margin-top:12px;"><button class="small ghost" onclick="loadBet365(${idx})">🟢 Cargar cuota Bet365</button></div>
       <div class="acc-grid">
         <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
         <details class="analysis-section" id="${cardId}-injuries-d"><summary>Bajas y sanciones</summary><div id="${cardId}-injuries"></div></details>
