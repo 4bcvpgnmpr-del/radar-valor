@@ -904,7 +904,7 @@
   <div id="view-widgets" class="view">
     <div class="panel">
       <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
-      <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>El plan gratuito de API-Football solo da acceso a temporadas hasta 2024</b>, no a la temporada en curso.</div>
+      <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>API-Football gratis solo llega a 2024</b>; con el token de football-data.org la temporada actual se carga desde allí.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <select id="widgetLeague">
           <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
@@ -1002,7 +1002,7 @@ function saveKeys() {
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
   if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
   if (k5) localStorage.setItem(ISPORTS_KEY_STORAGE, k5);
-  if (k6) { if (k6 !== getFdKey()) { const ts = document.getElementById("trSeason"); if (ts) ts.value = currentSeason(); } localStorage.setItem(FD_KEY_STORAGE, k6); }
+  if (k6) { if (k6 !== getFdKey()) { const ts = document.getElementById("trSeason"); if (ts) ts.value = currentSeason(); const ws = document.getElementById("widgetSeason"); if (ws) ws.value = currentSeason(); } localStorage.setItem(FD_KEY_STORAGE, k6); }
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
   try { localStorage.setItem("radar-profile", JSON.stringify({ league: document.getElementById("favLeague").value, market: document.getElementById("favMarket").value })); } catch (e) {}
@@ -3254,7 +3254,28 @@ async function loadBundesligaOpenLigaDB() {
   }
 }
 
+async function loadLeagueStatsFd(league, season) {
+  const statusEl = document.getElementById("widgets-status"), container = document.getElementById("widgets-container");
+  const code = FD_CODES[String(league)];
+  statusEl.textContent = "Cargando desde football-data.org...";
+  container.innerHTML = `<div class="skeleton skeleton-line" style="width:30%;"></div><div class="skeleton skeleton-card"></div>`;
+  const get = async path => { const r = await fetch(`https://api.football-data.org/v4/competitions/${code}/${path}`, { headers: { "X-Auth-Token": getFdKey() } }); if (r.status === 429) throw new Error("límite de 10 peticiones por minuto, espera un momento"); if (r.status === 403) throw new Error("tu plan gratuito no incluye esta liga o temporada"); if (!r.ok) throw new Error(String(r.status)); return r.json(); };
+  try {
+    const [st, sc] = await Promise.all([get(`standings?season=${season}`), get(`scorers?season=${season}&limit=50`).catch(() => ({ scorers: [] }))]);
+    statusEl.textContent = "";
+    const table = ((st.standings || []).find(x => x.type === "TOTAL") || (st.standings || [])[0] || {}).table || [];
+    const standingsHtml = !table.length ? `<div class="muted">Sin datos de clasificación para esta temporada/liga.</div>` : `<table class="cptable"><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>Pts</th><th>DG</th></tr></thead><tbody>${table.map(r => `<tr><td class="mono">${r.position}</td><td style="text-align:left;"><span style="display:inline-flex; align-items:center; gap:6px;">${r.team.crest ? `<img src="${r.team.crest}" style="width:18px; height:18px; object-fit:contain;" />` : ""}${r.team.name}</span></td><td class="mono">${r.playedGames}</td><td class="mono">${r.points}</td><td class="mono">${r.goalDifference}</td></tr>`).join("")}</tbody></table>`;
+    const list = sc.scorers || [];
+    lastTopScorers = list.map(x => x.player.name);
+    const card = (title, arr, fn) => `<div class="streak-card"><h4>${title}</h4>${arr.slice(0, 8).map(x => `<div class="ld-row" style="cursor:default;"><span>${x.player.name} <small>${x.team.name}</small></span><b>${fn(x)}</b></div>`).join("") || '<div class="muted" style="text-align:center;">Sin datos</div>'}</div>`;
+    const byAst = [...list].filter(x => x.assists != null).sort((a, b) => b.assists - a.assists);
+    container.innerHTML = `<div style="margin-bottom:20px;"><div class="muted" style="margin-bottom:6px;">Clasificación (temporada ${season}, football-data.org)</div>${standingsHtml}</div>
+      <div class="muted" style="margin-bottom:6px;">Líderes de jugadores</div><div class="ld-grid">${card("⚽ Goleadores", list, x => x.goals ?? 0)}${card("🎯 Asistentes (entre los 50 máximos goleadores)", byAst, x => x.assists)}</div>
+      <div class="muted" style="font-size:12px;">Tarjetas y fichas de jugador no están en el plan gratuito de football-data.org; para eso hace falta API-Football.</div>`;
+  } catch (e) { statusEl.textContent = ""; container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar desde football-data.org: ${e.message}</div>`; }
+}
 async function loadLeagueStats() {
+  { const lg = document.getElementById("widgetLeague").value, se = document.getElementById("widgetSeason").value || currentSeason(); if (getFdKey() && Number(se) >= currentSeason() && FD_CODES[String(lg)]) return loadLeagueStatsFd(lg, se); }
   const footballKey = getFootballKey();
   const statusEl = document.getElementById("widgets-status");
   const container = document.getElementById("widgets-container");
