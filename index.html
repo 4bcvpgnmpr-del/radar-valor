@@ -280,6 +280,8 @@
   .exbar i { display:block; height:100%; background:#3ECF8E; }
   /* ---- Backtesting sistema ---- */
   .bt-period { display:flex; width:fit-content; margin:0 auto 14px; }
+  #hb-panel label { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:12px; color:#9AA5B1; }
+  #hb-panel select, #hb-panel input[type=number] { width:100%; box-sizing:border-box; min-width:0; }
   .bt-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
   .bt-kpi { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px; text-align:center; }
   .bt-kpi .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#7C8797; }
@@ -2350,8 +2352,10 @@ const HB_COLS = {
 const HB_BOOKN = { pin: "Pinnacle (cierre)", b365: "Bet365", max: "La mejor cuota del mercado", avg: "Media del mercado" };
 const HB_SELN = { H: "Local gana", D: "Empate", A: "Visitante gana", O: "Más de 2.5", U: "Menos de 2.5" };
 const HB_ORDER = ["H", "D", "A", "O", "U"];
-let hbData = (() => { try { return JSON.parse(localStorage.getItem(HB_KEY) || "{}"); } catch (e) { return {}; } })();
-function hbSave() { try { localStorage.setItem(HB_KEY, JSON.stringify(hbData)); return true; } catch (e) { return false; } }
+let hbData = {};
+function hbDb() { return new Promise((res, rej) => { const r = indexedDB.open("radar-valor-hist", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function hbSave() { try { const db = await hbDb(); await new Promise((res, rej) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").put(hbData, "hist"); t.oncomplete = res; t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); return true; } catch (e) { return false; } }
+async function hbLoad() { try { const db = await hbDb(); hbData = await new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get("hist"); q.onsuccess = () => res(q.result || {}); q.onerror = () => rej(q.error); }); } catch (e) { hbData = {}; } try { localStorage.removeItem(HB_KEY); } catch (e) {} }
 function hbCsv(text) {
   text = text.replace(/^﻿/, ""); const rows = []; let row = [], cur = "", q = false;
   for (let i = 0; i < text.length; i++) {
@@ -2388,11 +2392,11 @@ async function hbImport(ev) {
     catch (e) { errs.push(f.name + ": " + e.message); }
   }
   ev.target.value = "";
-  const ok = hbSave();
-  msg.innerHTML = `${added} partidos añadidos.${errs.length ? " <span style='color:#E5484D'>" + errs.join(" · ") + "</span>" : ""}${ok ? "" : " <span style='color:#F0B429'>No cabe en el almacenamiento del navegador: los datos valen en esta sesión pero no se guardan. Importa menos temporadas.</span>"}`;
+  const ok = await hbSave();
+  msg.innerHTML = `${added} partidos añadidos.${errs.length ? " <span style='color:#E5484D'>" + errs.join(" · ") + "</span>" : ""}${ok ? "" : " <span style='color:#F0B429'>No se pudieron guardar en el navegador (¿modo privado?): valen solo en esta sesión.</span>"}`;
   hbInit();
 }
-function hbClear() { if (!confirm("¿Borrar todos los datos históricos importados?")) return; hbData = {}; try { localStorage.removeItem(HB_KEY); } catch (e) {} document.getElementById("hbMsg").textContent = "Datos borrados."; hbInit(); }
+function hbClear() { if (!confirm("¿Borrar todos los datos históricos importados?")) return; hbData = {}; hbSave(); document.getElementById("hbMsg").textContent = "Datos borrados."; hbInit(); }
 function hbSeasonsAll() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => set.add(r[5]))); return [...set].sort(); }
 function hbBooksAvail() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => Object.keys(r[6]).forEach(b => set.add(b)))); return Object.keys(HB_BOOKN).filter(b => set.has(b)); }
 function hbInit() {
@@ -2426,7 +2430,7 @@ function hbStats(b) {
   return { n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
 }
 function hbFilters() { const g = id => document.getElementById(id).value; return { from: g("hbFrom"), omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
-function hbVerdict(st) { if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= 2 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= 1 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
+function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
 function hbRender() {
   const lg = document.getElementById("hbLeague").value, sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters(), minN = parseInt(document.getElementById("hbMinN").value) || 0;
   const rows = (lg ? hbData[lg] || [] : Object.values(hbData).flat()).slice().sort((a, b) => a[0] - b[0]);
@@ -2449,11 +2453,11 @@ function hbRender() {
   Object.keys(hbData).forEach(l => HB_ORDER.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, f); combos++; if (b.length >= Math.max(1, minN)) { const s2 = hbStats(b); rk.push({ l, sl, s: s2 }); } }));
   rk.sort((a, b) => b.s.y - a.s.y);
   document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Liga</th><th>Selección</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
-    rk.slice(0, 25).map(x => { const v = hbVerdict(x.s); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPick('${x.l.replace(/'/g, "\\'")}','${x.sl}')"><td style="padding:7px 6px;">${x.l}</td><td>${HB_SELN[x.sl]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
-    <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de liga y selección: con tantas, alguna sale rentable solo por suerte. Fíate de las que mantienen yield positivo en <b>las dos mitades</b>, tienen muestra grande y marcan "señal sólida". Toca una fila para ver su detalle. Con cuotas de cierre de Pinnacle el mercado es muy eficiente; con las de Bet365 o la mejor cuota hay más margen para encontrar valor.</div>` : `<div class="muted" style="text-align:center;">Ninguna combinación llega a ${minN} apuestas con estos filtros.</div>`;
+    rk.slice(0, 25).map(x => { const v = hbVerdict(x.s, true); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPick('${x.l.replace(/'/g, "\\'")}','${x.sl}')"><td style="padding:7px 6px;">${x.l}</td><td>${HB_SELN[x.sl]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
+    <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de liga y selección: con tantas, alguna sale rentable solo por suerte. En el ranking el listón de fiabilidad es más alto (se exige más evidencia). Fíate de las que mantienen yield positivo en <b>las dos mitades</b>, tienen muestra grande y marcan "señal sólida". Toca una fila para ver su detalle. Con cuotas de cierre de Pinnacle el mercado es muy eficiente; con las de Bet365 o la mejor cuota hay más margen para encontrar valor.</div>` : `<div class="muted" style="text-align:center;">Ninguna combinación llega a ${minN} apuestas con estos filtros.</div>`;
 }
 function hbPick(l, sl) { document.getElementById("hbLeague").value = l; document.getElementById("hbSel").value = sl; hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
-document.addEventListener("DOMContentLoaded", hbInit); if (document.readyState !== "loading") hbInit();
+hbLoad().then(hbInit);
 function renderBacktestSystem() {
   const root = document.getElementById("bt-system"); if (!root) return;
   if (!document.getElementById("btSystem").options.length || document.getElementById("btSystem").options.length === 1) btFillSystems(document.getElementById("btSystem").value);
