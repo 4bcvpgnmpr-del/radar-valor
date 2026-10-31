@@ -250,6 +250,21 @@
   .pg-pages button { width:32px; height:32px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#9AA5B1; cursor:pointer; padding:0; font-size:12px; }
   .pg-pages button.on { background:#3ECF8E; color:#06231A; border-color:#3ECF8E; font-weight:700; }
   @media (max-width:900px) { .pg-layout { grid-template-columns:1fr; } .pg-side { position:static; } }
+  /* ---- Explorar ---- */
+  .ex-sel { display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .ex-hero { max-width:640px; margin:6px auto 12px; border-radius:16px; padding:22px 18px; text-align:center; background:radial-gradient(ellipse at 50% 120%, rgba(62,207,142,.22), transparent 60%), linear-gradient(160deg,#16303A,#0D1822); border:1px solid #1E2B35; }
+  .ex-hero .t { font-size:22px; font-weight:700; }
+  .ex-hero .s { color:#9AA5B1; font-size:13px; margin-top:4px; }
+  .ex-block { max-width:820px; margin:18px auto 0; background:#10151C; border:1px solid #1A212B; border-radius:16px; padding:14px 16px; }
+  .ex-block h3 { margin:0 0 10px; font-size:15px; text-align:center; }
+  .extable { width:100%; border-collapse:collapse; font-size:13px; }
+  .extable th { font-size:11px; color:#7C8797; font-weight:500; text-transform:uppercase; letter-spacing:.04em; padding:6px; text-align:center; border-bottom:1px solid #1A212B; }
+  .extable th:first-child, .extable td:first-child { text-align:left; }
+  .extable td { padding:7px 6px; text-align:center; border-bottom:1px solid #161C25; }
+  .extable td.exm { font-weight:600; }
+  .exin { width:78px; padding:4px 10px !important; text-align:center; }
+  .exbar { height:6px; border-radius:3px; background:#1A212B; margin-top:4px; overflow:hidden; }
+  .exbar i { display:block; height:100%; background:#3ECF8E; }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -267,6 +282,7 @@
       <button class="side-btn" data-v="coupon" onclick="switchView('coupon')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> Pregame</button>
       <button class="side-btn" data-v="daydash" onclick="switchView('daydash')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="8"/><rect x="10" y="7" width="4" height="13"/><rect x="17" y="3" width="4" height="17"/></svg> Dashboard del día</button>
       <button class="side-btn" data-v="trends" onclick="switchView('trends')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M8 3v18"/></svg> Tendencias de equipos</button>
+      <button class="side-btn" data-v="explore" onclick="switchView('explore')"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5M8 11h6M11 8v6"/></svg> Explorar mercados</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Formaciones</button>
 
@@ -596,6 +612,25 @@
     </div>
   </div>
 
+  <div id="view-explore" class="view">
+    <div style="display:flex; justify-content:center; margin-bottom:14px;">
+      <div class="seg" id="exModeSeg"><button class="seg-b active" data-m="league" onclick="setExMode('league')">Modo liga</button><button class="seg-b" data-m="game" onclick="setExMode('game')">Modo partido</button></div>
+    </div>
+    <div class="ex-sel">
+      <select id="exLeague" onchange="exPickLeague(this.value)">
+        <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option><option value="140">🇪🇸 La Liga</option><option value="135">🇮🇹 Serie A</option><option value="78">🇩🇪 Bundesliga</option><option value="2">🇪🇺 Champions League</option>
+      </select>
+      <select id="exSample" onchange="renderExplore()"><option value="0">Toda la temporada</option><option value="100">Últimos 100 partidos</option><option value="50">Últimos 50</option><option value="20">Últimos 20</option></select>
+      <select id="exMarket" onchange="renderExplore()"><option value="all">Todos los mercados</option><option value="1x2">Resultado 1X2</option><option value="goals">Goles totales</option><option value="btts">Ambos marcan</option><option value="scores">Marcadores</option></select>
+    </div>
+    <div class="ex-sel" id="exGameSel" style="display:none;">
+      <select id="exHome" onchange="renderExplore()"></select><span class="muted">vs</span><select id="exAway" onchange="renderExplore()"></select>
+    </div>
+    <div class="ex-hero" id="exHero"></div>
+    <div id="ex-status" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+    <div id="ex-out"></div>
+  </div>
+
   <div id="view-trends" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
@@ -689,7 +724,7 @@ async function getTeamBadge(name) {
   }
 }
 
-const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -698,6 +733,7 @@ function switchView(v) {
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
+  if (v === "explore") { document.getElementById("exLeague").value = document.getElementById("trLeague").value; if (!trData) loadTrends(); else renderExplore(); }
   if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
@@ -2039,7 +2075,7 @@ async function loadTrends() {
   if (!key) { st.textContent = "Añade tu API-Football key en ⚙️ Configuración."; return; }
   const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
   const ck = `radar-trends-${league}-${season}`;
-  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); return; } } catch (e) {}
+  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
   st.textContent = "Cargando partidos de la temporada...";
   try {
     const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, key);
@@ -2047,8 +2083,8 @@ async function loadTrends() {
       .map(f => ({ d: f.fixture.date, h: f.teams.home.name, a: f.teams.away.name, hg: f.goals.home, ag: f.goals.away }));
     try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f: trData })); } catch (e) {}
     st.textContent = trData.length ? `${trData.length} partidos analizados (temporada ${season}).` : "Sin partidos terminados para esta liga/temporada.";
-    renderTrends();
-  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
+    renderTrends(); renderExplore();
+  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; renderExplore(); }
 }
 function renderTrends() {
   const tb = document.getElementById("trTable"); if (!tb) return;
@@ -2156,6 +2192,69 @@ function cpSavePreset() {
 }
 function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...p, page: 0 }; cpWriteDom(); renderCoupon(); }
 function cpDeletePreset() { const n = document.getElementById("cpPreset").value; if (!n) return; const p = cpGetPresets(); delete p[n]; try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {} cpFillPresets(""); }
+let exMode = "league";
+function setExMode(m) { exMode = m; document.querySelectorAll("#exModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
+function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
+function exMarkets() {
+  const mk = (l, f) => ({ l, f });
+  return {
+    "1x2": ["Resultado 1X2", [mk("1 (local gana)", (h, a) => h > a), mk("X (empate)", (h, a) => h === a), mk("2 (visitante gana)", (h, a) => h < a), mk("1X", (h, a) => h >= a), mk("X2", (h, a) => h <= a), mk("12", (h, a) => h !== a)]],
+    goals: ["Goles totales", [1.5, 2.5, 3.5, 4.5].flatMap(x => [mk(`Más de ${x}`, (h, a) => h + a > x), mk(`Menos de ${x}`, (h, a) => h + a < x)])],
+    btts: ["Ambos marcan", [mk("Sí", (h, a) => h > 0 && a > 0), mk("No", (h, a) => h === 0 || a === 0), mk("Local anota", (h, a) => h > 0), mk("Visitante anota", (h, a) => a > 0)]],
+  };
+}
+function renderExplore() {
+  const out = document.getElementById("ex-out"); if (!out) return;
+  const hero = document.getElementById("exHero"), st = document.getElementById("ex-status");
+  document.getElementById("exLeague").value = document.getElementById("trLeague").value;
+  if (!trData || !trData.length) { hero.innerHTML = `<div class="t">Explorar mercados</div><div class="s">Cargando datos de la liga...</div>`; out.innerHTML = ""; st.textContent = document.getElementById("trStatus").textContent; return; }
+  const N = parseInt(document.getElementById("exSample").value) || 0, sel = document.getElementById("exMarket").value;
+  const lname = document.getElementById("exLeague").selectedOptions[0].textContent;
+  const byDate = [...trData].sort((a, b) => b.d.localeCompare(a.d));
+  const teams = [...new Set(trData.flatMap(f => [f.h, f.a]))].sort();
+  const fill = (id, keep, def) => { const el = document.getElementById(id); if (el.options.length !== teams.length) { el.innerHTML = teams.map(t => `<option>${t}</option>`).join(""); el.selectedIndex = def; } };
+  fill("exHome", null, 0); fill("exAway", null, Math.min(1, teams.length - 1));
+  let sets; // cada set: { label, pairs:[{h,a}] }
+  if (exMode === "league") {
+    const rows = N ? byDate.slice(0, N) : byDate;
+    sets = [{ label: "Liga", pairs: rows.map(f => ({ h: f.hg, a: f.ag })) }];
+    hero.innerHTML = `<div class="t">${lname}</div><div class="s">Análisis de liga · ${rows.length} partidos${N ? " (últimos " + N + ")" : " de la temporada"}</div>`;
+  } else {
+    const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value;
+    let hr = byDate.filter(f => f.h === H), ar = byDate.filter(f => f.a === A);
+    if (N) { hr = hr.slice(0, N); ar = ar.slice(0, N); }
+    sets = [{ label: `${H} (en casa)`, pairs: hr.map(f => ({ h: f.hg, a: f.ag })) }, { label: `${A} (fuera)`, pairs: ar.map(f => ({ h: f.hg, a: f.ag })) }];
+    hero.innerHTML = `<div class="t">${H} vs ${A}</div><div class="s">${lname} · ${hr.length} partidos del local en casa · ${ar.length} del visitante fuera</div>`;
+  }
+  st.textContent = "Cuota justa = 1 / frecuencia. Escribe tu cuota para ver el edge (cuota × frecuencia − 1).";
+  const freq = (pairs, f) => pairs.length ? pairs.filter(p => f(p.h, p.a)).length / pairs.length : null;
+  const defs = exMarkets(); let html = "";
+  Object.keys(defs).filter(k => sel === "all" || sel === k).forEach(k => {
+    const [title, list] = defs[k];
+    const head = sets.length > 1 ? `<th>${sets[0].label}</th><th>${sets[1].label}</th><th>Media</th>` : `<th>Frecuencia</th>`;
+    html += `<div class="ex-block"><h3>${title}</h3><table class="extable"><thead><tr><th>Mercado</th>${head}<th>Cuota justa</th><th>Tu cuota</th><th>Edge</th></tr></thead><tbody>` +
+      list.map(m => {
+        const fs = sets.map(x => freq(x.pairs, m.f)), valid = fs.filter(v => v != null), p = valid.length ? valid.reduce((a, c) => a + c, 0) / valid.length : null;
+        const cells = fs.map(v => `<td>${v == null ? "–" : (v * 100).toFixed(1) + "%"}</td>`).join("") + (sets.length > 1 ? `<td><b>${p == null ? "–" : (p * 100).toFixed(1) + "%"}</b></td>` : "");
+        return `<tr><td class="exm">${m.l}</td>${cells}<td><span class="codd">${p ? (1 / p).toFixed(2) : "–"}</span></td><td><input class="exin" type="number" step="0.01" placeholder="1.90" data-p="${p || 0}" oninput="exEdge(this)" /></td><td class="exedge muted">–</td></tr>`;
+      }).join("") + `</tbody></table></div>`;
+  });
+  if (sel === "all" || sel === "scores") {
+    const pooled = sets.flatMap(x => x.pairs), cnt = {};
+    pooled.forEach(p => { const k = `${p.h}-${p.a}`; cnt[k] = (cnt[k] || 0) + 1; });
+    const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8), mx = top.length ? top[0][1] : 1;
+    html += `<div class="ex-block"><h3>Marcadores más frecuentes</h3><table class="extable"><thead><tr><th>Marcador</th><th>Veces</th><th>Frecuencia</th><th style="width:40%;"></th></tr></thead><tbody>` +
+      top.map(([k, n]) => `<tr><td class="exm">${k}</td><td>${n}</td><td>${(100 * n / pooled.length).toFixed(1)}%</td><td><div class="exbar"><i style="width:${100 * n / mx}%"></i></div></td></tr>`).join("") + `</tbody></table></div>`;
+  }
+  html += `<div class="muted" style="max-width:820px; margin:14px auto 0; font-size:11px; text-align:center;">El análisis por minuto de gol (Next Goal) no está incluido: requiere los eventos de cada partido, que agotarían la cuota diaria del plan gratuito de API-Football.</div>`;
+  out.innerHTML = html;
+}
+function exEdge(inp) {
+  const p = parseFloat(inp.dataset.p), o = parseFloat(inp.value), c = inp.closest("tr").querySelector(".exedge");
+  if (!(o > 1) || !p) { c.innerHTML = "–"; return; }
+  const ev = o * p - 1, cls = ev >= 0.15 ? "val-error" : ev >= 0.02 ? "val-high" : ev > 0 ? "val-mid" : "val-low";
+  c.innerHTML = `<span class="epill ${cls}">${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%</span>`;
+}
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
   const day0 = new Date(); day0.setHours(0, 0, 0, 0);
