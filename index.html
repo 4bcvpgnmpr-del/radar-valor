@@ -685,7 +685,7 @@
           <label>Liga<select id="hbLeague" onchange="hbRender()"></select></label>
           <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option></select></label>
           <label>Cuota a la que apuestas<select id="hbBook" onchange="hbRender()"></select></label>
-          <label>Desde temporada<select id="hbFrom" onchange="hbRender()"></select></label>
+          <label>Temporadas<details id="hbSeasD" style="position:relative;"><summary id="hbSeasS" style="cursor:pointer; padding:10px 12px; border:1px solid #2A3340; border-radius:12px; background:#0D1117; color:#E6EAF0; font-size:14px;">Todas</summary><div id="hbSeasL" style="position:absolute; z-index:20; left:0; right:0; max-height:240px; overflow:auto; background:#10151C; border:1px solid #2A3340; border-radius:12px; margin-top:4px; padding:8px;"></div></details></label>
           <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
           <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRender()" /></label>
           <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRender()" /></label>
@@ -2402,19 +2402,28 @@ async function hbImport(ev) {
 function hbClear() { if (!confirm("¿Borrar todos los datos históricos importados?")) return; hbData = {}; hbSave(); document.getElementById("hbMsg").textContent = "Datos borrados."; hbInit(); }
 function hbSeasonsAll() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => set.add(r[5]))); return [...set].sort(); }
 function hbBooksAvail() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => Object.keys(r[6]).forEach(b => set.add(b)))); return Object.keys(HB_BOOKN).filter(b => set.has(b)); }
+let hbSeasSel = null; /* null = todas; Set = solo esas */
+function hbSeasDraw(ss) {
+  ss = ss || hbSeasonsAll(); const L = document.getElementById("hbSeasL"); if (!L) return;
+  L.innerHTML = `<div style="display:flex; gap:12px; margin-bottom:6px; font-size:12px;"><a href="#" onclick="hbSeasAll(true);return false;">Todas</a><a href="#" onclick="hbSeasAll(false);return false;">Ninguna</a><a href="#" onclick="hbSeasLast(3);return false;">Últimas 3</a></div>` + ss.slice().reverse().map(x => `<label style="display:flex; flex-direction:row; align-items:center; gap:8px; padding:4px 2px; font-size:13px; color:#E6EAF0; cursor:pointer;"><input type="checkbox" style="width:auto;" ${hbSeasSel === null || hbSeasSel.has(x) ? "checked" : ""} onchange="hbSeasTog('${x}',this.checked)" />${x}</label>`).join("");
+  document.getElementById("hbSeasS").textContent = hbSeasSel === null ? "Todas" : hbSeasSel.size === 0 ? "Ninguna" : hbSeasSel.size <= 3 ? [...hbSeasSel].sort().join(", ") : hbSeasSel.size + " temporadas";
+}
+function hbSeasTog(x, on) { const ss = hbSeasonsAll(); if (hbSeasSel === null) hbSeasSel = new Set(ss); on ? hbSeasSel.add(x) : hbSeasSel.delete(x); if (hbSeasSel.size === ss.length) hbSeasSel = null; hbSeasDraw(ss); hbRender(); }
+function hbSeasAll(on) { hbSeasSel = on ? null : new Set(); hbSeasDraw(); hbRender(); }
+function hbSeasLast(n) { hbSeasSel = new Set(hbSeasonsAll().slice(-n)); hbSeasDraw(); hbRender(); }
 function hbInit() {
   const lgs = Object.keys(hbData).sort(), body = document.getElementById("hbBody"); if (!body) return;
   if (!lgs.length) { body.style.display = "none"; if (!document.getElementById("hbMsg").textContent) document.getElementById("hbMsg").textContent = "Aún no hay datos. Descarga CSV de football-data.co.uk (por ejemplo NOR.csv de Noruega, o un E0.csv por temporada) e impórtalos aquí."; return; }
   body.style.display = "block";
   const sel = document.getElementById("hbLeague"), cur = sel.value; sel.innerHTML = `<option value="">Todas las ligas juntas</option>` + lgs.map(l => `<option value="${l}">${l} (${hbData[l].length})</option>`).join(""); if (lgs.includes(cur)) sel.value = cur; else if (lgs.length === 1) sel.value = lgs[0];
   const bk = document.getElementById("hbBook"), cb = bk.value; bk.innerHTML = hbBooksAvail().map(b => `<option value="${b}">${HB_BOOKN[b]}</option>`).join(""); if (cb) bk.value = cb; else if (hbBooksAvail().includes("b365")) bk.value = "b365";
-  const fr = document.getElementById("hbFrom"), cf = fr.value, ss = hbSeasonsAll(); fr.innerHTML = `<option value="">Todas</option>` + ss.map(x => `<option>${x}</option>`).join(""); fr.value = ss.includes(cf) ? cf : "";
+  const ss = hbSeasonsAll(); if (hbSeasSel) { hbSeasSel = new Set([...hbSeasSel].filter(x => ss.includes(x))); } hbSeasDraw(ss);
   hbRender();
 }
 function hbBets(rows, sel, bk, f) {
   const si = HB_ORDER.indexOf(sel), out = [];
   rows.forEach(r => {
-    if (f.from && r[5] < f.from) return;
+    if (f.seas && !f.seas.has(r[5])) return;
     const o = r[6][bk]; if (!o || !o[si]) return; const price = o[si];
     if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
     let ev = null; const fo = r[6].pin || r[6].avg;
@@ -2432,7 +2441,7 @@ function hbStats(b) {
   let pk = 0, cu = 0, dd = 0; b.forEach(x => { cu += x.p; pk = Math.max(pk, cu); dd = Math.max(dd, pk - cu); });
   return { n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
 }
-function hbFilters() { const g = id => document.getElementById(id).value; return { from: g("hbFrom"), omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
+function hbFilters() { const g = id => document.getElementById(id).value; return { seas: hbSeasSel, omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
 function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
 let hbGrp = "league", hbTeamF = null;
 const HB_TK = { hl: ["Gana de local", "h", "H"], aw: ["Gana de visitante", "a", "A"], ch: ["Rival gana cuando juega de local", "h", "A"], ca: ["Rival gana cuando juega de visitante", "a", "H"], dr: ["Empate", "any", "D"], ov: ["Más de 2.5 goles", "any", "O"], un: ["Menos de 2.5 goles", "any", "U"] };
