@@ -25,6 +25,16 @@
   .streak-card h4 { margin:0 0 8px; font-size:13px; font-weight:600; text-align:center; }
   .streak-row { display:flex; justify-content:space-between; align-items:center; padding:5px 2px; font-size:12px; border-top:1px solid #1E2630; }
   .streak-row b { background:#3ECF8E; color:#0B0E11; border-radius:6px; padding:1px 8px; min-width:24px; text-align:center; }
+  .cptable { width:100%; border-collapse:collapse; font-size:13px; }
+  .cptable th { color:#7C8797; font-weight:500; font-size:11px; text-transform:uppercase; padding:6px; text-align:center; }
+  .cptable th:first-child { text-align:left; }
+  .cptable td { padding:8px 6px; text-align:center; border-top:1px solid #1A2028; }
+  .cptable td.cm { text-align:left; cursor:pointer; }
+  .cptable td.cm:hover { color:#3ECF8E; }
+  .cptable tr.cpday td { text-align:left; background:#171C23; color:#7C8797; font-size:12px; font-weight:600; border-top:none; }
+  .codd { display:inline-block; min-width:48px; padding:4px 8px; border-radius:6px; background:#1E2630; font-variant-numeric:tabular-nums; }
+  .codd.v { background:rgba(62,207,142,.25); color:#3ECF8E; font-weight:600; }
+  .codd.e { background:rgba(224,90,90,.28); color:#FF8A8A; font-weight:600; }
   .trtable { width:100%; border-collapse:collapse; font-size:13px; }
   .trtable th { text-align:center; color:#7C8797; font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.04em; padding:8px 6px; cursor:pointer; white-space:nowrap; border-bottom:1px solid #232A33; position:sticky; top:0; background:#12161C; }
   .trtable th:nth-child(1), .trtable th:nth-child(2) { text-align:left; }
@@ -173,6 +183,7 @@
     <div class="sidebar-nav">
       <div class="sidebar-section">Partidos</div>
       <button class="side-btn active" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
+      <button class="side-btn" data-v="coupon" onclick="switchView('coupon')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg> Cupón</button>
       <button class="side-btn" data-v="daydash" onclick="switchView('daydash')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="8"/><rect x="10" y="7" width="4" height="13"/><rect x="17" y="3" width="4" height="17"/></svg> Dashboard del día</button>
       <button class="side-btn" data-v="trends" onclick="switchView('trends')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M3 12h18M3 19h18"/><path d="M8 3v18"/></svg> Tendencias de equipos</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
@@ -449,6 +460,17 @@
     </div>
   </div>
 
+  <div id="view-coupon" class="view">
+    <div class="panel">
+      <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+        <div style="font-weight:600;">Cupón — partidos y cuotas en una vista</div>
+        <input id="cpSearch" type="text" placeholder="Buscar equipo..." style="width:150px;" oninput="renderCoupon()" />
+      </div>
+      <div class="muted" style="font-size:12px; margin-bottom:10px;">Usa las cuotas cargadas en "Partidos y valor" (cambia de liga allí para verla aquí). Celda verde = valor (EV ≥ 2%), roja = posible error (EV ≥ 15%). Pulsa un partido para estudiarlo.</div>
+      <div id="coupon-content"></div>
+    </div>
+  </div>
+
   <div id="view-trends" class="view">
     <div class="panel">
       <div class="row" style="margin-bottom:12px; flex-wrap:wrap; gap:8px;">
@@ -548,6 +570,7 @@ function switchView(v) {
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
+  if (v === "coupon") renderCoupon();
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
 }
@@ -1925,6 +1948,35 @@ function renderTrends() {
     list.map((t, i) => `<tr><td class="rk">${i + 1}</td><td class="tn">${t.n}</td><td>${t.pj}</td><td>${t.gf.toFixed(2)}</td><td>${t.gc.toFixed(2)}</td>` +
       ["ov15","ov25","ov35","btts","cs"].map(k => `<td><span class="pcell" style="${heat(t[k])}">${t[k]}%</span></td>`).join("") +
       `<td><span class="pcell" style="${heat(t.fts, true)}">${t.fts}%</span></td><td>${t.last.map(dot).join("")}</td></tr>`).join("") + "</tbody>";
+}
+function renderCoupon() {
+  const el = document.getElementById("coupon-content"); if (!el) return;
+  if (!lastMatches.length) { el.innerHTML = '<div class="muted">Aún no hay cuotas cargadas. Ve a "Partidos y valor" y pulsa "Actualizar cuotas".</div>'; return; }
+  const q = (document.getElementById("cpSearch").value || "").toLowerCase();
+  const cols = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"]];
+  const pick = (bks, mk, key) => { // cuota mostrada + probabilidad justa
+    const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: mk === "totals" ? m.outcomes.filter(x => x.point === 2.5) : m.outcomes } : null; }).filter(Boolean);
+    const fairs = [];
+    rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
+    const shown = rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b));
+    if (!shown) return null;
+    const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
+    const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
+    return { price: o.price, ev: fair ? o.price * fair - 1 : null };
+  };
+  const list = lastMatches.filter(m => !q || m.home_team.toLowerCase().includes(q) || m.away_team.toLowerCase().includes(q)).sort((a, b) => a.commence_time.localeCompare(b.commence_time));
+  let day = "", html = '<table class="cptable"><thead><tr><th>Partido</th><th>1</th><th>X</th><th>2</th><th>+2.5</th><th>-2.5</th></tr></thead><tbody>';
+  list.forEach(m => {
+    const d = new Date(m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+    if (dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="6">${dk}</td></tr>`; }
+    const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+    const safe = m.home_team.replace(/'/g, "\\'");
+    html += `<tr><td class="cm" onclick="document.getElementById('teamSearch').value='${safe}'; switchView('partidos'); applyFilters();"><span class="muted">${hm}</span> &nbsp;${m.home_team} <span class="muted">vs</span> ${m.away_team}</td>` +
+      cols.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; const r = pick(m.bookmakers, c[0], key);
+        if (!r) return '<td class="muted">–</td>'; const cls = r.ev != null && r.ev >= 0.15 ? "e" : r.ev != null && r.ev >= 0.02 ? "v" : "";
+        return `<td><span class="codd ${cls}" title="${r.ev != null ? "EV " + (r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>";
+  });
+  el.innerHTML = html + "</tbody></table>";
 }
 function sortTrends(k) { trSort = { k, d: trSort.k === k ? -trSort.d : (k === "n" ? 1 : -1) }; renderTrends(); }
 
