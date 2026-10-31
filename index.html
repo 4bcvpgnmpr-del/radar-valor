@@ -302,7 +302,7 @@
   .lv-odds .h { font-size:9px; color:#7C8797; text-transform:uppercase; margin-bottom:3px; }
   @media (max-width:900px) { .lv-layout { grid-template-columns:1fr; } .lv-rail { flex-direction:row; flex-wrap:wrap; position:static; } .lv-row { grid-template-columns:1fr; } }
   /* ---- Ficha del partido ---- */
-  #match-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:300; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
+  #match-overlay, #alq-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); z-index:300; display:flex; align-items:flex-start; justify-content:center; padding:24px 16px; overflow-y:auto; }
   .ms-box { position:relative; background:#0D1218; border:1px solid #1A212B; border-radius:18px; width:100%; max-width:980px; padding:26px 24px 30px; }
   .ms-close { position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#E6E9ED; cursor:pointer; font-size:14px; }
   .ms-title { text-align:center; font-size:22px; font-weight:700; }
@@ -763,6 +763,8 @@
           <label>Valor (EV %) hasta<input id="alEMax" type="number" step="1" placeholder="100" /></label>
           <label>Cuota real (justa) desde<input id="alRMin" type="number" step="0.05" /></label>
           <label>Cuota real (justa) hasta<input id="alRMax" type="number" step="0.05" /></label>
+          <label>Diferencia vs otras casas % desde<input id="alDMin" type="number" step="0.5" placeholder="3" /></label>
+          <label>Diferencia vs otras casas % hasta<input id="alDMax" type="number" step="0.5" /></label>
         </div>
       </div>
       <div id="alLive" style="display:none;">
@@ -781,6 +783,25 @@
     </div>
     <div class="ex-block"><h3>Mis alarmas</h3><div id="alList"></div></div>
     <div class="ex-block"><h3>Últimos disparos</h3><div id="alLog"></div></div>
+  </div>
+
+  <div id="alq-overlay" style="display:none;" onclick="if(event.target===this) alqClose()">
+    <div class="ms-box" style="max-width:520px;">
+      <button class="ms-close" onclick="alqClose()" aria-label="Cerrar">✕</button>
+      <div class="ms-title" style="font-size:18px;">Alarma para este partido</div>
+      <div class="ms-sub" id="alqMatch"></div>
+      <div class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;">Salta cuando se cumplan todas las condiciones que rellenes.</div>
+      <div class="al-grid" style="grid-template-columns:repeat(2,1fr);">
+        <label>Selección<select id="alqSel"><option value="any">Cualquiera</option><option value="1">1 (local)</option><option value="X">X (empate)</option><option value="2">2 (visitante)</option><option value="+2.5">Más de 2.5</option><option value="-2.5">Menos de 2.5</option></select></label>
+        <label>Valor (EV %) desde<input id="alqEMin" type="number" step="1" placeholder="5" /></label>
+        <label>Cuota desde<input id="alqOMin" type="number" step="0.05" placeholder="1.50" /></label>
+        <label>Cuota hasta<input id="alqOMax" type="number" step="0.05" /></label>
+        <label>Cuota real desde<input id="alqRMin" type="number" step="0.05" /></label>
+        <label>Diferencia vs otras casas % desde<input id="alqDMin" type="number" step="0.5" placeholder="3" /></label>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;"><input id="alqName" type="text" placeholder="Descripción (opcional)" style="width:240px;" /><button onclick="alqSave()">Guardar y activar</button></div>
+      <div id="alqMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
+    </div>
   </div>
 
   <div id="match-overlay" style="display:none;" onclick="if(event.target===this) closeMatchSheet()">
@@ -2411,8 +2432,11 @@ function cpPick(bks, mk, key) {
   if (!shown) return null;
   const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
   const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
-  return { price: o.price, ev: fair ? o.price * fair - 1 : null, fair };
+  const allP = rows.map(r => { const x = r.o.find(y => outcomeKey(y) === key); return x ? { b: r.b, price: x.price } : null; }).filter(Boolean);
+  const others = allP.filter(x => x.b !== shown.b), diff = others.length ? (o.price / (others.reduce((a, c) => a + c.price, 0) / others.length) - 1) * 100 : null;
+  return { price: o.price, ev: fair ? o.price * fair - 1 : null, fair, all: allP, diff };
 }
+function cpExpand(btn) { const n = btn.closest("tr").nextElementSibling; if (n && n.classList.contains("cpx")) n.style.display = n.style.display === "none" ? "table-row" : "none"; }
 function cpRead() {
   cp.q = (document.getElementById("cpSearch").value || "").toLowerCase().trim();
   cp.sort = document.getElementById("cpSort").value;
@@ -2507,7 +2531,14 @@ function exEdge(inp) {
   const ev = o * p - 1, cls = ev >= 0.15 ? "val-error" : ev >= 0.02 ? "val-high" : ev > 0 ? "val-mid" : "val-low";
   c.innerHTML = `<span class="epill ${cls}">${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%</span>`;
 }
-let msCtx = "";
+let msCtx = "", msCtx2 = null;
+async function msGoExplore() {
+  const c = msCtx2; if (!c) return; closeMatchSheet();
+  if (document.getElementById("trLeague").value !== String(c.leagueId)) { document.getElementById("trLeague").value = c.leagueId; trData = null; }
+  switchView("explore"); setExMode("game");
+  if (!trData) await loadTrends();
+  if (trData) { const teams = [...new Set(trData.flatMap(f => [f.h, f.a]))], H = msFind(c.home, teams), A = msFind(c.away, teams); if (H) document.getElementById("exHome").value = H; if (A) document.getElementById("exAway").value = A; renderExplore(); }
+}
 function msGoOdds() { closeMatchSheet(); document.getElementById("teamSearch").value = msCtx; switchView("partidos"); applyFilters(); }
 function closeMatchSheet() { document.getElementById("match-overlay").style.display = "none"; document.body.style.overflow = ""; }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeMatchSheet(); });
@@ -2543,8 +2574,8 @@ function msDots(last) { return last.length ? last.map(r => { const k = r.gf > r.
 async function openMatchSheet(home, away, leagueId, leagueName) {
   const ov = document.getElementById("match-overlay"), body = document.getElementById("ms-body");
   ov.style.display = "flex"; document.body.style.overflow = "hidden";
-  msCtx = home;
-  const head = `<div class="ms-title">${home} <span style="color:#3ECF8E">vs</span> ${away}</div><div class="ms-sub">${leagueName || ""} · <a href="#" style="color:#3ECF8E;" onclick="msGoOdds(); return false;">Ver cuotas y valor →</a></div>`;
+  msCtx = home; msCtx2 = { home, away, leagueId };
+  const head = `<div class="ms-title">${home} <span style="color:#3ECF8E">vs</span> ${away}</div><div class="ms-sub">${leagueName || ""} · <a href="#" style="color:#3ECF8E;" onclick="msGoOdds(); return false;">Ver cuotas y valor →</a> · <a href="#" style="color:#3ECF8E;" onclick="msGoExplore(); return false;">Explorar mercados →</a></div>`;
   if (!getFootballKey()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
   const season = document.getElementById("trSeason").value || 2024;
   body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Cargando datos de la temporada ${season}...</div>`;
@@ -2584,14 +2615,23 @@ function saveAlarms(a) { try { localStorage.setItem("radar-alarms", JSON.stringi
 function getAlLog() { try { return JSON.parse(localStorage.getItem("radar-alarm-log") || "[]"); } catch (e) { return []; } }
 function getAlFired() { try { return new Set(JSON.parse(localStorage.getItem("radar-alarm-fired") || "[]")); } catch (e) { return new Set(); } }
 function saveAlFired(set) { try { localStorage.setItem("radar-alarm-fired", JSON.stringify([...set].slice(-600))); } catch (e) {} }
+let alqCtx = null;
+function alQuick(matchId, home, away, leagueId) { alqCtx = { matchId, label: `${home} vs ${away}`, leagueId }; document.getElementById("alqMatch").textContent = alqCtx.label; document.getElementById("alqMsg").textContent = ""; ["alqEMin","alqOMin","alqOMax","alqRMin","alqDMin","alqName"].forEach(i => document.getElementById(i).value = ""); document.getElementById("alqSel").value = "any"; document.getElementById("alq-overlay").style.display = "flex"; }
+function alqClose() { document.getElementById("alq-overlay").style.display = "none"; }
+function alqSave() {
+  const v = id => document.getElementById(id).value.trim(), a = { id: "a" + Date.now(), type: "pre", active: true, leagues: [alqCtx.leagueId], matchId: alqCtx.matchId, matchLabel: alqCtx.label, sel: v("alqSel"), oMin: v("alqOMin"), oMax: v("alqOMax"), eMin: v("alqEMin"), eMax: "", rMin: v("alqRMin"), rMax: "", dMin: v("alqDMin"), dMax: "" };
+  if (a.sel === "any" && !a.oMin && !a.oMax && !a.eMin && !a.rMin && !a.dMin) { document.getElementById("alqMsg").textContent = "Añade al menos una condición."; return; }
+  a.name = v("alqName") || `${alqCtx.label}`;
+  const all = getAlarms(); all.unshift(a); saveAlarms(all.slice(0, 40)); alqClose(); showToast(`Alarma creada: ${a.name}`); renderAlarms();
+}
 function alSetType(t) { alType = t; document.querySelectorAll("#alType .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === t)); document.getElementById("alPre").style.display = t === "pre" ? "block" : "none"; document.getElementById("alLive").style.display = t === "live" ? "block" : "none"; }
 function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) alLeaguesSel.splice(i, 1); else alLeaguesSel.push(id); renderAlarms(); }
 function alSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
   const a = { id: "a" + Date.now(), type: alType, active: true, leagues: [...alLeaguesSel], name: v("alName") };
   if (alType === "pre") {
-    Object.assign(a, { sel: v("alSel"), oMin: v("alOMin"), oMax: v("alOMax"), eMin: v("alEMin"), eMax: v("alEMax"), rMin: v("alRMin"), rMax: v("alRMax") });
-    if (a.sel === "any" && !a.oMin && !a.oMax && !a.eMin && !a.eMax && !a.rMin && !a.rMax) { msg.textContent = "Añade al menos una condición (selección o algún rango)."; return; }
+    Object.assign(a, { sel: v("alSel"), oMin: v("alOMin"), oMax: v("alOMax"), eMin: v("alEMin"), eMax: v("alEMax"), rMin: v("alRMin"), rMax: v("alRMax"), dMin: v("alDMin"), dMax: v("alDMax") });
+    if (a.sel === "any" && !a.oMin && !a.oMax && !a.eMin && !a.eMax && !a.rMin && !a.rMax && !a.dMin && !a.dMax) { msg.textContent = "Añade al menos una condición (selección o algún rango)."; return; }
   } else {
     Object.assign(a, { gh: v("alGH"), ga: v("alGA"), mMin: v("alMMin"), mMax: v("alMMax") });
     if (!a.gh && !a.ga && !a.mMin && !a.mMax) { msg.textContent = "Añade al menos una condición (marcador o minutos)."; return; }
@@ -2602,7 +2642,7 @@ function alSave() {
 }
 function alDescribe(a) {
   const r = (l, mn, mx) => mn || mx ? `${l} ${mn || "…"}–${mx || "…"}` : "", parts = [];
-  if (a.type === "pre") { if (a.sel && a.sel !== "any") parts.push("Selección " + a.sel); parts.push(r("cuota", a.oMin, a.oMax), r("EV%", a.eMin, a.eMax), r("cuota real", a.rMin, a.rMax)); }
+  if (a.type === "pre") { if (a.sel && a.sel !== "any") parts.push("Selección " + a.sel); parts.push(r("cuota", a.oMin, a.oMax), r("EV%", a.eMin, a.eMax), r("cuota real", a.rMin, a.rMax), r("dif. casas %", a.dMin, a.dMax)); if (a.matchLabel) parts.unshift(a.matchLabel); }
   else { if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); }
   const lg = a.leagues.length ? a.leagues.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).join(", ") : "todas las ligas";
   return `${a.type === "pre" ? "Pregame" : "En vivo"} · ${parts.filter(Boolean).join(" · ") || "sin rangos"} · ${lg}`;
@@ -2631,11 +2671,12 @@ function runAlarms(matches, sport) {
   matches.forEach(m => {
     const cells = CP_COLS.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; return { lab: c[2], r: cpPick(m.bookmakers, c[0], key) }; });
     alarms.forEach(a => {
+      if (a.matchId && a.matchId !== m.id) return;
       if (a.leagues.length && !a.leagues.includes(lg.id)) return;
       cells.forEach(c => {
         if (!c.r || (a.sel !== "any" && a.sel !== c.lab)) return;
         const ev = c.r.ev != null ? c.r.ev * 100 : null, real = c.r.fair ? 1 / c.r.fair : null;
-        if (!alIn(c.r.price, a.oMin, a.oMax) || !alIn(ev, a.eMin, a.eMax) || !alIn(real, a.rMin, a.rMax)) return;
+        if (!alIn(c.r.price, a.oMin, a.oMax) || !alIn(ev, a.eMin, a.eMax) || !alIn(real, a.rMin, a.rMax) || !alIn(c.r.diff, a.dMin, a.dMax)) return;
         const k = `${a.id}|${m.id}|${c.lab}|${today}`; if (fired.has(k)) return; fired.add(k); any = true;
         alFire(a, `${m.home_team} vs ${m.away_team}<br/>Selección ${c.lab} a ${c.r.price.toFixed(2)}${ev != null ? ` · valor ${ev >= 0 ? "+" : ""}${ev.toFixed(1)}%` : ""}`);
       });
@@ -2689,8 +2730,9 @@ function renderCoupon() {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
     if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
-    html += `<tr><td class="cm" onclick="openMatchSheet('${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgm"><div class="pgm-top"><span class="lgtag">${r.l.fl} ${r.l.nm}</span><span>${hm}</span></div><div class="pgm-t">${r.m.home_team}</div><div class="pgm-vs">vs</div><div class="pgm-t">${r.m.away_team}</div></div></td>` +
-      r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""; return `<td><span class="codd ${cls}" title="${c.r.ev != null ? "EV " + (c.r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${c.r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>";
+    html += `<tr><td class="cm" onclick="openMatchSheet('${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgm"><div class="pgm-top"><span class="lgtag">${r.l.fl} ${r.l.nm}</span><span>${hm}</span></div><div class="pgm-t">${r.m.home_team}</div><div class="pgm-vs">vs</div><div class="pgm-t">${r.m.away_team}</div><div style="margin-top:6px; display:flex; gap:6px;"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
+      r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""; return `<td><span class="codd ${cls}" title="${c.r.ev != null ? "EV " + (c.r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${c.r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>" +
+      `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}</tr>`;
   });
   el.innerHTML = html + "</tbody></table>";
   document.getElementById("cpPages").innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `<button class="${i === cp.page ? "on" : ""}" onclick="cp.page=${i}; renderCoupon();">${i + 1}</button>`).join("") : "";
