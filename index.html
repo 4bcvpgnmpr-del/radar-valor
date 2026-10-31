@@ -252,6 +252,15 @@
             <select id="kellyFraction" style="width:100%;"><option value="1">100%</option><option value="0.5" selected>50%</option><option value="0.25">25%</option></select>
           </div>
         </div>
+        <div style="border-top:1px solid #232A33; padding-top:12px;">
+          <div class="muted" style="margin-bottom:8px; font-weight:600;">Mi perfil (la app arranca así)</div>
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Liga favorita</div>
+              <select id="favLeague" style="width:100%;"><option value="soccer_epl">Premier League</option><option value="soccer_spain_la_liga">La Liga</option><option value="soccer_italy_serie_a">Serie A</option><option value="soccer_germany_bundesliga">Bundesliga</option><option value="soccer_uefa_champs_league">Champions League</option></select></div>
+            <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Mercado favorito</div>
+              <select id="favMarket" style="width:100%;"><option value="all">Todos</option><option value="h2h">1X2</option><option value="spreads">Hándicap</option><option value="totals">Más/menos goles</option></select></div>
+          </div>
+        </div>
         <label class="muted" style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" id="soundToggle" onchange="toggleSound()" /> 🔔 Sonido en alertas</label>
         <button onclick="saveKeys()">Guardar configuración</button>
       </div>
@@ -588,6 +597,7 @@ function saveKeys() {
   if (k5) localStorage.setItem(ISPORTS_KEY_STORAGE, k5);
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
+  try { localStorage.setItem("radar-profile", JSON.stringify({ league: document.getElementById("favLeague").value, market: document.getElementById("favMarket").value })); } catch (e) {}
   document.getElementById("status").textContent = "Configuración guardada.";
   loadOdds();
 }
@@ -2381,6 +2391,15 @@ async function loadLeagueStats() {
 }
 
 
+(function applyProfile() {
+  try {
+    const p = JSON.parse(localStorage.getItem("radar-profile") || "null"); if (!p) return;
+    const ids = { soccer_epl: "39", soccer_spain_la_liga: "140", soccer_italy_serie_a: "135", soccer_germany_bundesliga: "78", soccer_uefa_champs_league: "2" };
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+    set("sport", p.league); set("favLeague", p.league); set("marketFilter", p.market); set("favMarket", p.market);
+    set("dayDashLeague", ids[p.league]); set("trLeague", ids[p.league]);
+  } catch (e) {}
+})();
 loadOdds();
 renderDashboard();
 renderBadges();
