@@ -289,6 +289,11 @@
   details.help[open] > summary { color:#3ECF8E; border-bottom:1px solid #1A212B; }
   details.help .hp { padding:12px 16px; font-size:13px; line-height:1.65; color:#C5CCD6; text-align:left; }
   details.help .hp b { color:#E6EAF0; } details.help .hp ul { margin:6px 0 0; padding-left:18px; } details.help .hp li { margin:3px 0; }
+  .hb-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; margin-top:14px; }
+  .hb-col { display:flex; flex-direction:column; gap:14px; min-width:0; }
+  .hb-win { background:#10151C; border:1px solid #232B36; border-radius:14px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:0; }
+  .hb-win .bt-kpis { grid-template-columns:repeat(auto-fit,minmax(84px,1fr)); gap:6px; } .hb-win .bt-kpi { padding:10px 4px; } .hb-win .bt-kpi .n { font-size:17px; } .hb-win .bt-kpi .l { font-size:10px; }
+  @media (min-width:1180px) { .hb-grid { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); } }
   .bt-kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px; }
   .bt-kpi { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px; text-align:center; }
   .bt-kpi .l { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#7C8797; }
@@ -696,7 +701,8 @@
       <div data-help="hist" style="margin-top:12px;"></div>
       <div id="hbMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
       <div id="hbBody" style="display:none;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-top:16px;">
+        <div class="hb-grid"><div class="hb-col"><div class="hb-win">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Reporte del sistema</div>
           <button class="small" onclick="hbOpenF()">⚙ Filtros</button>
         </div>
@@ -712,13 +718,22 @@
         <div id="hbDD" class="muted" style="text-align:center; font-size:12px; margin:-4px 0 8px;"></div>
         <div id="hbChart"></div>
         <div id="hbSeasons" style="margin-top:10px; text-align:center;"></div>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:22px; flex-wrap:wrap;">
+        </div><div class="hb-win">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Resultados de backtesting</div>
           <input id="hbQ" type="text" placeholder="Buscar..." oninput="hbRender()" style="width:170px;" />
         </div>
         <div id="hbResults" style="margin-top:8px; overflow-x:auto;"></div>
-        <div style="font-weight:600; font-size:15px; margin-top:22px;">Descripción del sistema</div>
+        </div></div><div class="hb-col"><div class="hb-win">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+          <div style="font-weight:600; font-size:15px;">Picks del sistema</div>
+          <input id="hbPQ" type="text" placeholder="Buscar..." oninput="hbPicksRender()" style="width:150px;" />
+        </div>
+        <div id="hbPicks" style="margin-top:8px; overflow-x:auto;"></div>
+        </div><div class="hb-win">
+        <div style="font-weight:600; font-size:15px;">Descripción del sistema</div>
         <div id="hbDesc" style="margin-top:8px;"></div>
+        </div></div></div>
         <details id="hbRkD" ontoggle="hbRender()" style="margin-top:22px; border:1px solid #1A212B; border-radius:12px; background:#0F141B;">
           <summary style="cursor:pointer; padding:11px 14px; font-weight:600; font-size:14px;">🔎 Buscar ligas y equipos rentables (ranking)</summary>
           <div style="padding:6px 14px 14px;">
@@ -2571,7 +2586,7 @@ function hbSeasDraw(ss) {
 function hbSeasTog(x, on) { const ss = hbSeasonsAll(); if (hbSeasSel === null) hbSeasSel = new Set(ss); on ? hbSeasSel.add(x) : hbSeasSel.delete(x); if (hbSeasSel.size === ss.length) hbSeasSel = null; hbSeasDraw(ss); hbRender(); }
 function hbSeasAll(on) { hbSeasSel = on ? null : new Set(); hbSeasDraw(); hbRender(); }
 function hbSeasLast(n) { hbSeasSel = new Set(hbSeasonsAll().slice(-n)); hbSeasDraw(); hbRender(); }
-const hbMet = new WeakMap(), hbEnr = {}; let hbLastSeas = {}, hbMaxD = 0, hbLgSel = null, hbInc = [], hbExc = [], hbPer = "all", hbMode = "league", hbOpenG = new Set(), hbPg = {}, hbGroups = [];
+const hbMet = new WeakMap(), hbEnr = {}, hbNow = {}; let hbLastSeas = {}, hbMaxD = 0, hbLgSel = null, hbInc = [], hbExc = [], hbPer = "all", hbMode = "league", hbOpenG = new Set(), hbPg = {}, hbGroups = [];
 function hbEnrich(l) {
   const rows = hbData[l]; if (!rows || hbEnr[l] === rows) return; hbEnr[l] = rows;
   const bySeason = {}; rows.forEach(r => (bySeason[r[5]] = bySeason[r[5]] || []).push(r));
@@ -2591,6 +2606,7 @@ function hbEnrich(l) {
       const hr = r[3] > r[4] ? "W" : r[3] < r[4] ? "L" : "D"; h.res.push(hr); a.res.push(hr === "W" ? "L" : hr === "L" ? "W" : "D");
       h.pj++; a.pj++; h.gf += r[3]; h.ga += r[4]; a.gf += r[4]; a.ga += r[3]; h.pts += hr === "W" ? 3 : hr === "D" ? 1 : 0; a.pts += hr === "L" ? 3 : hr === "D" ? 1 : 0;
     });
+    if (sn === rows[rows.length - 1][5]) hbNow[l] = { T, names, last: rs[rs.length - 1][0] };
   });
 }
 function hbRowOk(r, f) {
@@ -2600,11 +2616,13 @@ function hbRowOk(r, f) {
   if (f.lastSeas && hbLastSeas[m.l] !== r[5]) return false;
   if (f.inc.length && !f.inc.some(e => (!e.l || e.l === m.l) && (((e.side === "h" || e.side === "b") && r[1] === e.t) || ((e.side === "a" || e.side === "b") && r[2] === e.t)))) return false;
   if (f.exc.some(e => (!e.l || e.l === m.l) && ((r[1] === e.t && e.r.includes(r[2])) || (r[2] === e.t && e.r.includes(r[1]))))) return false;
-  if (f.st) {
-    if (!m.ok) return false; const S = f.st, inr = (v, g) => !g || (v >= g[0] && v <= g[1]);
-    if (!inr(m.hp, S.ph) || !inr(m.ap, S.pa) || !inr(m.hav, S.gh) || !inr(m.aav, S.ga)) return false;
-    if ((S.wh != null && m.hw < S.wh) || (S.wa != null && m.aw < S.wa) || (S.uh != null && m.hu < S.uh) || (S.ua != null && m.au < S.ua)) return false;
-  }
+  if (f.st && !hbStOk(m, f.st)) return false;
+  return true;
+}
+function hbStOk(m, S) {
+  if (!m || !m.ok) return false; const inr = (v, g) => !g || (v >= g[0] && v <= g[1]);
+  if (!inr(m.hp, S.ph) || !inr(m.ap, S.pa) || !inr(m.hav, S.gh) || !inr(m.aav, S.ga)) return false;
+  if ((S.wh != null && m.hw < S.wh) || (S.wa != null && m.aw < S.wa) || (S.uh != null && m.hu < S.uh) || (S.ua != null && m.au < S.ua)) return false;
   return true;
 }
 function hbSelRows(f) {
@@ -2720,12 +2738,61 @@ function hbRenderFreq(rows, sel, lg) {
   document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">${hbGrp === "team" ? "Equipo" : "Liga"}</th><th style="text-align:right;">Partidos</th><th style="text-align:right;">Frecuencia</th><th style="text-align:right;">Cuota mínima</th>${fix ? `<th style="text-align:right;">Yield a ${fix}</th>` : ""}</tr>` +
     rk.slice(0, 40).map(r => `<tr style="border-top:1px solid #1A212B; ${hbGrp === "team" ? "cursor:pointer;" : ""}" ${hbGrp === "team" ? `onclick="hbTeamF={t:'${r.name.replace(/'/g, "\\'")}',k:'f'};hbRender();"` : ""}><td style="padding:7px 6px;">${r.name}</td><td style="text-align:right;">${r.x.n}</td><td style="text-align:right; font-weight:600;">${(r.x.p * 100).toFixed(1)}%</td><td style="text-align:right;">${r.x.be.toFixed(2)}</td>${fix ? `<td style="text-align:right; color:${col(r.x.y)};">${r.x.y >= 0 ? "+" : ""}${r.x.y.toFixed(1)}%</td>` : ""}</tr>`).join("") + `</table><div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Compara la "cuota mínima" con la cuota real que ofrece tu casa: si te pagan más que esa cuota, a largo plazo ese mercado habría dado beneficio en esa liga o equipo. Cuidado: es el pasado y con pocas muestras puede ser azar.</div>` : `<div class="muted" style="text-align:center;">Ningún grupo llega a ${minN} partidos (baja la muestra mínima).</div>`;
 }
+function hbNowMetrics(l, home, away) {
+  const n = hbNow[l]; if (!n) return null; const h = n.T[home], a = n.T[away]; if (!h || !a || h.pj < 3 || a.pj < 3) return null;
+  const T = n.T, order = n.names.slice().sort((x, y) => T[y].pts - T[x].pts || (T[y].gf - T[y].ga) - (T[x].gf - T[x].ga) || T[y].gf - T[x].gf || x.localeCompare(y));
+  const strk = (res, f) => { let k = 0; for (let i = res.length - 1; i >= 0 && f(res[i]); i--) k++; return k; };
+  return { ok: true, l, hp: order.indexOf(home) + 1, ap: order.indexOf(away) + 1, hav: (h.gf + h.ga) / h.pj, aav: (a.gf + a.ga) / a.pj, hw: strk(h.res, x => x === "W"), aw: strk(a.res, x => x === "W"), hu: strk(h.res, x => x !== "L"), au: strk(a.res, x => x !== "L") };
+}
+function hbPickPrice(m, sel, bk) {
+  const mk = sel === "O" || sel === "U" ? "totals" : "h2h", key = { H: "home", D: "Draw", A: "away", O: "Over +2.5", U: "Under +2.5" }[sel];
+  const want = key === "home" ? m.home_team : key === "away" ? m.away_team : key;
+  const rows = (m.bookmakers || []).map(b => { const mm = b.markets.find(x => x.key === mk); if (!mm) return null; const o = mk === "totals" ? mm.outcomes.filter(x => x.point === 2.5) : mm.outcomes, names = o.map(outcomeKey), i = names.indexOf(want); if (i < 0 || o.length < 2) return null; const ip = o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); return { b: b.key, price: o[i].price, fair: ip[i] / t }; }).filter(Boolean);
+  if (!rows.length) return null;
+  const fair = rows.length >= 2 ? rows.reduce((a, c) => a + c.fair, 0) / rows.length : null;
+  let price = null;
+  if (bk === "b365") { const r = rows.find(x => x.b.includes("bet365")); price = r && r.price; }
+  else if (bk === "pin") { const r = rows.find(x => x.b.includes("pinnacle")); price = r && r.price; }
+  else if (bk === "max") price = Math.max(...rows.map(x => x.price));
+  else price = rows.reduce((a, c) => a + c.price, 0) / rows.length;
+  return price ? { price, fair, ev: fair ? price * fair - 1 : null } : null;
+}
+let hbPickCache = null;
+function hbPicksRender() {
+  const el = document.getElementById("hbPicks"); if (!el || !Object.keys(hbData).length) return;
+  const sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters();
+  if (HB_FREQ[sel] || sel === "X" || sel === "Y") { el.innerHTML = `<div class="muted" style="text-align:center; padding:10px; font-size:12px;">Este mercado no tiene cuotas en las casas cargadas, así que no hay picks.</div>`; return; }
+  const q = (document.getElementById("hbPQ").value || "").trim().toLowerCase(), now = Date.now(), lgs = Object.keys(hbData), names = {};
+  lgs.forEach(l => { names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]; });
+  const out = []; let seen = 0;
+  cpAll().forEach(({ m }) => {
+    const t = Date.parse(m.commence_time); if (t < now - 3600000 || t > now + 8 * 86400000) return; seen++;
+    let lg = null, hn = null, an = null;
+    const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
+    for (const l of lgs) { const h = msFind(m.home_team, names[l]), a = msFind(m.away_team, names[l]); if (h && a && h !== a && same(h, m.home_team) && same(a, m.away_team)) { lg = l; hn = h; an = a; break; } }
+    if (!lg) return;
+    if (f.leagues && !f.leagues.has(lg)) return;
+    if (f.inc.length && !f.inc.some(e => (!e.l || e.l === lg) && (((e.side === "h" || e.side === "b") && hn === e.t) || ((e.side === "a" || e.side === "b") && an === e.t)))) return;
+    if (f.exc.some(e => (!e.l || e.l === lg) && ((hn === e.t && e.r.includes(an)) || (an === e.t && e.r.includes(hn))))) return;
+    if (f.st && !hbStOk(hbNowMetrics(lg, hn, an), f.st)) return;
+    const p = hbPickPrice(m, sel, bk); if (!p) return;
+    if (f.omin && p.price < f.omin) return; if (f.omax && p.price > f.omax) return;
+    if (f.ev != null && (p.ev == null || p.ev * 100 < f.ev)) return;
+    if (q && !`${m.home_team} ${m.away_team} ${lg}`.toLowerCase().includes(q)) return;
+    out.push({ t, m, lg, p });
+  });
+  out.sort((a, b) => a.t - b.t);
+  const col = v => v >= 0 ? "#3ECF8E" : "#E5484D";
+  el.innerHTML = out.length ? `<table style="width:100%; border-collapse:collapse; font-size:12px; min-width:440px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:5px;">Fecha</th><th>Liga</th><th>Local</th><th>Visitante</th><th style="text-align:right;">Cuota</th><th style="text-align:right;">Valor %</th></tr>` +
+    out.slice(0, 40).map(x => `<tr style="border-top:1px solid #1A212B;"><td style="padding:6px 5px; white-space:nowrap;">${new Date(x.t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td>${x.lg.split(" · ").pop()}</td><td>${x.m.home_team}</td><td>${x.m.away_team}</td><td style="text-align:right; font-weight:600;">${x.p.price.toFixed(2)}</td><td style="text-align:right; color:${x.p.ev == null ? "#7C8797" : col(x.p.ev)};">${x.p.ev == null ? "—" : (x.p.ev >= 0 ? "+" : "") + (x.p.ev * 100).toFixed(1) + "%"}</td></tr>`).join("") + `</table>` :
+    `<div class="muted" style="text-align:center; padding:10px; font-size:12px; line-height:1.6;">${seen ? "Ningún partido de los próximos 8 días cumple este sistema." : "No hay partidos con cuotas cargadas. Abre una liga en Partidos y valor para cargar sus cuotas."}<br>Solo se miran ligas con cuotas ya cargadas y que existan en tus CSV.</div>`;
+}
 const hbFmtD = d => { const x = new Date(d * 86400000); return `${String(x.getUTCDate()).padStart(2, "0")}/${String(x.getUTCMonth() + 1).padStart(2, "0")}/${x.getUTCFullYear()}`; };
 const hbEur = v => (v >= 0 ? "" : "-") + Math.abs(v).toFixed(2) + "€";
 function hbRender() {
   const sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters();
   if (!Object.keys(hbData).length) return;
-  const rows = hbSelRows(f); hbDescRender(f, sel, bk);
+  const rows = hbSelRows(f); hbDescRender(f, sel, bk); hbPicksRender();
   if (HB_FREQ[sel]) { hbRenderFreq(rows, sel, null); return; }
   if (hbTeamF && hbTeamF.k === "f") hbTeamF = null;
   document.getElementById("hbDetail").innerHTML = "";
