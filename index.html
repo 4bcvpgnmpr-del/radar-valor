@@ -794,7 +794,7 @@
       <div class="pf-main">
         <div class="pf-card"><h4>Muestra de estadísticas</h4>
           <div class="muted" style="font-size:12px; margin-bottom:8px;">Cómo se calculan Tendencias, Explorar y Rachas para este perfil.</div>
-          <div class="pf-row"><label>Temporada</label><input id="pfSeason" type="number" style="width:90px;" /><span class="muted" style="font-size:11px;">plan gratuito: hasta 2024</span></div>
+          <div class="pf-row"><label>Temporada</label><input id="pfSeason" type="number" placeholder="auto" style="width:90px;" /><span class="muted" style="font-size:11px;">vacío = temporada actual si usas football-data.org; si no, 2024</span></div>
           <div class="pf-row"><label>Local / visitante</label><select id="pfVenue"><option value="all">Todos los partidos</option><option value="home">Solo como local</option><option value="away">Solo como visitante</option></select></div>
         </div>
         <div class="pf-card"><h4>Ligas favoritas</h4><div class="chip-row mini" id="pfLeagues" style="justify-content:flex-start;"></div></div>
@@ -1014,6 +1014,7 @@ function saveKeys() {
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
 function getFdProxy() { return (localStorage.getItem("radar-valor-fd-proxy") || "").replace(/\/+$/, ""); }
 function getFdKey() { return localStorage.getItem(FD_KEY_STORAGE) || (getFdProxy() ? "proxy" : ""); }
+function defaultSeason() { return getFdKey() ? currentSeason() : 2024; }
 function fdBase() { return getFdProxy() || "https://api.football-data.org"; }
 function fdHeaders() { const k = localStorage.getItem(FD_KEY_STORAGE) || ""; return k ? { "X-Auth-Token": k } : {}; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
@@ -2916,7 +2917,7 @@ function pfRender() {
   const s = pfStore(); if (!pfName || !s.list[pfName]) pfName = s.active;
   pfEdit = JSON.parse(JSON.stringify(s.list[pfName]));
   document.getElementById("pfList").innerHTML = Object.keys(s.list).map(n => `<div class="pf-item ${n === pfName ? "sel" : ""}" onclick="pfName='${n.replace(/'/g, "\\'")}'; pfRender();">${n === s.active ? "★ " : ""}${n}</div>`).join("");
-  document.getElementById("pfSeason").value = pfEdit.season || 2024;
+  document.getElementById("pfSeason").value = pfEdit.season && Number(pfEdit.season) !== 2024 ? pfEdit.season : "";
   document.getElementById("pfVenue").value = pfEdit.venue || "all";
   pfDraw();
 }
@@ -2930,7 +2931,7 @@ function pfDraw() {
   chips("pfBooks", PF_BOOKS, "books");
 }
 function pfSave(activate) {
-  const s = pfStore(); pfEdit.season = parseInt(document.getElementById("pfSeason").value) || 2024; pfEdit.venue = document.getElementById("pfVenue").value;
+  const s = pfStore(); pfEdit.season = parseInt(document.getElementById("pfSeason").value) || 0; pfEdit.venue = document.getElementById("pfVenue").value;
   s.list[pfName] = pfEdit; if (activate) s.active = pfName; pfSaveStore(s);
   if (s.active === pfName) pfApply(); showToast(`Perfil "${pfName}" guardado${s.active === pfName ? " y activo" : ""}`); pfRender();
 }
@@ -2939,7 +2940,7 @@ function pfNew() { const n = (prompt("Nombre del perfil:") || "").trim(); if (!n
 function pfDelete() { const s = pfStore(); if (Object.keys(s.list).length < 2) { showToast("Debe quedar al menos un perfil"); return; } delete s.list[pfName]; if (s.active === pfName) s.active = Object.keys(s.list)[0]; pfSaveStore(s); pfName = s.active; pfApply(); pfRender(); }
 function pfApply() {
   const p = pfActive();
-  if (p.season) { const el = document.getElementById("trSeason"); if (el) el.value = p.season; }
+  { const se = p.season && Number(p.season) !== 2024 ? p.season : defaultSeason(); ["trSeason", "widgetSeason"].forEach(id => { const el = document.getElementById(id); if (el) el.value = se; }); }
   if (p.venue) { trVenue = p.venue; document.querySelectorAll("#trVenue .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === p.venue)); }
   if (p.markets && p.markets.length) cp.cols = CP_COLS.map(c => c[2]).filter(c => p.markets.includes(c));
   if (p.leagues && p.leagues.length) { cp.leagues = [...p.leagues]; const first = p.leagues[0]; ["trLeague", "dayDashLeague"].forEach(id => { const el = document.getElementById(id); if (el) el.value = first; }); }
