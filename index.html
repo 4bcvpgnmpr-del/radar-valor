@@ -428,6 +428,7 @@
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
         <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
+        <li>Probabilidades del modelo en la ficha del partido (Dixon-Coles) comparadas con el mercado</li>
         <li>Explorar: hándicap, goles por equipo, combinados, goles exactos, descanso, 2ª parte y descanso/final</li>
         <li>Las 12 competiciones gratuitas de football-data.org (Ligue 1, Eredivisie, Primeira, Championship, Brasileirão, Mundial y Eurocopa)</li>
         <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
@@ -1601,6 +1602,73 @@ function pvOpen(idx) {
   getTeamBadge(it.m.away_team).then(u => { const e = document.getElementById(`${c}-badge-a`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
   renderNoteTags(it.m.id, c);
 }
+/* ===== Modelo de probabilidades (Dixon-Coles simplificado) ===== */
+function dcModel(rows) {
+  const now = Date.now(), HL = 240 * 86400000;
+  const teams = [...new Set(rows.flatMap(r => [r.h, r.a]))], ix = Object.fromEntries(teams.map((t, i) => [t, i])), n = teams.length;
+  const M = rows.map(r => ({ h: ix[r.h], a: ix[r.a], hg: r.hg, ag: r.ag, w: Math.pow(0.5, Math.max(0, now - Date.parse(r.d)) / HL) }));
+  const W = M.reduce((a, m) => a + m.w, 0), mu = M.reduce((a, m) => a + m.w * (m.hg + m.ag), 0) / (2 * W), K = 2;
+  let att = Array(n).fill(mu), def = Array(n).fill(1), hfa = 1.2;
+  for (let it = 0; it < 80; it++) {
+    const G = Array(n).fill(0), E = Array(n).fill(0), C = Array(n).fill(0), F = Array(n).fill(0);
+    M.forEach(m => { G[m.h] += m.w * m.hg; E[m.h] += m.w * def[m.a] * hfa; G[m.a] += m.w * m.ag; E[m.a] += m.w * def[m.h]; C[m.a] += m.w * m.hg; F[m.a] += m.w * att[m.h] * hfa; C[m.h] += m.w * m.ag; F[m.h] += m.w * att[m.a]; });
+    att = att.map((_, i) => (G[i] + K * mu) / (E[i] + K));
+    def = def.map((_, i) => (C[i] + K * mu) / (F[i] + K * mu));
+    const md = def.reduce((a, c) => a + c, 0) / n; def = def.map(x => x / md); att = att.map(x => x * md);
+    let hs = 0, he = 0; M.forEach(m => { hs += m.w * m.hg; he += m.w * att[m.h] * def[m.a]; }); hfa = hs / he;
+  }
+  const cnt = {}; rows.forEach(r => { cnt[r.h] = (cnt[r.h] || 0) + 1; cnt[r.a] = (cnt[r.a] || 0) + 1; });
+  return { teams, ix, att, def, hfa, mu, cnt, n: rows.length };
+}
+function dcMatrix(lh, la, rho, N) {
+  rho = rho == null ? -0.08 : rho; N = N || 10;
+  const pois = l => { const p = [Math.exp(-l)]; for (let k = 1; k <= N; k++) p.push(p[k - 1] * l / k); return p; };
+  const ph = pois(lh), pa = pois(la), P = []; let tot = 0;
+  for (let i = 0; i <= N; i++) { P[i] = []; for (let j = 0; j <= N; j++) { let t = 1; if (i === 0 && j === 0) t = 1 - lh * la * rho; else if (i === 0 && j === 1) t = 1 + lh * rho; else if (i === 1 && j === 0) t = 1 + la * rho; else if (i === 1 && j === 1) t = 1 - rho; const v = ph[i] * pa[j] * Math.max(t, 0); P[i][j] = v; tot += v; } }
+  return P.map(r => r.map(v => v / tot));
+}
+async function loadModel(idx) {
+  const it = pvItems[idx]; if (!it) return;
+  const m = it.m, box = document.getElementById(`${it.cardId}-model`);
+  if (!getFootballKey() && !getFdKey()) { box.innerHTML = `<div class="muted" style="text-align:center;">Añade tu token de football-data.org (o API-Football) en ⚙️ Configuración.</div>`; return; }
+  box.innerHTML = `<div class="muted" style="text-align:center;">Calculando el modelo con los resultados de la liga...</div>`;
+  try {
+    const lg = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0], season = Number(document.getElementById("trSeason").value) || defaultSeason();
+    let rows = await msLeagueData(lg.id, season);
+    try { const prev = await msLeagueData(lg.id, season - 1); if (prev && prev.length) rows = prev.concat(rows); } catch (e) {}
+    if (rows.length < 20) throw new Error("hay muy pocos partidos jugados para estimar el modelo");
+    const md = dcModel(rows), hn = msFind(m.home_team, md.teams), an = msFind(m.away_team, md.teams);
+    if (!hn || !an || hn === an) throw new Error("no encuentro estos equipos en los datos de la liga");
+    const lh = md.att[md.ix[hn]] * md.def[md.ix[an]] * md.hfa, la = md.att[md.ix[an]] * md.def[md.ix[hn]];
+    const P = dcMatrix(lh, la), pr = f => { let s2 = 0; for (let i = 0; i < P.length; i++) for (let j = 0; j < P[i].length; j++) if (f(i, j)) s2 += P[i][j]; return s2; };
+    const mkt = (mk, key) => { const r = cpPick(m.bookmakers, mk, key); if (!r || !r.fair) return null; const best = r.all.reduce((a, c) => c.price > a.price ? c : a, r.all[0]); return { fair: r.fair, price: best.price, bk: best.b }; };
+    const groups = [
+      ["Resultado", [["1 · " + m.home_team, (h, a) => h > a, mkt("h2h", m.home_team)], ["X · Empate", (h, a) => h === a, mkt("h2h", "Draw")], ["2 · " + m.away_team, (h, a) => h < a, mkt("h2h", m.away_team)], ["1X", (h, a) => h >= a], ["X2", (h, a) => h <= a], ["12", (h, a) => h !== a]]],
+      ["Goles totales", [[0.5, 1.5, 2.5, 3.5, 4.5].flatMap(x => [[`Más de ${x}`, (h, a) => h + a > x, x === 2.5 ? mkt("totals", "Over +2.5") : null], [`Menos de ${x}`, (h, a) => h + a < x, x === 2.5 ? mkt("totals", "Under +2.5") : null]])][0]],
+      ["Ambos marcan y equipos", [["Ambos marcan: Sí", (h, a) => h > 0 && a > 0], ["Ambos marcan: No", (h, a) => h === 0 || a === 0], ["Local portería a cero", (h, a) => a === 0], ["Visitante portería a cero", (h, a) => h === 0], ["Local más de 1.5 goles", (h, a) => h > 1.5], ["Visitante más de 1.5 goles", (h, a) => a > 1.5]]],
+      ["Hándicap", [["Local -1.5", (h, a) => h - a > 1.5], ["Local +1.5", (h, a) => h - a > -1.5], ["Visitante -1.5", (h, a) => a - h > 1.5], ["Visitante +1.5", (h, a) => a - h > -1.5]]],
+      ["Combinados", [["Ambos marcan + Más de 2.5", (h, a) => h > 0 && a > 0 && h + a > 2], ["Local gana + Más de 2.5", (h, a) => h > a && h + a > 2], ["Visitante gana + Más de 2.5", (h, a) => a > h && h + a > 2], ["Local gana + Ambos marcan", (h, a) => h > a && a > 0], ["Empate + Menos de 2.5", (h, a) => h === a && h + a < 3]]],
+    ];
+    const pill = ev => { const c = ev >= ERROR_THRESHOLD ? "val-error" : ev >= VALUE_THRESHOLD ? "val-high" : ev > 0 ? "val-mid" : "val-low"; return `<span class="epill ${c}">${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%</span>`; };
+    let big = null;
+    const rowsHtml = groups.map(([title, list]) => `<tr class="cpday"><td colspan="8">${title}</td></tr>` + list.map(([lab, f, mk]) => {
+      const p = pr(f), fair = p > 0 ? 1 / p : null;
+      let mc = '<td class="muted">–</td><td class="muted">–</td><td class="muted">–</td><td class="muted">–</td>';
+      if (mk) { const diff = (p - mk.fair) * 100, pb = 0.5 * p + 0.5 * mk.fair, ev = mk.price * pb - 1; if (!big || Math.abs(diff) > Math.abs(big.diff)) big = { lab, diff }; mc = `<td>${(mk.fair * 100).toFixed(1)}%</td><td style="color:${diff > 3 ? "#3ECF8E" : diff < -3 ? "#E5484D" : "#9AA5B1"}">${diff >= 0 ? "+" : ""}${diff.toFixed(1)} pp</td><td><span class="codd">${mk.price.toFixed(2)}</span></td><td>${pill(ev)}</td>`; }
+      return `<tr><td class="cm" style="cursor:default;">${lab}</td><td><b>${(p * 100).toFixed(1)}%</b></td><td class="mono">${fair ? fair.toFixed(2) : "–"}</td>${mc}</tr>`;
+    }).join("")).join("");
+    const top = []; for (let i = 0; i <= 5; i++) for (let j = 0; j <= 5; j++) top.push([i, j, P[i][j]]);
+    top.sort((a, b) => b[2] - a[2]);
+    const nh = md.cnt[hn], na = md.cnt[an];
+    box.innerHTML = `<div class="ms-h" style="margin:6px 0 4px;">Probabilidades del modelo</div>
+      <div class="ms-sub">Goles esperados: ${m.home_team} <b style="color:#3ECF8E">${lh.toFixed(2)}</b> · ${m.away_team} <b style="color:#3ECF8E">${la.toFixed(2)}</b> · ventaja de local ×${md.hfa.toFixed(2)}</div>
+      ${big && Math.abs(big.diff) >= 3 ? `<div class="ms-note">Mayor discrepancia con el mercado: <b>${big.lab}</b> (${big.diff >= 0 ? "el modelo la ve más probable" : "el modelo la ve menos probable"}, ${big.diff >= 0 ? "+" : ""}${big.diff.toFixed(1)} pp).</div>` : ""}
+      <table class="cptable" style="margin-top:10px;"><thead><tr><th>Mercado</th><th>Modelo</th><th>Cuota justa</th><th>Mercado (justa)</th><th>Diferencia</th><th>Mejor cuota</th><th>Edge prudente</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+      <div class="ms-h" style="font-size:13px; margin:14px 0 6px;">Marcadores más probables</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">${top.slice(0, 6).map(t => `<span class="badge-chip" style="font-size:13px;">${t[0]}-${t[1]} · <b>${(t[2] * 100).toFixed(1)}%</b></span>`).join("")}</div>
+      <div class="muted" style="font-size:11px; margin-top:10px; text-align:center; line-height:1.6;">Modelo tipo Dixon-Coles: ataque y defensa de cada equipo, ventaja de local y más peso a los partidos recientes. Datos: ${md.n} partidos de la liga (${nh} del local, ${na} del visitante). ${Math.min(nh, na) < 8 ? "<b style='color:#F0B429;'>Muestra pequeña: fíate poco.</b> " : ""}El "edge prudente" mezcla 50% modelo y 50% mercado, porque el mercado suele estar mejor calibrado. No tiene en cuenta lesiones ni alineaciones. Es una segunda opinión, no una predicción segura.</div>`;
+  } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px; text-align:center;">No se pudo calcular el modelo: ${e.message}</div><div style="text-align:center; margin-top:6px;"><button class="small ghost" onclick="loadModel(${idx})">Reintentar</button></div>`; }
+}
 async function loadBet365(idx) {
   const it = pvItems[idx]; if (!it) return;
   const m = it.m, box = document.getElementById(`${it.cardId}-b365`), key = getFootballKey();
@@ -1676,6 +1744,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div id="${cardId}-study-status"></div>
       <div class="mkt-tabs">${tabs.map((t, i) => `<button class="mkt-tab ${i === 0 ? "active" : ""}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t, i) => `<div class="mkt-body ${i === 0 ? "active" : ""}" data-idx="${i}">${t.html}</div>`).join("")}
+      <div id="${cardId}-model" style="margin-top:14px; text-align:center;"><button class="small" onclick="loadModel(${idx})" style="font-weight:700;">📐 Probabilidades del modelo</button></div>
       <div id="${cardId}-b365" style="text-align:center; margin-top:12px;"><button class="small ghost" onclick="loadBet365(${idx})">🟢 Cargar cuota Bet365</button></div>
       <div class="acc-grid">
         <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
