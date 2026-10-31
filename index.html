@@ -428,6 +428,7 @@
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
         <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
+        <li>Las 12 competiciones gratuitas de football-data.org (Ligue 1, Eredivisie, Primeira, Championship, Brasileirão, Mundial y Eurocopa)</li>
         <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
         <li>Formaciones renovadas: ficha de jugador con datos por 90 min, suplentes y líderes de jugadores</li>
         <li>Perfil: ligas, mercados, rachas y casas favoritas, con varios perfiles</li>
@@ -1145,6 +1146,7 @@ function renderDashboard() {
 }
 
 async function loadOdds(forceRefresh) {
+  try { pvChips(); } catch (e) {}
   const key = getOddsKey();
   const statusEl = document.getElementById("status");
   const contentEl = document.getElementById("content");
@@ -1490,13 +1492,7 @@ let lastSport = null;
 let lastFullMarketsByMatch = {};
 
 function showAllLeaguesValue() {
-  const sports = [
-    { key: "soccer_epl", label: "Premier League" },
-    { key: "soccer_spain_la_liga", label: "La Liga" },
-    { key: "soccer_italy_serie_a", label: "Serie A" },
-    { key: "soccer_germany_bundesliga", label: "Bundesliga" },
-    { key: "soccer_uefa_champs_league", label: "Champions League" },
-  ];
+  const sports = DD_LEAGUES.map(l => ({ key: l.odds, label: l.nm }));
   const panel = document.getElementById("all-leagues-panel");
   let cachedLeagues = 0;
   sports.forEach(s => {
@@ -1518,7 +1514,7 @@ function showAllLeaguesValue() {
     return;
   }
   panel.innerHTML = `<div class="panel">
-    <div style="font-weight:600; margin-bottom:8px;">Mejores oportunidades de hoy, todas las ligas (${cachedLeagues}/5 en caché)</div>
+    <div style="font-weight:600; margin-bottom:8px;">Mejores oportunidades de hoy, todas las ligas (${cachedLeagues}/${sports.length} en caché)</div>
     ${!sorted.length ? `<div class="muted">No hay value bets detectados hoy en las ligas que tienes en caché.</div>` : sorted.map(e => `
       <div class="live-row">
         <div>${e.kind === "error" ? `<span class="tag-error">ERROR</span>` : `<span class="tag-value">VALOR</span>`} ${e.home} vs ${e.away} <span class="muted">· ${e.marketLabel}</span></div>
@@ -2490,7 +2486,7 @@ async function loadFavoritesCalendar() {
   }
 }
 
-const FD_CODES = { "39": "PL", "140": "PD", "135": "SA", "78": "BL1", "2": "CL" };
+const FD_CODES = { "39": "PL", "140": "PD", "135": "SA", "78": "BL1", "2": "CL", "61": "FL1", "88": "DED", "94": "PPL", "40": "ELC", "71": "BSA", "1": "WC", "4": "EC" };
 async function fdResults(league, season) {
   const code = FD_CODES[String(league)]; if (!code) throw new Error("liga no disponible en football-data.org");
   const res = await fetch(`${fdBase()}/v4/competitions/${code}/matches?season=${season}&status=FINISHED`, { headers: fdHeaders() });
@@ -2563,8 +2559,22 @@ const DD_LEAGUES = [
   { odds: "soccer_spain_la_liga", id: "140", fl: "🇪🇸", nm: "La Liga" },
   { odds: "soccer_italy_serie_a", id: "135", fl: "🇮🇹", nm: "Serie A" },
   { odds: "soccer_germany_bundesliga", id: "78", fl: "🇩🇪", nm: "Bundesliga" },
+  { odds: "soccer_france_ligue_one", id: "61", fl: "🇫🇷", nm: "Ligue 1" },
   { odds: "soccer_uefa_champs_league", id: "2", fl: "🇪🇺", nm: "Champions" },
+  { odds: "soccer_netherlands_eredivisie", id: "88", fl: "🇳🇱", nm: "Eredivisie" },
+  { odds: "soccer_portugal_primeira_liga", id: "94", fl: "🇵🇹", nm: "Primeira Liga" },
+  { odds: "soccer_efl_champ", id: "40", fl: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", nm: "Championship" },
+  { odds: "soccer_brazil_campeonato", id: "71", fl: "🇧🇷", nm: "Brasileirão" },
+  { odds: "soccer_fifa_world_cup", id: "1", fl: "🌍", nm: "Mundial" },
+  { odds: "soccer_uefa_european_championship", id: "4", fl: "🇪🇺", nm: "Eurocopa" },
 ];
+function fillLeagueSelects() {
+  [["trLeague", "id"], ["exLeague", "id"], ["dayDashLeague", "id"], ["widgetLeague", "id"], ["lineupLeague", "id"], ["sport", "odds"], ["favLeague", "odds"]].forEach(([id, k]) => {
+    const el = document.getElementById(id); if (!el) return; const cur = el.value;
+    el.innerHTML = DD_LEAGUES.map(l => `<option value="${l[k]}">${l.fl} ${l.nm}</option>`).join("");
+    if (DD_LEAGUES.some(l => l[k] === cur)) el.value = cur;
+  });
+}
 function renderDdChips() {
   const el = document.getElementById("dd-chips"); if (!el) return;
   const cur = document.getElementById("trLeague").value, now = Date.now(), lim = now + 3 * 86400000;
@@ -3324,10 +3334,11 @@ async function loadLeagueStats() {
 }
 
 
+fillLeagueSelects();
 (function applyProfile() {
   try {
     const p = JSON.parse(localStorage.getItem("radar-profile") || "null"); if (!p) return;
-    const ids = { soccer_epl: "39", soccer_spain_la_liga: "140", soccer_italy_serie_a: "135", soccer_germany_bundesliga: "78", soccer_uefa_champs_league: "2" };
+    const ids = Object.fromEntries(DD_LEAGUES.map(l => [l.odds, l.id]));
     const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
     set("sport", p.league); set("favLeague", p.league); set("marketFilter", p.market); set("favMarket", p.market);
     set("dayDashLeague", ids[p.league]); set("trLeague", ids[p.league]);
