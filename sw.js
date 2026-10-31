@@ -1,4 +1,4 @@
-const CACHE_NAME = "radar-valor-v1";
+const CACHE_NAME = "radar-valor-v2";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -14,13 +14,16 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Solo cacheamos el shell de la app; las llamadas a las APIs (odds, football, IA)
-  // siempre van a la red, nunca a caché, para no servir cuotas ni datos viejos.
+  // Las llamadas a las APIs siempre van a la red (nunca datos viejos).
   const url = event.request.url;
-  if (url.includes("api.the-odds-api.com") || url.includes("api-sports.io") || url.includes("api.anthropic.com") || url.includes("thesportsdb.com")) {
+  if (url.includes("api.the-odds-api.com") || url.includes("api-sports.io") || url.includes("api.anthropic.com") || url.includes("thesportsdb.com") || url.includes("openligadb")) {
     return;
   }
+  if (event.request.method !== "GET") return;
+  // Primero la red (versión nueva); la caché solo sirve si no hay conexión.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((res) => { const copy = res.clone(); caches.open(CACHE_NAME).then((c) => c.put(event.request, copy)).catch(() => {}); return res; })
+      .catch(() => caches.match(event.request))
   );
 });
