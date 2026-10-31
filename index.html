@@ -428,6 +428,7 @@
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
         <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
+        <li>Alarmas en vivo por tramo: tiros a puerta, tiros fuera, goles o córners entre dos minutos o en los últimos X minutos, con vigilancia automática</li>
         <li>Probabilidades del modelo en la ficha del partido (Dixon-Coles) comparadas con el mercado</li>
         <li>Explorar: hándicap, goles por equipo, combinados, goles exactos, descanso, 2ª parte y descanso/final</li>
         <li>Las 12 competiciones gratuitas de football-data.org (Ligue 1, Eredivisie, Primeira, Championship, Brasileirão, Mundial y Eurocopa)</li>
@@ -843,6 +844,17 @@
           <label>Minuto desde<input id="alMMin" type="number" min="0" max="120" placeholder="0" /></label>
           <label>Minuto hasta<input id="alMMax" type="number" min="0" max="120" placeholder="90" /></label>
         </div>
+        <div class="pg-h" style="text-align:center; margin-top:16px;">Condición dentro de un tramo del partido (opcional)</div>
+        <div class="al-grid">
+          <label>Qué contar<select id="alWKind"><option value="">— nada —</option><option value="sot">Tiros a puerta</option><option value="soff">Tiros fuera</option><option value="shots">Tiros totales</option><option value="goals">Goles</option><option value="corners">Córners</option><option value="yellow">Tarjetas amarillas</option></select></label>
+          <label>Equipo<select id="alWTeam"><option value="any">Cualquiera de los dos</option><option value="home">Local</option><option value="away">Visitante</option><option value="sum">Suma de ambos</option></select></label>
+          <label>Al menos (cantidad)<input id="alWMin" type="number" min="1" placeholder="3" /></label>
+          <label>Tramo<select id="alWMode" onchange="alWModeSet()"><option value="fixed">Entre dos minutos</option><option value="last">En los últimos X minutos</option></select></label>
+          <label id="alWFromL">Desde el minuto<input id="alWFrom" type="number" min="0" max="120" placeholder="60" /></label>
+          <label id="alWToL">Hasta el minuto<input id="alWTo" type="number" min="1" max="120" placeholder="75" /></label>
+          <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
+        </div>
+        <div class="muted" style="text-align:center; font-size:11px; margin-top:8px; line-height:1.6;">Ejemplo: "Tiros a puerta · cualquiera de los dos · al menos 3 · entre el 60 y el 75". Los goles se leen al minuto exacto; los tiros se calculan comparando fotos de las estadísticas cada ~90 s, así que la app debe estar abierta durante el tramo. Cada partido vigilado gasta peticiones de API-Football (recomendable el plan Pro).</div>
       </div>
       <div style="display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap;">
         <input id="alName" type="text" placeholder="Descripción (ej. Favoritos con valor)" style="width:280px;" />
@@ -850,7 +862,7 @@
       </div>
       <div id="alMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
     </div>
-    <div class="ex-block"><h3>Mis alarmas</h3><div id="alList"></div></div>
+    <div class="ex-block"><h3>Mis alarmas</h3><div id="alWatch" class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;"></div><div id="alList"></div></div>
     <div class="ex-block"><h3>Últimos disparos</h3><div id="alLog"></div></div>
   </div>
 
@@ -2891,7 +2903,14 @@ function alSave() {
     if (a.sel === "any" && !a.oMin && !a.oMax && !a.eMin && !a.eMax && !a.rMin && !a.rMax && !a.dMin && !a.dMax) { msg.textContent = "Añade al menos una condición (selección o algún rango)."; return; }
   } else {
     Object.assign(a, { gh: v("alGH"), ga: v("alGA"), mMin: v("alMMin"), mMax: v("alMMax") });
-    if (!a.gh && !a.ga && !a.mMin && !a.mMax) { msg.textContent = "Añade al menos una condición (marcador o minutos)."; return; }
+    if (v("alWKind")) {
+      const mode = v("alWMode"), n = parseInt(v("alWMin"));
+      if (!(n >= 1)) { msg.textContent = "Indica la cantidad mínima (por ejemplo 3)."; return; }
+      if (mode === "fixed" && !(v("alWTo") !== "" && +v("alWTo") > +(v("alWFrom") || 0))) { msg.textContent = "Indica el tramo: minuto de inicio y de fin (el fin mayor que el inicio)."; return; }
+      if (mode === "last" && !(parseInt(v("alWLast")) >= 1)) { msg.textContent = "Indica cuántos minutos quieres mirar hacia atrás."; return; }
+      a.w = { kind: v("alWKind"), team: v("alWTeam"), min: n, mode, from: +(v("alWFrom") || 0), to: +v("alWTo"), last: parseInt(v("alWLast")) || 10 };
+    }
+    if (!a.gh && !a.ga && !a.mMin && !a.mMax && !a.w) { msg.textContent = "Añade al menos una condición (marcador, minutos o un tramo)."; return; }
   }
   if (!a.name) a.name = alDescribe(a);
   const all = getAlarms(); all.unshift(a); saveAlarms(all.slice(0, 40));
@@ -2900,7 +2919,7 @@ function alSave() {
 function alDescribe(a) {
   const r = (l, mn, mx) => mn || mx ? `${l} ${mn || "…"}–${mx || "…"}` : "", parts = [];
   if (a.type === "pre") { if (a.sel && a.sel !== "any") parts.push("Selección " + a.sel); parts.push(r("cuota", a.oMin, a.oMax), r("EV%", a.eMin, a.eMax), r("cuota real", a.rMin, a.rMax), r("dif. casas %", a.dMin, a.dMax)); if (a.matchLabel) parts.unshift(a.matchLabel); }
-  else { if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); }
+  else { if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); if (a.w) { const k = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase(), t = { any: "cualquiera de los dos", home: "local", away: "visitante", sum: "suma de ambos" }[a.w.team]; parts.push(`${k} (${t}) ≥ ${a.w.min} ${a.w.mode === "last" ? "en los últimos " + a.w.last + " min" : "entre el " + a.w.from + "' y el " + a.w.to + "'"}`); } }
   const lg = a.leagues.length ? a.leagues.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).join(", ") : "todas las ligas";
   return `${a.type === "pre" ? "Pregame" : "En vivo"} · ${parts.filter(Boolean).join(" · ") || "sin rangos"} · ${lg}`;
 }
@@ -2909,6 +2928,7 @@ function alDelete(id) { saveAlarms(getAlarms().filter(x => x.id !== id)); render
 function alClearLog() { try { localStorage.removeItem("radar-alarm-log"); } catch (e) {} renderAlarms(); }
 function renderAlarms() {
   const el = document.getElementById("alList"); if (!el) return;
+  try { alWatchRender(); } catch (e) {}
   document.getElementById("alLeagues").innerHTML = DD_LEAGUES.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" onclick="alToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
   const all = getAlarms();
   el.innerHTML = all.length ? all.map(a => `<div class="al-item"><div><div class="t">${a.name}</div><div class="d">${alDescribe(a)}</div></div><div style="display:flex; gap:8px; align-items:center;"><button class="small ${a.active ? "" : "ghost"}" onclick="alToggle('${a.id}')">${a.active ? "Activa" : "Pausada"}</button><button class="small ghost" onclick="alDelete('${a.id}')" title="Borrar">🗑</button></div></div>`).join("") : `<div class="muted" style="text-align:center; padding:10px;">Aún no tienes alarmas.</div>`;
@@ -2941,21 +2961,93 @@ function runAlarms(matches, sport) {
   });
   if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
 }
+const WIN_KINDS = { sot: ["Tiros a puerta", "Shots on Goal"], soff: ["Tiros fuera", "Shots off Goal"], shots: ["Tiros totales", "Total Shots"], corners: ["Córners", "Corner Kicks"], yellow: ["Tarjetas amarillas", "Yellow Cards"], goals: ["Goles", null] };
+function alWModeSet() { const m = document.getElementById("alWMode").value; document.getElementById("alWFromL").style.display = document.getElementById("alWToL").style.display = m === "fixed" ? "" : "none"; document.getElementById("alWLastL").style.display = m === "last" ? "" : "none"; }
+let liveSnap = (() => { try { return JSON.parse(localStorage.getItem("radar-live-snap") || "{}"); } catch (e) { return {}; } })();
+function snapSave() { const lim = Date.now() - 8 * 3600000; Object.keys(liveSnap).forEach(k => { if ((liveSnap[k].t || 0) < lim) delete liveSnap[k]; }); try { localStorage.setItem("radar-live-snap", JSON.stringify(liveSnap)); } catch (e) {} }
+function reqTrack(n) { const d = new Date().toISOString().slice(0, 10); let r; try { r = JSON.parse(localStorage.getItem("radar-live-reqs") || "{}"); } catch (e) { r = {}; } if (r.d !== d) r = { d, n: 0 }; r.n += n || 1; try { localStorage.setItem("radar-live-reqs", JSON.stringify(r)); } catch (e) {} }
+function reqToday() { try { const r = JSON.parse(localStorage.getItem("radar-live-reqs") || "{}"); return r.d === new Date().toISOString().slice(0, 10) ? r.n : 0; } catch (e) { return 0; } }
+const winMemo = new Map();
+function winGet(f, kind) {
+  const fid = f.fixture.id, min = f.fixture.status.elapsed || 0, mk = `${fid}|${kind}|${min}`;
+  if (winMemo.has(mk)) return winMemo.get(mk);
+  const key = getFootballKey();
+  const pr = (async () => {
+    if (kind === "goals") {
+      const ev = await apiFootball(`/fixtures/events?fixture=${fid}`, key); reqTrack(1);
+      return { goals: ev.filter(e => e.type === "Goal" && e.detail !== "Missed Penalty").map(e => ({ m: e.time.elapsed || 0, home: e.team.id === f.teams.home.id })) };
+    }
+    const st = await apiFootball(`/fixtures/statistics?fixture=${fid}`, key); reqTrack(1);
+    const val = (tid, type) => { const x = (((st.find(y => y.team.id === tid) || {}).statistics) || []).find(y => y.type === type); return Number(x && x.value) || 0; };
+    const sn = liveSnap[fid] = liveSnap[fid] || { t: 0, d: {} }; sn.t = Date.now();
+    const arr = sn.d[kind] = sn.d[kind] || [];
+    arr.push({ m: min, h: val(f.teams.home.id, WIN_KINDS[kind][1]), a: val(f.teams.away.id, WIN_KINDS[kind][1]) });
+    if (arr.length > 200) arr.shift();
+    return { arr };
+  })();
+  winMemo.set(mk, pr); return pr;
+}
+async function winEval(a, f) {
+  const w = a.w, min = f.fixture.status.elapsed; if (min == null) return null;
+  let from, to;
+  if (w.mode === "last") { from = Math.max(0, min - w.last); to = min; }
+  else { from = w.from || 0; to = w.to; if (min < from - (w.kind === "goals" ? 0 : 3) || min > to + 2) return null; }
+  const d = await winGet(f, w.kind);
+  let h, aw, approx = null;
+  if (w.kind === "goals") { const g = d.goals.filter(x => x.m > from && x.m <= to); h = g.filter(x => x.home).length; aw = g.length - h; }
+  else {
+    const arr = d.arr, at = t => { let r = null; arr.forEach(x => { if (x.m <= t) r = x; }); return r; };
+    const end = at(Math.min(min, to)) || arr[arr.length - 1];
+    let base = at(from);
+    if (!base) { base = from <= 0 ? { h: 0, a: 0, m: 0 } : arr[0]; if (from > 0) approx = arr[0].m; }
+    h = end.h - base.h; aw = end.a - base.a;
+  }
+  const count = w.team === "home" ? h : w.team === "away" ? aw : w.team === "sum" ? h + aw : Math.max(h, aw);
+  return { count, h, aw, from, to, approx };
+}
 function runLiveAlarms(fixtures) {
   const alarms = getAlarms().filter(a => a.active && a.type === "live"); if (!alarms.length) return;
-  const fired = getAlFired(); let any = false;
+  const fired = getAlFired(), jobs = []; let any = false; winMemo.clear();
   fixtures.forEach(f => {
     const min = f.fixture.status.elapsed, gh = f.goals.home ?? 0, ga = f.goals.away ?? 0;
     alarms.forEach(a => {
       if (a.leagues.length && !a.leagues.includes(String(f.league.id))) return;
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
+      if (a.w) { jobs.push([a, f]); return; }
       const k = `${a.id}|${f.fixture.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
       alFire(a, `${f.teams.home.name} ${gh}-${ga} ${f.teams.away.name}<br/>Minuto ${min ?? "—"}'`);
     });
   });
   if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
+  if (jobs.length) (async () => {
+    const fr = getAlFired(); let fa = false;
+    for (const [a, f] of jobs) {
+      try {
+        const r = await winEval(a, f); if (!r || r.count < a.w.min) continue;
+        const k = `${a.id}|${f.fixture.id}|w|${a.w.mode === "last" ? Math.floor((f.fixture.status.elapsed || 0) / Math.max(5, a.w.last)) : "x"}`; if (fr.has(k)) continue; fr.add(k); fa = true;
+        const nm = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase();
+        alFire(a, `${f.teams.home.name} ${f.goals.home ?? 0}-${f.goals.away ?? 0} ${f.teams.away.name}<br/>Minuto ${f.fixture.status.elapsed}' · ${nm}: local ${r.h}, visitante ${r.aw} (del ${r.from}' al ${r.to}')${r.approx != null ? ` · contado desde el ${r.approx}', cuando empezó la vigilancia` : ""}`);
+      } catch (e) { console.warn("alarma de tramo:", e.message); }
+    }
+    if (fa) { saveAlFired(fr); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
+    snapSave();
+  })();
 }
+/* Vigilancia automática: consulta los partidos en vivo cada ~90 s solo si hay alarmas en vivo y partidos que deberían estar jugándose */
+let liveWatchLast = null, liveWatchState = "";
+function liveWatchWanted() {
+  const al = getAlarms().filter(a => a.active && a.type === "live"); if (!al.length) { liveWatchState = "sin alarmas en vivo activas"; return false; }
+  if (!getFootballKey()) { liveWatchState = "falta la key de API-Football"; return false; }
+  const now = Date.now(), ok = cpAll().some(x => { const t = Date.parse(x.m.commence_time); return t >= now - 150 * 60000 && t <= now + 3 * 60000 && al.some(a => !a.leagues.length || a.leagues.includes(x.l.id)); });
+  liveWatchState = ok ? "activa" : "en espera (no hay partidos en juego en las ligas de tus alarmas, según las cuotas cargadas)"; return ok;
+}
+async function liveWatchTick() {
+  try { if (!liveWatchWanted()) { alWatchRender(); return; } const data = await apiFootball(`/fixtures?live=all`, getFootballKey()); reqTrack(1); liveWatchLast = new Date(); runLiveAlarms(data); } catch (e) { liveWatchState = "error: " + e.message; }
+  alWatchRender();
+}
+function alWatchRender() { const el = document.getElementById("alWatch"); if (!el) return; liveWatchWanted(); const n = reqToday(); el.innerHTML = `Vigilancia en vivo: <b style="color:#3ECF8E;">${liveWatchState}</b>${liveWatchLast ? " · última comprobación " + liveWatchLast.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""} · peticiones de alarmas hoy: ${n}${n >= 80 ? ' <b style="color:#F0B429;">(cerca del límite del plan gratuito: 100/día)</b>' : ""}`; }
+setInterval(liveWatchTick, 90000);
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
   const day0 = new Date(); day0.setHours(0, 0, 0, 0);
