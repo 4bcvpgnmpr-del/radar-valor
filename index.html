@@ -208,6 +208,21 @@
   .epill.val-error { background:rgba(229,72,77,.18); }
   .tag-error, .tag-value { border-radius:999px; margin-left:6px; }
   .live-row { border-radius:12px; }
+  /* ---- Dashboard estilo BetPractice ---- */
+  .dd-title { text-align:center; font-size:20px; font-weight:600; margin:6px 0 14px; }
+  .chip-row { display:flex; gap:12px; overflow-x:auto; justify-content:center; padding:4px 2px 8px; flex-wrap:wrap; }
+  .chip { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px 10px; min-width:108px; text-align:center; cursor:pointer; transition:transform .12s, border-color .12s; }
+  .chip:hover { transform:translateY(-2px); border-color:#2A3441; }
+  .chip.active { border-color:#3ECF8E; background:#142B25; }
+  .chip .fl { font-size:26px; line-height:1.1; }
+  .chip .nm { font-size:12px; font-weight:600; margin-top:6px; }
+  .chip .ct { font-size:24px; font-weight:700; margin-top:2px; font-family:'IBM Plex Mono',monospace; }
+  .chip .ct.zero { color:#4A525E; }
+  .dd-grid { grid-template-columns:repeat(2,minmax(0,1fr)); max-width:860px; margin:0 auto; gap:18px; }
+  .dd-grid .streak-card { padding:16px 18px; background:#141A23; border-radius:16px; }
+  .dd-grid .streak-card h4 { font-size:15px; margin-bottom:12px; }
+  .dd-grid .streak-row { font-size:13px; padding:8px 4px; }
+  @media (max-width:720px) { .dd-grid { grid-template-columns:1fr; } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -364,7 +379,13 @@
   </div>
 
   <div id="view-daydash" class="view">
-    <div class="panel">
+    <div class="dd-title">Partidos por liga</div>
+    <div class="chip-row" id="dd-chips"></div>
+    <div class="dd-title" style="margin-top:26px;">Rachas de la liga</div>
+    <div id="dd-streak-status" class="muted" style="text-align:center; margin-bottom:12px; font-size:12px;"></div>
+    <div id="dd-streaks" class="streak-grid dd-grid"></div>
+    <details class="panel" style="margin-top:22px;"><summary style="cursor:pointer; font-weight:600; text-align:center;">Equipos que juegan hoy (goles y tarjetas)</summary>
+    <div style="margin-top:14px;">
       <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -382,6 +403,7 @@
       <div id="daydash-status" class="muted"></div>
       <div id="daydash-content"></div>
     </div>
+    </details>
   </div>
 
   <div id="view-live" class="view">
@@ -620,6 +642,7 @@ function switchView(v) {
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
   if (v === "coupon") renderCoupon();
+  if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
 }
@@ -1989,10 +2012,12 @@ function renderTrends() {
   list.sort((a, b) => (typeof a[trSort.k] === "string" ? a[trSort.k].localeCompare(b[trSort.k]) : a[trSort.k] - b[trSort.k]) * trSort.d);
   const defs = [["Más victorias seguidas", x => x.gf > x.ga], ["Más over 1.5 seguidos", x => x.gf + x.ga > 1], ["Más over 2.5 seguidos", x => x.gf + x.ga > 2], ["Más BTTS seguidos", x => x.gf > 0 && x.ga > 0], ["Más sin perder", x => x.gf >= x.ga], ["Más porterías a cero", x => x.ga === 0]];
   const streakOf = (rows, fn) => { let c = 0; for (let i = rows.length - 1; i >= 0 && fn(rows[i]); i--) c++; return c; };
-  document.getElementById("trStreaks").innerHTML = defs.map(([title, fn]) => {
+  const streakHtml = defs.map(([title, fn]) => {
     const top = Object.values(T).map(t => ({ n: t.n, c: streakOf([...t.rows].sort((a, b) => a.d.localeCompare(b.d)), fn) })).filter(x => x.c > 0).sort((a, b) => b.c - a.c).slice(0, 5);
     return `<div class="streak-card"><h4>${title}</h4>${top.map(x => `<div class="streak-row"><span>${x.n}</span><b>${x.c}</b></div>`).join("") || '<div class="muted" style="text-align:center;">Sin rachas</div>'}</div>`;
   }).join("");
+  document.getElementById("trStreaks").innerHTML = streakHtml;
+  const ddS = document.getElementById("dd-streaks"); if (ddS) ddS.innerHTML = streakHtml;
   const cols = [["n","Equipo"],["pj","PJ"],["gf","GF"],["gc","GC"],["ov15","+1.5"],["ov25","+2.5"],["ov35","+3.5"],["btts","Ambos"],["cs","Portería 0"],["fts","Sin marcar"]];
   const heat = (v, inv) => { const a = Math.min(1, v / 100) * 0.45; return `background:${inv ? `rgba(224,90,90,${a})` : `rgba(62,207,142,${a})`}`; };
   const dot = x => { const r = x.gf > x.ga ? ["V","#3ECF8E"] : x.gf < x.ga ? ["D","#E05A5A"] : ["E","#9AA5B1"]; return `<span class="fdot" style="background:${r[1]}" title="${x.gf}-${x.ga}">${r[0]}</span>`; };
@@ -2000,6 +2025,26 @@ function renderTrends() {
     list.map((t, i) => `<tr><td class="rk">${i + 1}</td><td class="tn">${t.n}</td><td>${t.pj}</td><td>${t.gf.toFixed(2)}</td><td>${t.gc.toFixed(2)}</td>` +
       ["ov15","ov25","ov35","btts","cs"].map(k => `<td><span class="pcell" style="${heat(t[k])}">${t[k]}%</span></td>`).join("") +
       `<td><span class="pcell" style="${heat(t.fts, true)}">${t.fts}%</span></td><td>${t.last.map(dot).join("")}</td></tr>`).join("") + "</tbody>";
+}
+const DD_LEAGUES = [
+  { odds: "soccer_epl", id: "39", fl: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", nm: "Premier League" },
+  { odds: "soccer_spain_la_liga", id: "140", fl: "🇪🇸", nm: "La Liga" },
+  { odds: "soccer_italy_serie_a", id: "135", fl: "🇮🇹", nm: "Serie A" },
+  { odds: "soccer_germany_bundesliga", id: "78", fl: "🇩🇪", nm: "Bundesliga" },
+  { odds: "soccer_uefa_champs_league", id: "2", fl: "🇪🇺", nm: "Champions" },
+];
+function renderDdChips() {
+  const el = document.getElementById("dd-chips"); if (!el) return;
+  const cur = document.getElementById("trLeague").value, now = Date.now(), lim = now + 3 * 86400000;
+  el.innerHTML = DD_LEAGUES.map(l => {
+    let n = 0;
+    try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) n = c.data.filter(m => { const t = Date.parse(m.commence_time); return t >= now - 3 * 3600000 && t <= lim; }).length; } catch (e) {}
+    return `<div class="chip ${l.id === cur ? "active" : ""}" onclick="pickDdLeague('${l.id}')"><div class="fl">${l.fl}</div><div class="nm">${l.nm}</div><div class="ct ${n ? "" : "zero"}" title="Partidos en los próximos 3 días (según cuotas cargadas)">${n}</div></div>`;
+  }).join("");
+}
+function pickDdLeague(id) {
+  document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
+  trData = null; renderDdChips(); loadTrends();
 }
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
@@ -2442,6 +2487,7 @@ async function loadLeagueStats() {
     set("dayDashLeague", ids[p.league]); set("trLeague", ids[p.league]);
   } catch (e) {}
 })();
+(function mirrorTrStatus() { const st = document.getElementById("trStatus"), dst = document.getElementById("dd-streak-status"); if (st && dst) new MutationObserver(() => { dst.textContent = st.textContent; }).observe(st, { childList: true, characterData: true, subtree: true }); })();
 loadOdds();
 renderDashboard();
 renderBadges();
