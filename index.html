@@ -440,6 +440,7 @@
         <li>Dashboard: chips de ligas y rachas (victorias, over, BTTS, sin perder)</li>
         <li>Tendencias de equipos y Explorar mercados (modo liga y modo partido)</li>
         <li>Backtesting: yield, unidades, % acierto, filtros y curva</li>
+        <li>Backtest histórico por liga: importa CSV con cuotas, prueba estrategias (ej. visitante en Noruega) y ranking de ligas rentables</li>
         <li>Mi perfil: liga y mercado favoritos al arrancar</li>
         <li>Configuración movida a un panel aparte, header más limpio</li>
         <li>Tooltips explicativos en Edge, Prob. justa, Kelly y CLV</li>
@@ -668,6 +669,34 @@
   </div>
 
   <div id="view-stats" class="view">
+    <div class="panel" id="hb-panel">
+      <div style="font-weight:600; font-size:16px; text-align:center;">Backtest histórico por liga</div>
+      <div class="muted" style="text-align:center; font-size:12px; margin:6px 0 12px; line-height:1.6;">Prueba una estrategia sobre partidos pasados con sus cuotas reales: elige liga, selección (local, empate, visitante, más/menos 2.5), casa y filtros, y mira cuánto habría rendido. Datos: archivos CSV gratuitos de football-data.co.uk (con cuotas Pinnacle, Bet365, máx. y media).</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center;">
+        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;">📂 Importar CSV (varios a la vez)<input type="file" id="hbFile" accept=".csv,text/csv" multiple style="display:none;" onchange="hbImport(event)" /></label>
+        <a class="small ghost" href="https://www.football-data.co.uk/data.php" target="_blank" rel="noopener" style="padding:8px 14px; border:1px solid #2A3340; border-radius:10px; color:inherit; text-decoration:none;">🌐 Dónde descargarlos</a>
+        <button class="small ghost" onclick="hbClear()">🗑 Borrar datos</button>
+      </div>
+      <div id="hbMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
+      <div id="hbBody" style="display:none;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:14px;">
+          <label>Liga<select id="hbLeague" onchange="hbRender()"></select></label>
+          <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option></select></label>
+          <label>Cuota a la que apuestas<select id="hbBook" onchange="hbRender()"></select></label>
+          <label>Desde temporada<select id="hbFrom" onchange="hbRender()"></select></label>
+          <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
+          <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRender()" /></label>
+          <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRender()" /></label>
+          <label>Muestra mínima (ranking)<input id="hbMinN" type="number" step="10" value="60" oninput="hbRender()" /></label>
+        </div>
+        <div class="muted" style="font-size:11px; margin-top:6px;">El valor mínimo compara tu cuota con la probabilidad justa de Pinnacle (o de la media si no hay Pinnacle), sin margen. Stake fijo de 1 unidad.</div>
+        <div class="bt-kpis" id="hbKpis" style="margin-top:14px;"></div>
+        <div id="hbChart"></div>
+        <div id="hbSeasons" style="margin-top:10px;"></div>
+        <div class="pg-h" style="text-align:center; margin-top:18px;">Ranking: ligas y selecciones más rentables (con tus filtros de casa, cuota y valor)</div>
+        <div id="hbRank"></div>
+      </div>
+    </div>
     <div class="panel" id="bt-system">
       <div class="seg bt-period" id="btPeriod">
         <button class="seg-b active" data-p="all" onclick="btSetPeriod('all')">Todo</button><button class="seg-b" data-p="7" onclick="btSetPeriod('7')">7 días</button><button class="seg-b" data-p="30" onclick="btSetPeriod('30')">30 días</button>
@@ -2309,6 +2338,122 @@ function btLoadSystem(n) { if (!n) return; const sys = btGetSystems()[n]; if (!s
 function btDeleteSystem() { const n = document.getElementById("btSystem").value; if (!n) return; const sys = btGetSystems(); delete sys[n]; try { localStorage.setItem("radar-systems", JSON.stringify(sys)); } catch (e) {} btFillSystems(""); }
 function btResetFilters() { ["btLeague","btMarket","btBookie","btKind"].forEach(id => document.getElementById(id).value = ""); ["btOMin","btOMax","btEMin","btEMax"].forEach(id => document.getElementById(id).value = ""); renderBacktestSystem(); }
 function btLeagueName(sport) { const l = DD_LEAGUES.find(x => x.odds === sport); return l ? `${l.fl} ${l.nm}` : (sport || "—"); }
+/* ---- Backtest histórico por liga (CSV de football-data.co.uk) ---- */
+const HB_KEY = "radar-bt-hist";
+const HB_NAMES = { E0: "Inglaterra · Premier League", E1: "Inglaterra · Championship", E2: "Inglaterra · League One", E3: "Inglaterra · League Two", SC0: "Escocia · Premiership", D1: "Alemania · Bundesliga", D2: "Alemania · 2. Bundesliga", I1: "Italia · Serie A", I2: "Italia · Serie B", SP1: "España · La Liga", SP2: "España · Segunda", F1: "Francia · Ligue 1", F2: "Francia · Ligue 2", N1: "Países Bajos · Eredivisie", B1: "Bélgica · Pro League", P1: "Portugal · Primeira Liga", T1: "Turquía · Süper Lig", G1: "Grecia · Super League" };
+const HB_COLS = {
+  pin: { H: ["PSCH", "PH", "PSH"], D: ["PSCD", "PD", "PSD"], A: ["PSCA", "PA", "PSA"], O: ["PC>2.5", "P>2.5"], U: ["PC<2.5", "P<2.5"] },
+  b365: { H: ["B365CH", "B365H"], D: ["B365CD", "B365D"], A: ["B365CA", "B365A"], O: ["B365C>2.5", "B365>2.5"], U: ["B365C<2.5", "B365<2.5"] },
+  max: { H: ["MaxCH", "MaxH"], D: ["MaxCD", "MaxD"], A: ["MaxCA", "MaxA"], O: ["MaxC>2.5", "Max>2.5"], U: ["MaxC<2.5", "Max<2.5"] },
+  avg: { H: ["AvgCH", "AvgH"], D: ["AvgCD", "AvgD"], A: ["AvgCA", "AvgA"], O: ["AvgC>2.5", "Avg>2.5"], U: ["AvgC<2.5", "Avg<2.5"] }
+};
+const HB_BOOKN = { pin: "Pinnacle (cierre)", b365: "Bet365", max: "La mejor cuota del mercado", avg: "Media del mercado" };
+const HB_SELN = { H: "Local gana", D: "Empate", A: "Visitante gana", O: "Más de 2.5", U: "Menos de 2.5" };
+const HB_ORDER = ["H", "D", "A", "O", "U"];
+let hbData = (() => { try { return JSON.parse(localStorage.getItem(HB_KEY) || "{}"); } catch (e) { return {}; } })();
+function hbSave() { try { localStorage.setItem(HB_KEY, JSON.stringify(hbData)); return true; } catch (e) { return false; } }
+function hbCsv(text) {
+  text = text.replace(/^﻿/, ""); const rows = []; let row = [], cur = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true; else if (c === ",") { row.push(cur); cur = ""; }
+    else if (c === "\n") { row.push(cur); rows.push(row); row = []; cur = ""; } else if (c !== "\r") cur += c;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); } return rows.filter(r => r.length > 3);
+}
+function hbParseDate(d) { const m = String(d || "").trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/); if (!m) return null; let y = +m[3]; if (y < 100) y += y > 70 ? 1900 : 2000; return Date.UTC(y, +m[2] - 1, +m[1]); }
+function hbSeasonOf(ts, given) { if (given) { const g = String(given).trim(); if (g) return g; } const d = new Date(ts), y = d.getUTCFullYear(); return d.getUTCMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`; }
+function hbFromCsv(text, fname) {
+  const rows = hbCsv(text); if (rows.length < 2) return {};
+  const h = rows[0].map(x => x.trim()), ix = n => h.indexOf(n), col = (...ns) => { for (const n of ns) { const i = ix(n); if (i >= 0) return i; } return -1; };
+  const iD = col("Date"), iH = col("HomeTeam", "Home"), iA = col("AwayTeam", "Away"), iHG = col("FTHG", "HG"), iAG = col("FTAG", "AG"), iS = col("Season"), iC = col("Country"), iL = col("League"), iDiv = col("Div");
+  if (iD < 0 || iH < 0 || iA < 0 || iHG < 0 || iAG < 0) throw new Error("no parece un CSV de football-data.co.uk (faltan Date/Home/Away/goles)");
+  const code = (fname || "").replace(/\.csv$/i, "").replace(/\s*\(\d+\)$/, ""), out = {};
+  const ocols = {}; Object.keys(HB_COLS).forEach(b => { ocols[b] = HB_ORDER.map(k => col(...HB_COLS[b][k])); });
+  for (let r = 1; r < rows.length; r++) {
+    const x = rows[r], ts = hbParseDate(x[iD]); const hg = parseInt(x[iHG]), ag = parseInt(x[iAG]); if (ts == null || isNaN(hg) || isNaN(ag)) continue;
+    let lg; if (iC >= 0 && iL >= 0 && x[iC]) lg = `${x[iC].trim()} · ${x[iL].trim()}`; else lg = HB_NAMES[(iDiv >= 0 && x[iDiv] ? x[iDiv].trim() : code)] || (iDiv >= 0 && x[iDiv] ? x[iDiv].trim() : code) || "Liga";
+    const o = HB_ORDER.map(() => null).length ? {} : {};
+    Object.keys(ocols).forEach(b => { const a = ocols[b].map(i => { const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; }); if (a.some(v => v)) o[b] = a; });
+    if (!Object.keys(o).length) continue;
+    (out[lg] = out[lg] || []).push([Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o]);
+  }
+  return out;
+}
+async function hbImport(ev) {
+  const files = [...ev.target.files], msg = document.getElementById("hbMsg"); let added = 0, errs = [];
+  for (const f of files) {
+    try { const d = hbFromCsv(await f.text(), f.name); Object.keys(d).forEach(lg => { const have = new Map((hbData[lg] || []).map(r => [r[0] + "|" + r[1] + "|" + r[2], r])); d[lg].forEach(r => { if (!have.has(r[0] + "|" + r[1] + "|" + r[2])) added++; have.set(r[0] + "|" + r[1] + "|" + r[2], r); }); hbData[lg] = [...have.values()].sort((a, b) => a[0] - b[0]); }); }
+    catch (e) { errs.push(f.name + ": " + e.message); }
+  }
+  ev.target.value = "";
+  const ok = hbSave();
+  msg.innerHTML = `${added} partidos añadidos.${errs.length ? " <span style='color:#E5484D'>" + errs.join(" · ") + "</span>" : ""}${ok ? "" : " <span style='color:#F0B429'>No cabe en el almacenamiento del navegador: los datos valen en esta sesión pero no se guardan. Importa menos temporadas.</span>"}`;
+  hbInit();
+}
+function hbClear() { if (!confirm("¿Borrar todos los datos históricos importados?")) return; hbData = {}; try { localStorage.removeItem(HB_KEY); } catch (e) {} document.getElementById("hbMsg").textContent = "Datos borrados."; hbInit(); }
+function hbSeasonsAll() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => set.add(r[5]))); return [...set].sort(); }
+function hbBooksAvail() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => Object.keys(r[6]).forEach(b => set.add(b)))); return Object.keys(HB_BOOKN).filter(b => set.has(b)); }
+function hbInit() {
+  const lgs = Object.keys(hbData).sort(), body = document.getElementById("hbBody"); if (!body) return;
+  if (!lgs.length) { body.style.display = "none"; if (!document.getElementById("hbMsg").textContent) document.getElementById("hbMsg").textContent = "Aún no hay datos. Descarga CSV de football-data.co.uk (por ejemplo NOR.csv de Noruega, o un E0.csv por temporada) e impórtalos aquí."; return; }
+  body.style.display = "block";
+  const sel = document.getElementById("hbLeague"), cur = sel.value; sel.innerHTML = `<option value="">Todas las ligas juntas</option>` + lgs.map(l => `<option value="${l}">${l} (${hbData[l].length})</option>`).join(""); if (lgs.includes(cur)) sel.value = cur; else if (lgs.length === 1) sel.value = lgs[0];
+  const bk = document.getElementById("hbBook"), cb = bk.value; bk.innerHTML = hbBooksAvail().map(b => `<option value="${b}">${HB_BOOKN[b]}</option>`).join(""); if (cb) bk.value = cb; else if (hbBooksAvail().includes("b365")) bk.value = "b365";
+  const fr = document.getElementById("hbFrom"), cf = fr.value, ss = hbSeasonsAll(); fr.innerHTML = `<option value="">Todas</option>` + ss.map(x => `<option>${x}</option>`).join(""); fr.value = ss.includes(cf) ? cf : "";
+  hbRender();
+}
+function hbBets(rows, sel, bk, f) {
+  const si = HB_ORDER.indexOf(sel), out = [];
+  rows.forEach(r => {
+    if (f.from && r[5] < f.from) return;
+    const o = r[6][bk]; if (!o || !o[si]) return; const price = o[si];
+    if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
+    let ev = null; const fo = r[6].pin || r[6].avg;
+    if (fo) { const idx = sel === "O" || sel === "U" ? [3, 4] : [0, 1, 2]; if (idx.every(i => fo[i])) { const inv = idx.map(i => 1 / fo[i]), sum = inv.reduce((a, b) => a + b, 0); ev = price * (inv[idx.indexOf(si)] / sum) - 1; } }
+    if (f.ev != null) { if (ev == null || ev * 100 < f.ev) return; }
+    const win = sel === "H" ? r[3] > r[4] : sel === "A" ? r[3] < r[4] : sel === "D" ? r[3] === r[4] : sel === "O" ? r[3] + r[4] > 2.5 : r[3] + r[4] < 2.5;
+    out.push({ d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev, t: `${r[1]} - ${r[2]}` });
+  });
+  return out;
+}
+function hbStats(b) {
+  const n = b.length; if (!n) return { n: 0 };
+  const u = b.reduce((a, x) => a + x.p, 0), mean = u / n, sd = Math.sqrt(b.reduce((a, x) => a + (x.p - mean) ** 2, 0) / Math.max(1, n - 1)), t = sd ? mean / (sd / Math.sqrt(n)) : 0;
+  const half = Math.floor(n / 2), y1 = half ? b.slice(0, half).reduce((a, x) => a + x.p, 0) / half : 0, y2 = (n - half) ? b.slice(half).reduce((a, x) => a + x.p, 0) / (n - half) : 0;
+  let pk = 0, cu = 0, dd = 0; b.forEach(x => { cu += x.p; pk = Math.max(pk, cu); dd = Math.max(dd, pk - cu); });
+  return { n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
+}
+function hbFilters() { const g = id => document.getElementById(id).value; return { from: g("hbFrom"), omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
+function hbVerdict(st) { if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= 2 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= 1 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
+function hbRender() {
+  const lg = document.getElementById("hbLeague").value, sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters(), minN = parseInt(document.getElementById("hbMinN").value) || 0;
+  const rows = (lg ? hbData[lg] || [] : Object.values(hbData).flat()).slice().sort((a, b) => a[0] - b[0]);
+  const bets = hbBets(rows, sel, bk, f), st = hbStats(bets), col = v => v >= 0 ? "#3ECF8E" : "#E5484D", vd = hbVerdict(st);
+  document.getElementById("hbKpis").innerHTML = !st.n ? `<div class="muted" style="grid-column:1/-1; text-align:center;">Sin apuestas con estos filtros (¿la casa elegida tiene cuotas para esa selección?).</div>` :
+    `<div class="bt-kpi"><div class="l">Yield</div><div class="n" style="color:${col(st.y)}">${st.y >= 0 ? "+" : ""}${st.y.toFixed(2)}%</div><div class="sm" style="color:${vd[1]}">${vd[0]}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Unidades</div><div class="n" style="color:${col(st.u)}">${st.u >= 0 ? "+" : ""}${st.u.toFixed(2)}</div></div>` +
+    `<div class="bt-kpi"><div class="l">% acierto</div><div class="n">${Math.round(st.wins / st.n * 100)}%</div><div class="sm">${st.wins} de ${st.n}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Cuota media</div><div class="n">${st.odds.toFixed(2)}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Drawdown máx.</div><div class="n" style="color:#E5484D">-${st.dd.toFixed(1)}</div><div class="sm">1ª mitad ${st.y1 >= 0 ? "+" : ""}${st.y1.toFixed(0)}% · 2ª ${st.y2 >= 0 ? "+" : ""}${st.y2.toFixed(0)}%</div></div>`;
+  // curva
+  const ch = document.getElementById("hbChart");
+  if (st.n > 1) { const W = 640, H = 170, P = 8; let c = 0; const pts = bets.map(x => (c += x.p)), mn = Math.min(0, ...pts), mx = Math.max(0, ...pts), rg = (mx - mn) || 1; const X = i => P + i / (pts.length - 1) * (W - 2 * P), Y = v => H - P - (v - mn) / rg * (H - 2 * P);
+    ch.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; margin-top:6px;"><line x1="${P}" x2="${W - P}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2A3340" stroke-dasharray="4 4"/><polyline fill="none" stroke="${col(st.u)}" stroke-width="2" points="${pts.map((v, i) => X(i).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")}"/></svg>`; } else ch.innerHTML = "";
+  // por temporada
+  const bs = {}; bets.forEach(x => (bs[x.s] = bs[x.s] || []).push(x));
+  document.getElementById("hbSeasons").innerHTML = Object.keys(bs).sort().length ? `<div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">` + Object.keys(bs).sort().map(k => { const s2 = hbStats(bs[k]); return `<div style="background:#141A23; border:1px solid #1A212B; border-radius:10px; padding:6px 10px; font-size:12px; text-align:center;"><div class="muted">${k}</div><b style="color:${col(s2.y)}">${s2.y >= 0 ? "+" : ""}${s2.y.toFixed(0)}%</b> <span class="muted">· ${s2.n}</span></div>`; }).join("") + `</div>` : "";
+  // ranking
+  const rk = []; let combos = 0;
+  Object.keys(hbData).forEach(l => HB_ORDER.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, f); combos++; if (b.length >= Math.max(1, minN)) { const s2 = hbStats(b); rk.push({ l, sl, s: s2 }); } }));
+  rk.sort((a, b) => b.s.y - a.s.y);
+  document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Liga</th><th>Selección</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
+    rk.slice(0, 25).map(x => { const v = hbVerdict(x.s); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPick('${x.l.replace(/'/g, "\\'")}','${x.sl}')"><td style="padding:7px 6px;">${x.l}</td><td>${HB_SELN[x.sl]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
+    <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de liga y selección: con tantas, alguna sale rentable solo por suerte. Fíate de las que mantienen yield positivo en <b>las dos mitades</b>, tienen muestra grande y marcan "señal sólida". Toca una fila para ver su detalle. Con cuotas de cierre de Pinnacle el mercado es muy eficiente; con las de Bet365 o la mejor cuota hay más margen para encontrar valor.</div>` : `<div class="muted" style="text-align:center;">Ninguna combinación llega a ${minN} apuestas con estos filtros.</div>`;
+}
+function hbPick(l, sl) { document.getElementById("hbLeague").value = l; document.getElementById("hbSel").value = sl; hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
+document.addEventListener("DOMContentLoaded", hbInit); if (document.readyState !== "loading") hbInit();
 function renderBacktestSystem() {
   const root = document.getElementById("bt-system"); if (!root) return;
   if (!document.getElementById("btSystem").options.length || document.getElementById("btSystem").options.length === 1) btFillSystems(document.getElementById("btSystem").value);
