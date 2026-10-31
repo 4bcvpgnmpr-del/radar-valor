@@ -1,4 +1,4 @@
-const CACHE_NAME = "radar-valor-v2";
+const CACHE_NAME = "radar-valor-v4";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -16,14 +16,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   // Las llamadas a las APIs siempre van a la red (nunca datos viejos).
   const url = event.request.url;
-  if (url.includes("api.the-odds-api.com") || url.includes("api-sports.io") || url.includes("api.anthropic.com") || url.includes("thesportsdb.com") || url.includes("openligadb")) {
-    return;
-  }
+  // Solo gestionamos archivos de este mismo sitio; cualquier otra petición (APIs, proxies) va directa.
+  if (new URL(url).origin !== self.location.origin) return;
   if (event.request.method !== "GET") return;
   // Primero la red (versión nueva); la caché solo sirve si no hay conexión.
   event.respondWith(
     fetch(event.request)
       .then((res) => { const copy = res.clone(); caches.open(CACHE_NAME).then((c) => c.put(event.request, copy)).catch(() => {}); return res; })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then((r) => r || Response.error()))
   );
 });
