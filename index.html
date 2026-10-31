@@ -428,6 +428,7 @@
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
         <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
+        <li>Explorar: hándicap, goles por equipo, combinados, goles exactos, descanso, 2ª parte y descanso/final</li>
         <li>Las 12 competiciones gratuitas de football-data.org (Ligue 1, Eredivisie, Primeira, Championship, Brasileirão, Mundial y Eurocopa)</li>
         <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
         <li>Formaciones renovadas: ficha de jugador con datos por 90 min, suplentes y líderes de jugadores</li>
@@ -775,7 +776,7 @@
         <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option><option value="140">🇪🇸 La Liga</option><option value="135">🇮🇹 Serie A</option><option value="78">🇩🇪 Bundesliga</option><option value="2">🇪🇺 Champions League</option>
       </select>
       <select id="exSample" onchange="renderExplore()"><option value="0">Toda la temporada</option><option value="100">Últimos 100 partidos</option><option value="50">Últimos 50</option><option value="20">Últimos 20</option></select>
-      <select id="exMarket" onchange="renderExplore()"><option value="all">Todos los mercados</option><option value="1x2">Resultado 1X2</option><option value="goals">Goles totales</option><option value="btts">Ambos marcan</option><option value="scores">Marcadores</option></select>
+      <select id="exMarket" onchange="renderExplore()"><option value="all">Todos los mercados</option><option value="1x2">Resultado 1X2</option><option value="goals">Goles totales</option><option value="btts">Ambos marcan</option><option value="hcp">Hándicap</option><option value="team">Goles por equipo</option><option value="combo">Combinados</option><option value="exact">Goles exactos y par/impar</option><option value="ht">Descanso (1ª parte)</option><option value="half2">2ª parte</option><option value="htft">Descanso / Final</option><option value="scores">Marcadores</option></select>
     </div>
     <div class="ex-sel" id="exGameSel" style="display:none;">
       <select id="exHome" onchange="renderExplore()"></select><span class="muted">vs</span><select id="exAway" onchange="renderExplore()"></select>
@@ -2494,13 +2495,13 @@ async function fdResults(league, season) {
   if (res.status === 403) throw new Error("football-data.org: tu plan gratuito no incluye esta liga o temporada");
   if (!res.ok) throw new Error(`football-data.org ${res.status}`);
   const d = await res.json();
-  return (d.matches || []).filter(x => x.score && x.score.fullTime && x.score.fullTime.home != null).map(x => ({ d: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name, hg: x.score.fullTime.home, ag: x.score.fullTime.away }));
+  return (d.matches || []).filter(x => x.score && x.score.fullTime && x.score.fullTime.home != null).map(x => ({ d: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name, hg: x.score.fullTime.home, ag: x.score.fullTime.away, hh: x.score.halfTime ? x.score.halfTime.home : null, ha: x.score.halfTime ? x.score.halfTime.away : null }));
 }
 async function fetchLeagueResults(league, season) {
   const useFd = getFdKey() && Number(season) >= currentSeason();
   if (useFd) { try { return { f: await fdResults(league, season), src: "football-data.org" }; } catch (e) { if (!getFootballKey()) throw e; console.warn(e.message); } }
   const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, getFootballKey());
-  return { f: all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away })), src: "API-Football" };
+  return { f: all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away, hh: x.score && x.score.halftime ? x.score.halftime.home : null, ha: x.score && x.score.halftime ? x.score.halftime.away : null })), src: "API-Football" };
 }
 let trData = null, trVenue = "all", trSort = { k: "ov25", d: -1 };
 function setTrVenue(v) { trVenue = v; document.querySelectorAll("#trVenue .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === v)); renderTrends(); }
@@ -2509,7 +2510,7 @@ async function loadTrends() {
   const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
   if (!key && !(getFdKey() && Number(season) >= currentSeason())) { st.textContent = "Añade tu API-Football key (o el proxy de football-data.org) en ⚙️ Configuración."; return; }
   const ck = `radar-trends-${league}-${season}`;
-  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
+  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000 && (!c.f.length || c.f[0].hh !== undefined)) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
   st.textContent = "Cargando partidos de la temporada...";
   try {
     const r = await fetchLeagueResults(league, season);
@@ -2651,11 +2652,20 @@ let exMode = "league";
 function setExMode(m) { exMode = m; document.querySelectorAll("#exModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
 function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
 function exMarkets() {
-  const mk = (l, f) => ({ l, f });
+  const mk = (l, f, ht) => ({ l, f, ht });
+  const T = (x, side) => [mk(`${side === "h" ? "Local" : "Visitante"} más de ${x}`, (h, a) => (side === "h" ? h : a) > x), mk(`${side === "h" ? "Local" : "Visitante"} menos de ${x}`, (h, a) => (side === "h" ? h : a) < x)];
+  const r = (h, a) => h > a ? "1" : h < a ? "2" : "X";
   return {
     "1x2": ["Resultado 1X2", [mk("1 (local gana)", (h, a) => h > a), mk("X (empate)", (h, a) => h === a), mk("2 (visitante gana)", (h, a) => h < a), mk("1X", (h, a) => h >= a), mk("X2", (h, a) => h <= a), mk("12", (h, a) => h !== a)]],
-    goals: ["Goles totales", [1.5, 2.5, 3.5, 4.5].flatMap(x => [mk(`Más de ${x}`, (h, a) => h + a > x), mk(`Menos de ${x}`, (h, a) => h + a < x)])],
-    btts: ["Ambos marcan", [mk("Sí", (h, a) => h > 0 && a > 0), mk("No", (h, a) => h === 0 || a === 0), mk("Local anota", (h, a) => h > 0), mk("Visitante anota", (h, a) => a > 0)]],
+    goals: ["Goles totales", [0.5, 1.5, 2.5, 3.5, 4.5, 5.5].flatMap(x => [mk(`Más de ${x}`, (h, a) => h + a > x), mk(`Menos de ${x}`, (h, a) => h + a < x)])],
+    btts: ["Ambos marcan", [mk("Sí", (h, a) => h > 0 && a > 0), mk("No", (h, a) => h === 0 || a === 0), mk("Local anota", (h, a) => h > 0), mk("Visitante anota", (h, a) => a > 0), mk("Local portería a cero", (h, a) => a === 0), mk("Visitante portería a cero", (h, a) => h === 0)]],
+    hcp: ["Hándicap (sobre el resultado final)", [mk("Local -1.5 (gana por 2+)", (h, a) => h - a > 1.5), mk("Local -0.5 (gana)", (h, a) => h - a > 0.5), mk("Local +0.5 (no pierde)", (h, a) => h - a > -0.5), mk("Local +1.5 (no pierde por 2+)", (h, a) => h - a > -1.5), mk("Visitante -1.5 (gana por 2+)", (h, a) => a - h > 1.5), mk("Visitante -0.5 (gana)", (h, a) => a - h > 0.5), mk("Visitante +0.5 (no pierde)", (h, a) => a - h > -0.5), mk("Visitante +1.5 (no pierde por 2+)", (h, a) => a - h > -1.5), mk("Margen exacto de 1 gol", (h, a) => Math.abs(h - a) === 1), mk("Margen de 3+ goles", (h, a) => Math.abs(h - a) >= 3)]],
+    team: ["Goles por equipo", [...T(0.5, "h"), ...T(1.5, "h"), ...T(2.5, "h"), ...T(0.5, "a"), ...T(1.5, "a"), ...T(2.5, "a")]],
+    combo: ["Combinados", [mk("Ambos marcan + Más de 2.5", (h, a) => h > 0 && a > 0 && h + a > 2), mk("Ambos marcan + Menos de 2.5", (h, a) => h > 0 && a > 0 && h + a < 3), mk("No ambos marcan + Menos de 2.5", (h, a) => (h === 0 || a === 0) && h + a < 3), mk("Local gana + Más de 2.5", (h, a) => h > a && h + a > 2), mk("Visitante gana + Más de 2.5", (h, a) => a > h && h + a > 2), mk("Local gana + Ambos marcan", (h, a) => h > a && a > 0), mk("Visitante gana + Ambos marcan", (h, a) => a > h && h > 0), mk("Local gana sin encajar", (h, a) => h > a && a === 0), mk("Visitante gana sin encajar", (h, a) => a > h && h === 0), mk("Empate + Menos de 2.5", (h, a) => h === a && h + a < 3), mk("Empate + Ambos marcan", (h, a) => h === a && h > 0)]],
+    exact: ["Goles exactos y par/impar", [...[0, 1, 2, 3, 4].map(n => mk(`Exactamente ${n} gol${n === 1 ? "" : "es"}`, (h, a) => h + a === n)), mk("5 o más goles", (h, a) => h + a >= 5), mk("Total par", (h, a) => (h + a) % 2 === 0), mk("Total impar", (h, a) => (h + a) % 2 === 1)]],
+    ht: ["Descanso (1ª parte)", [mk("1 al descanso", (h, a, hh, ha) => hh > ha, 1), mk("X al descanso", (h, a, hh, ha) => hh === ha, 1), mk("2 al descanso", (h, a, hh, ha) => hh < ha, 1), mk("Más de 0.5 goles 1ª parte", (h, a, hh, ha) => hh + ha > 0, 1), mk("Más de 1.5 goles 1ª parte", (h, a, hh, ha) => hh + ha > 1, 1), mk("Menos de 1.5 goles 1ª parte", (h, a, hh, ha) => hh + ha < 2, 1), mk("Ambos marcan 1ª parte", (h, a, hh, ha) => hh > 0 && ha > 0, 1)]],
+    half2: ["2ª parte", [mk("Más de 0.5 goles 2ª parte", (h, a, hh, ha) => (h - hh) + (a - ha) > 0, 1), mk("Más de 1.5 goles 2ª parte", (h, a, hh, ha) => (h - hh) + (a - ha) > 1, 1), mk("Más de 2.5 goles 2ª parte", (h, a, hh, ha) => (h - hh) + (a - ha) > 2, 1), mk("Más goles en la 2ª parte que en la 1ª", (h, a, hh, ha) => (h - hh) + (a - ha) > hh + ha, 1), mk("Más goles en la 1ª parte que en la 2ª", (h, a, hh, ha) => hh + ha > (h - hh) + (a - ha), 1), mk("Misma cantidad en ambas partes", (h, a, hh, ha) => hh + ha === (h - hh) + (a - ha), 1), mk("Gana 2ª parte el local", (h, a, hh, ha) => (h - hh) > (a - ha), 1), mk("Gana 2ª parte el visitante", (h, a, hh, ha) => (a - ha) > (h - hh), 1)]],
+    htft: ["Descanso / Final", ["1", "X", "2"].flatMap(p => ["1", "X", "2"].map(f => mk(`${p} / ${f}`, (h, a, hh, ha) => r(hh, ha) === p && r(h, a) === f, 1)))],
   };
 }
 function renderExplore() {
@@ -2672,24 +2682,24 @@ function renderExplore() {
   let sets; // cada set: { label, pairs:[{h,a}] }
   if (exMode === "league") {
     const rows = N ? byDate.slice(0, N) : byDate;
-    sets = [{ label: "Liga", pairs: rows.map(f => ({ h: f.hg, a: f.ag })) }];
+    sets = [{ label: "Liga", pairs: rows.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }];
     hero.innerHTML = `<div class="t">${lname}</div><div class="s">Análisis de liga · ${rows.length} partidos${N ? " (últimos " + N + ")" : " de la temporada"}</div>`;
   } else {
     const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value;
     let hr = byDate.filter(f => f.h === H), ar = byDate.filter(f => f.a === A);
     if (N) { hr = hr.slice(0, N); ar = ar.slice(0, N); }
-    sets = [{ label: `${H} (en casa)`, pairs: hr.map(f => ({ h: f.hg, a: f.ag })) }, { label: `${A} (fuera)`, pairs: ar.map(f => ({ h: f.hg, a: f.ag })) }];
+    sets = [{ label: `${H} (en casa)`, pairs: hr.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }, { label: `${A} (fuera)`, pairs: ar.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }];
     hero.innerHTML = `<div class="t">${H} vs ${A}</div><div class="s">${lname} · ${hr.length} partidos del local en casa · ${ar.length} del visitante fuera</div>`;
   }
   st.textContent = "Cuota justa = 1 / frecuencia. Escribe tu cuota para ver el edge (cuota × frecuencia − 1).";
-  const freq = (pairs, f) => pairs.length ? pairs.filter(p => f(p.h, p.a)).length / pairs.length : null;
+  const freq = (pairs, f, ht) => { const ps = ht ? pairs.filter(p => p.hh != null && p.ha != null) : pairs; return ps.length ? ps.filter(p => f(p.h, p.a, p.hh, p.ha)).length / ps.length : null; };
   const defs = exMarkets(); let html = "";
   Object.keys(defs).filter(k => sel === "all" || sel === k).forEach(k => {
     const [title, list] = defs[k];
     const head = sets.length > 1 ? `<th>${sets[0].label}</th><th>${sets[1].label}</th><th>Media</th>` : `<th>Frecuencia</th>`;
     html += `<div class="ex-block"><h3>${title}</h3><table class="extable"><thead><tr><th>Mercado</th>${head}<th>Cuota justa</th><th>Tu cuota</th><th>Edge</th></tr></thead><tbody>` +
       list.map(m => {
-        const fs = sets.map(x => freq(x.pairs, m.f)), valid = fs.filter(v => v != null), p = valid.length ? valid.reduce((a, c) => a + c, 0) / valid.length : null;
+        const fs = sets.map(x => freq(x.pairs, m.f, m.ht)), valid = fs.filter(v => v != null), p = valid.length ? valid.reduce((a, c) => a + c, 0) / valid.length : null;
         const cells = fs.map(v => `<td>${v == null ? "–" : (v * 100).toFixed(1) + "%"}</td>`).join("") + (sets.length > 1 ? `<td><b>${p == null ? "–" : (p * 100).toFixed(1) + "%"}</b></td>` : "");
         return `<tr><td class="exm">${m.l}</td>${cells}<td><span class="codd">${p ? (1 / p).toFixed(2) : "–"}</span></td><td><input class="exin" type="number" step="0.01" placeholder="1.90" data-p="${p || 0}" oninput="exEdge(this)" /></td><td class="exedge muted">–</td></tr>`;
       }).join("") + `</tbody></table></div>`;
@@ -2733,7 +2743,7 @@ function msFind(name, teams) {
 }
 async function msLeagueData(league, season) {
   const ck = `radar-trends-${league}-${season}`;
-  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 24 * 3600 * 1000) return c.f; } catch (e) {}
+  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 24 * 3600 * 1000 && (!c.f.length || c.f[0].hh !== undefined)) return c.f; } catch (e) {}
   const { f } = await fetchLeagueResults(league, season);
   try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f })); } catch (e) {}
   return f;
