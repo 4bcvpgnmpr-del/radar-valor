@@ -683,12 +683,13 @@
       <div id="hbBody" style="display:none;">
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:14px;">
           <label>Liga<select id="hbLeague" onchange="hbRender()"></select></label>
-          <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
+          <label>Selección<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><optgroup label="Sin cuota en el CSV (solo frecuencia)"><option value="Pbs">Ambos marcan: Sí</option><option value="Pbn">Ambos marcan: No</option><option value="Po5">Más de 0.5 goles</option><option value="Pu5">Menos de 0.5 goles</option><option value="Po15">Más de 1.5 goles</option><option value="Pu15">Menos de 1.5 goles</option><option value="1To5">1T: más de 0.5 goles</option><option value="1Tu5">1T: menos de 0.5 goles</option><option value="1To15">1T: más de 1.5 goles</option><option value="1Tu15">1T: menos de 1.5 goles</option><option value="1Tbs">1T: ambos marcan</option><option value="2To5">2T: más de 0.5 goles</option><option value="2Tu5">2T: menos de 0.5 goles</option><option value="2To15">2T: más de 1.5 goles</option><option value="2Tu15">2T: menos de 1.5 goles</option></optgroup><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
           <label>Cuota a la que apuestas<select id="hbBook" onchange="hbRender()"></select></label>
           <label>Temporadas<details id="hbSeasD" style="position:relative;"><summary id="hbSeasS" style="cursor:pointer; padding:10px 12px; border:1px solid #2A3340; border-radius:12px; background:#0D1117; color:#E6EAF0; font-size:14px;">Todas</summary><div id="hbSeasL" style="position:absolute; z-index:20; left:0; right:0; max-height:240px; overflow:auto; background:#10151C; border:1px solid #2A3340; border-radius:12px; margin-top:4px; padding:8px;"></div></details></label>
           <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
           <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRender()" /></label>
           <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRender()" /></label>
+          <label>Cuota simulada (mercados sin cuota)<input id="hbFix" type="number" step="0.05" placeholder="ej. 1.80" oninput="hbRender()" /></label>
           <label>Muestra mínima (ranking)<input id="hbMinN" type="number" step="10" value="60" oninput="hbRender()" /></label>
         </div>
         <div class="muted" style="font-size:11px; margin-top:6px;">El valor mínimo compara tu cuota con la probabilidad justa de Pinnacle (o de la media si no hay Pinnacle), sin margen. Stake fijo de 1 unidad.</div>
@@ -2410,7 +2411,7 @@ function hbFromCsv(text, fname) {
   const iD = col("Date"), iH = col("HomeTeam", "Home"), iA = col("AwayTeam", "Away"), iHG = col("FTHG", "HG"), iAG = col("FTAG", "AG"), iS = col("Season"), iC = col("Country"), iL = col("League"), iDiv = col("Div");
   if (iD < 0 || iH < 0 || iA < 0 || iHG < 0 || iAG < 0) throw new Error("no parece un CSV de football-data.co.uk (faltan Date/Home/Away/goles)");
   const code = (fname || "").replace(/\.csv$/i, "").replace(/\s*\(\d+\)$/, ""), out = {};
-  const iAH = col("AHh"), iAHC = col("AHCh"), ahc = {}; Object.keys(HB_AH).forEach(b => { ahc[b] = HB_AH[b].map(p => [col(p[0]), col(p[1])]); });
+  const iHTH = col("HTHG"), iHTA = col("HTAG"), iAH = col("AHh"), iAHC = col("AHCh"), ahc = {}; Object.keys(HB_AH).forEach(b => { ahc[b] = HB_AH[b].map(p => [col(p[0]), col(p[1])]); });
   const ocols = {}; Object.keys(HB_COLS).forEach(b => { ocols[b] = HB_ORDER.map(k => col(...HB_COLS[b][k])); });
   for (let r = 1; r < rows.length; r++) {
     const x = rows[r], ts = hbParseDate(x[iD]); const hg = parseInt(x[iHG]), ag = parseInt(x[iAG]); if (ts == null || isNaN(hg) || isNaN(ag)) continue;
@@ -2420,8 +2421,8 @@ function hbFromCsv(text, fname) {
       const a = ocols[b].map(i => { const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; });
       for (let k = 0; k < 2; k++) { const ix1 = ahc[b][k][0], ix2 = ahc[b][k][1], il = k === 0 ? iAHC : iAH; if (ix1 < 0 || ix2 < 0 || il < 0) continue; const p1 = parseFloat(x[ix1]), p2 = parseFloat(x[ix2]), ln = parseFloat(x[il]); if (p1 > 1 && p2 > 1 && !isNaN(ln)) { a.push(Math.round(p1 * 1000) / 1000, Math.round(p2 * 1000) / 1000, ln); break; } }
       if (a.some(v => v)) o[b] = a; });
-    if (!Object.keys(o).length) continue;
-    (out[lg] = out[lg] || []).push([Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o]);
+    const hth = iHTH >= 0 ? parseInt(x[iHTH]) : NaN, hta = iHTA >= 0 ? parseInt(x[iHTA]) : NaN, ht = isNaN(hth) || isNaN(hta) ? null : [hth, hta];
+    (out[lg] = out[lg] || []).push([Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o, ht]);
   }
   return out;
 }
@@ -2482,6 +2483,37 @@ function hbStats(b) {
 }
 function hbFilters() { const g = id => document.getElementById(id).value; return { seas: hbSeasSel, omin: parseFloat(g("hbOMin")) || 0, omax: parseFloat(g("hbOMax")) || 0, ev: g("hbEV") === "" ? null : parseFloat(g("hbEV")) }; }
 function hbVerdict(st, strict) { const T1 = strict ? 3 : 2, T2 = strict ? 2 : 1; if (st.n < 30) return ["muy poca muestra", "#7C8797"]; if (st.y > 0 && st.t >= T1 && st.y1 > 0 && st.y2 > 0) return ["señal sólida", "#3ECF8E"]; if (st.y > 0 && st.t >= T2 && st.y1 > 0 && st.y2 > 0) return ["prometedora", "#F0B429"]; if (st.y > 0) return ["probable azar", "#9AA5B1"]; return ["no rentable", "#E5484D"]; }
+const HB_FREQ = (() => {
+  const T = r => r[3] + r[4], T1 = r => r[7][0] + r[7][1], T2 = r => T(r) - T1(r), o = {};
+  [["", T, 0], ["1T ", T1, 1], ["2T ", T2, 1]].forEach(([p, fn, needHt]) => [0.5, 1.5].forEach(x => { const k = x === 0.5 ? "5" : "15"; o[`${p ? p.trim() : "P"}o${k}`] = [`${p}Más de ${x} goles`, r => fn(r) > x, needHt]; o[`${p ? p.trim() : "P"}u${k}`] = [`${p}Menos de ${x} goles`, r => fn(r) < x, needHt]; }));
+  o.Pbs = ["Ambos marcan: Sí", r => r[3] > 0 && r[4] > 0, 0]; o.Pbn = ["Ambos marcan: No", r => r[3] === 0 || r[4] === 0, 0];
+  o["1Tbs"] = ["1T Ambos marcan: Sí", r => r[7][0] > 0 && r[7][1] > 0, 1];
+  return o; })();
+function hbRenderFreq(rows, sel, lg) {
+  const [label, fn, needHt] = HB_FREQ[sel], f = hbFilters(), minN = parseInt(document.getElementById("hbMinN").value) || 0, fix = parseFloat(document.getElementById("hbFix").value) || 0;
+  const ok = r => (!f.seas || f.seas.has(r[5])) && (!needHt || r[7]);
+  const stat = rs => { const a = rs.filter(ok); if (!a.length) return { n: 0 }; const w = a.filter(fn).length, p = w / a.length; return { n: a.length, w, p, be: p > 0 ? 1 / p : null, y: fix ? (p * fix - 1) * 100 : null, a }; };
+  let rs = rows; if (hbTeamF && hbTeamF.k === "f") rs = rows.filter(r => r[1] === hbTeamF.t || r[2] === hbTeamF.t);
+  const st = stat(rs), col = v => v >= 0 ? "#3ECF8E" : "#E5484D";
+  document.getElementById("hbDetail").innerHTML = `<div class="muted" style="font-size:12px; margin-bottom:6px;">Los CSV no traen cuotas de este mercado: se mide con qué frecuencia ocurrió y qué cuota mínima necesitas para ganar dinero.</div>` + (hbTeamF && hbTeamF.k === "f" ? `<span style="background:#141A23; border:1px solid #2A3340; border-radius:999px; padding:6px 12px; font-size:13px;">Detalle: <b>${hbTeamF.t}</b> <a href="#" onclick="hbClearTeam();return false;" style="color:#9AA5B1; margin-left:8px;">✕ quitar</a></span>` : "");
+  document.getElementById("hbKpis").innerHTML = !st.n ? `<div class="muted" style="grid-column:1/-1; text-align:center;">Sin partidos con datos para este mercado${needHt ? " (los mercados de mitad necesitan archivos con resultado al descanso, normalmente las ligas principales)" : ""}.</div>` :
+    `<div class="bt-kpi"><div class="l">Frecuencia</div><div class="n">${(st.p * 100).toFixed(1)}%</div><div class="sm">${label}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Partidos</div><div class="n">${st.n}</div><div class="sm">${st.w} sí · ${st.n - st.w} no</div></div>` +
+    `<div class="bt-kpi"><div class="l">Cuota mínima</div><div class="n">${st.be ? st.be.toFixed(2) : "—"}</div><div class="sm">para no perder a largo plazo</div></div>` +
+    `<div class="bt-kpi"><div class="l">Con tu cuota</div><div class="n" style="color:${st.y == null ? "" : col(st.y)}">${st.y == null ? "—" : (st.y >= 0 ? "+" : "") + st.y.toFixed(1) + "%"}</div><div class="sm">${fix ? "yield a cuota " + fix : "escribe una cuota simulada"}</div></div>` +
+    `<div class="bt-kpi"><div class="l">Si la cuota es</div><div class="n" style="font-size:15px; line-height:1.5;">${[1.3, 1.5, 1.8, 2.0].map(c => `${c}: <b style="color:${col(st.p * c - 1)}">${((st.p * c - 1) * 100).toFixed(0)}%</b>`).join("<br>")}</div></div>`;
+  document.getElementById("hbChart").innerHTML = "";
+  const bs = {}; (st.a || []).forEach(r => (bs[r[5]] = bs[r[5]] || []).push(r));
+  document.getElementById("hbSeasons").innerHTML = Object.keys(bs).sort().map(k => { const x = stat(bs[k]); return `<div style="display:inline-block; margin:3px; background:#141A23; border:1px solid #1A212B; border-radius:10px; padding:6px 10px; font-size:12px; text-align:center;"><div class="muted">${k}</div><b>${(x.p * 100).toFixed(0)}%</b> <span class="muted">· ${x.n}</span></div>`; }).join("");
+  document.getElementById("hbTeamQ").style.display = hbGrp === "team" ? "block" : "none";
+  document.getElementById("hbRankT").textContent = `Ranking ${hbGrp === "team" ? "por equipo" : "por liga"}: dónde ocurre más (${label})`;
+  const rk = [];
+  if (hbGrp === "team") { const q = (document.getElementById("hbTeamQ").value || "").trim().toLowerCase(), by = {}; rows.forEach(r => { [r[1], r[2]].forEach(t => (by[t] = by[t] || []).push(r)); }); Object.keys(by).forEach(t => { if (q && !t.toLowerCase().includes(q)) return; const x = stat(by[t]); if (x.n >= Math.max(1, minN)) rk.push({ name: t, k: "f", x }); }); }
+  else Object.keys(hbData).forEach(l => { const x = stat(hbData[l]); if (x.n >= Math.max(1, minN)) rk.push({ name: l, x }); });
+  rk.sort((a, b) => b.x.p - a.x.p);
+  document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">${hbGrp === "team" ? "Equipo" : "Liga"}</th><th style="text-align:right;">Partidos</th><th style="text-align:right;">Frecuencia</th><th style="text-align:right;">Cuota mínima</th>${fix ? `<th style="text-align:right;">Yield a ${fix}</th>` : ""}</tr>` +
+    rk.slice(0, 40).map(r => `<tr style="border-top:1px solid #1A212B; ${hbGrp === "team" ? "cursor:pointer;" : ""}" ${hbGrp === "team" ? `onclick="hbTeamF={t:'${r.name.replace(/'/g, "\\'")}',k:'f'};hbRender();"` : ""}><td style="padding:7px 6px;">${r.name}</td><td style="text-align:right;">${r.x.n}</td><td style="text-align:right; font-weight:600;">${(r.x.p * 100).toFixed(1)}%</td><td style="text-align:right;">${r.x.be.toFixed(2)}</td>${fix ? `<td style="text-align:right; color:${col(r.x.y)};">${r.x.y >= 0 ? "+" : ""}${r.x.y.toFixed(1)}%</td>` : ""}</tr>`).join("") + `</table><div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Compara la "cuota mínima" con la cuota real que ofrece tu casa: si te pagan más que esa cuota, a largo plazo ese mercado habría dado beneficio en esa liga o equipo. Cuidado: es el pasado y con pocas muestras puede ser azar.</div>` : `<div class="muted" style="text-align:center;">Ningún grupo llega a ${minN} partidos (baja la muestra mínima).</div>`;
+}
 let hbGrp = "league", hbTeamF = null;
 const HB_TK = { hl: ["Gana de local", "h", "H"], aw: ["Gana de visitante", "a", "A"], ch: ["Rival gana cuando juega de local", "h", "A"], ca: ["Rival gana cuando juega de visitante", "a", "H"], dr: ["Empate", "any", "D"], ov: ["Más de 2.5 goles", "any", "O"], un: ["Menos de 2.5 goles", "any", "U"] };
 const HB_TKAH = { ahl: ["Hándicap asiático a favor (local)", "h", "X"], aha: ["Hándicap asiático a favor (visitante)", "a", "Y"] };
@@ -2493,6 +2525,8 @@ function hbClearTeam() { hbTeamF = null; hbRender(); }
 function hbRender() {
   const lg = document.getElementById("hbLeague").value, sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters(), minN = parseInt(document.getElementById("hbMinN").value) || 0;
   const rows = (lg ? hbData[lg] || [] : Object.values(hbData).flat()).slice().sort((a, b) => a[0] - b[0]);
+  if (HB_FREQ[sel]) { hbRenderFreq(rows, sel, lg); return; }
+  if (hbTeamF && hbTeamF.k === "f") hbTeamF = null;
   let rowsU = rows, selU = sel;
   if (hbTeamF) { const k = HB_TK[hbTeamF.k]; rowsU = hbTeamRows(rows, hbTeamF.t, k[1]); selU = k[2]; }
   document.getElementById("hbDetail").innerHTML = hbTeamF ? `<span style="background:#141A23; border:1px solid #2A3340; border-radius:999px; padding:6px 12px; font-size:13px;">Detalle: <b>${hbTeamF.t}</b> · ${HB_TK[hbTeamF.k][0]} <a href="#" onclick="hbClearTeam();return false;" style="color:#9AA5B1; margin-left:8px;">✕ quitar</a></span>` : "";
