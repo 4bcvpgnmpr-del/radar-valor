@@ -1829,7 +1829,8 @@ async function loadModel(idx) {
   const it = pvItems[idx]; if (!it) return;
   const m = it.m, box = document.getElementById(`${it.cardId}-model`);
   const hist = hbModelRows(m);
-  if (!hist && !getFootballKey() && !getFdKey()) { box.innerHTML = `<div class="muted" style="text-align:center;">Importa CSV históricos (Backtesting) o añade tu token de football-data.org en ⚙️ Configuración.</div>`; return; }
+  const lgG = DD_LEAGUES.find(x => x.odds === lastSport);
+  if (!hist && !getFootballKey() && !getFdKey() && !(lgG && OF_CODES[lgG.id])) { box.innerHTML = `<div class="muted" style="text-align:center;">Importa CSV históricos (Backtesting) o añade tu token de football-data.org en ⚙️ Configuración.</div>`; return; }
   box.innerHTML = `<div class="muted" style="text-align:center;">Calculando el modelo con los resultados de la liga...</div>`;
   try {
     let rows, src = "de la liga";
@@ -3137,18 +3138,33 @@ async function fdResults(league, season) {
   const d = await res.json();
   return (d.matches || []).filter(x => x.score && x.score.fullTime && x.score.fullTime.home != null).map(x => ({ d: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name, hg: x.score.fullTime.home, ag: x.score.fullTime.away, hh: x.score.halfTime ? x.score.halfTime.home : null, ha: x.score.halfTime ? x.score.halfTime.away : null }));
 }
+const OF_CODES = { "39": "en.1", "40": "en.2", "140": "es.1", "135": "it.1", "78": "de.1", "61": "fr.1", "88": "nl.1", "94": "pt.1" };
+async function ofResults(league, season) {
+  const code = OF_CODES[String(league)]; if (!code) throw new Error("esta liga no está en los datos abiertos (openfootball)");
+  const y = Number(season), res = await fetch(`https://raw.githubusercontent.com/openfootball/football.json/master/${y}-${String(y + 1).slice(2)}/${code}.json`);
+  if (res.status === 404) throw new Error(`openfootball no tiene la temporada ${y}/${String(y + 1).slice(2)} de esta liga`);
+  if (!res.ok) throw new Error(`openfootball ${res.status}`);
+  const j = await res.json();
+  return (j.matches || []).filter(m => m.score && m.score.ft && m.score.ft.length === 2).map(m => ({ d: `${m.date}T${m.time || "12:00"}:00Z`, h: m.team1, a: m.team2, hg: m.score.ft[0], ag: m.score.ft[1], hh: m.score.ht ? m.score.ht[0] : null, ha: m.score.ht ? m.score.ht[1] : null }));
+}
 async function fetchLeagueResults(league, season) {
-  const useFd = getFdKey() && Number(season) >= currentSeason();
-  if (useFd) { try { return { f: await fdResults(league, season), src: "football-data.org" }; } catch (e) { if (!getFootballKey()) throw e; console.warn(e.message); } }
-  const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, getFootballKey());
-  return { f: all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away, hh: x.score && x.score.halftime ? x.score.halftime.home : null, ha: x.score && x.score.halftime ? x.score.halftime.away : null })), src: "API-Football" };
+  const useFd = getFdKey() && Number(season) >= currentSeason(); let err = null;
+  if (useFd) { try { return { f: await fdResults(league, season), src: "football-data.org" }; } catch (e) { err = e; console.warn(e.message); } }
+  if (getFootballKey()) {
+    try {
+      const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, getFootballKey());
+      return { f: all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away, hh: x.score && x.score.halftime ? x.score.halftime.home : null, ha: x.score && x.score.halftime ? x.score.halftime.away : null })), src: "API-Football" };
+    } catch (e) { err = err || e; console.warn(e.message); }
+  }
+  if (OF_CODES[String(league)]) { try { return { f: await ofResults(league, season), src: "openfootball (datos abiertos)" }; } catch (e) { err = err || e; } }
+  throw err || new Error("añade una key de API-Football o el token de football-data.org en ⚙️ Configuración");
 }
 let trData = null, trVenue = "all", trSort = { k: "ov25", d: -1 };
 function setTrVenue(v) { trVenue = v; document.querySelectorAll("#trVenue .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === v)); renderTrends(); }
 async function loadTrends() {
   const key = getFootballKey(), st = document.getElementById("trStatus");
   const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
-  if (!key && !(getFdKey() && Number(season) >= currentSeason())) { st.textContent = "Añade tu API-Football key (o el proxy de football-data.org) en ⚙️ Configuración."; return; }
+  if (!key && !(getFdKey() && Number(season) >= currentSeason()) && !OF_CODES[String(league)]) { st.textContent = "Esta liga necesita tu API-Football key o el token de football-data.org en ⚙️ Configuración."; return; }
   const ck = `radar-trends-${league}-${season}`;
   try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000 && (!c.f.length || c.f[0].hh !== undefined)) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
   st.textContent = "Cargando partidos de la temporada...";
