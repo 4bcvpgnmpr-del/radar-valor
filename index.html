@@ -426,6 +426,7 @@
         <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
       </div>
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
         <li>Partidos y valor: lista limpia con 1X2 y mejor valor por partido; el detalle se abre al pulsar</li>
         <li>Formaciones renovadas: ficha de jugador con datos por 90 min, suplentes y líderes de jugadores</li>
@@ -467,6 +468,7 @@
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div><div class="muted" style="margin-bottom:4px;">Odds API key <span class="tooltip" title="the-odds-api.com — necesaria para ver cuotas de partidos.">ⓘ</span></div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">API-Football key <span class="tooltip" title="api-football.com — necesaria para forma, lesiones, formaciones y estadísticas.">ⓘ</span></div><input id="footballKey" type="password" placeholder="api-football.com" style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">football-data.org token <span class="tooltip" title="football-data.org — gratis. Da resultados de la temporada ACTUAL de 12 ligas para Tendencias, Explorar y la ficha del partido.">ⓘ</span></div><input id="fdKey" type="password" placeholder="football-data.org (gratis)" style="width:100%;" /></div>
         <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
@@ -935,6 +937,7 @@
 <script>
 const ODDS_KEY_STORAGE = "radar-valor-oddsapi-key";
 const FOOTBALL_KEY_STORAGE = "radar-valor-footballapi-key";
+const FD_KEY_STORAGE = "radar-valor-footballdata-key";
 const ANTHROPIC_KEY_STORAGE = "radar-valor-anthropic-key";
 const ISPORTS_KEY_STORAGE = "radar-valor-isports-key";
 const BANKROLL_STORAGE = "radar-valor-bankroll";
@@ -992,12 +995,14 @@ function saveKeys() {
   const k2 = document.getElementById("footballKey").value.trim();
   const k3 = document.getElementById("anthropicKey").value.trim();
   const k5 = document.getElementById("isportsKey").value.trim();
+  const k6 = document.getElementById("fdKey").value.trim();
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
   if (k2) localStorage.setItem(FOOTBALL_KEY_STORAGE, k2);
   if (k3) localStorage.setItem(ANTHROPIC_KEY_STORAGE, k3);
   if (k5) localStorage.setItem(ISPORTS_KEY_STORAGE, k5);
+  if (k6) { if (k6 !== getFdKey()) { const ts = document.getElementById("trSeason"); if (ts) ts.value = currentSeason(); } localStorage.setItem(FD_KEY_STORAGE, k6); }
   if (br) localStorage.setItem(BANKROLL_STORAGE, br);
   localStorage.setItem(KELLY_STORAGE, kf);
   try { localStorage.setItem("radar-profile", JSON.stringify({ league: document.getElementById("favLeague").value, market: document.getElementById("favMarket").value })); } catch (e) {}
@@ -1005,6 +1010,7 @@ function saveKeys() {
   loadOdds();
 }
 function getOddsKey() { return localStorage.getItem(ODDS_KEY_STORAGE) || ""; }
+function getFdKey() { return localStorage.getItem(FD_KEY_STORAGE) || ""; }
 function getFootballKey() { return localStorage.getItem(FOOTBALL_KEY_STORAGE) || ""; }
 function getAnthropicKey() { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ""; }
 function getIsportsKey() { return localStorage.getItem(ISPORTS_KEY_STORAGE) || ""; }
@@ -1140,6 +1146,7 @@ async function loadOdds(forceRefresh) {
   document.getElementById("footballKey").value = getFootballKey();
   document.getElementById("anthropicKey").value = getAnthropicKey();
   document.getElementById("isportsKey").value = getIsportsKey();
+  document.getElementById("fdKey").value = getFdKey();
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
@@ -2476,21 +2483,36 @@ async function loadFavoritesCalendar() {
   }
 }
 
+const FD_CODES = { "39": "PL", "140": "PD", "135": "SA", "78": "BL1", "2": "CL" };
+async function fdResults(league, season) {
+  const code = FD_CODES[String(league)]; if (!code) throw new Error("liga no disponible en football-data.org");
+  const res = await fetch(`https://api.football-data.org/v4/competitions/${code}/matches?season=${season}&status=FINISHED`, { headers: { "X-Auth-Token": getFdKey() } });
+  if (res.status === 429) throw new Error("football-data.org: límite de 10 peticiones por minuto, espera un momento");
+  if (res.status === 403) throw new Error("football-data.org: tu plan gratuito no incluye esta liga o temporada");
+  if (!res.ok) throw new Error(`football-data.org ${res.status}`);
+  const d = await res.json();
+  return (d.matches || []).filter(x => x.score && x.score.fullTime && x.score.fullTime.home != null).map(x => ({ d: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name, hg: x.score.fullTime.home, ag: x.score.fullTime.away }));
+}
+async function fetchLeagueResults(league, season) {
+  const useFd = getFdKey() && Number(season) >= currentSeason();
+  if (useFd) { try { return { f: await fdResults(league, season), src: "football-data.org" }; } catch (e) { if (!getFootballKey()) throw e; console.warn(e.message); } }
+  const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, getFootballKey());
+  return { f: all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away })), src: "API-Football" };
+}
 let trData = null, trVenue = "all", trSort = { k: "ov25", d: -1 };
 function setTrVenue(v) { trVenue = v; document.querySelectorAll("#trVenue .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === v)); renderTrends(); }
 async function loadTrends() {
   const key = getFootballKey(), st = document.getElementById("trStatus");
-  if (!key) { st.textContent = "Añade tu API-Football key en ⚙️ Configuración."; return; }
   const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
+  if (!key && !(getFdKey() && Number(season) >= currentSeason())) { st.textContent = "Añade tu API-Football key (o el token de football-data.org) en ⚙️ Configuración."; return; }
   const ck = `radar-trends-${league}-${season}`;
   try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
   st.textContent = "Cargando partidos de la temporada...";
   try {
-    const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, key);
-    trData = all.filter(f => f.goals.home != null && f.goals.away != null && ["FT","AET","PEN"].includes(f.fixture.status.short))
-      .map(f => ({ d: f.fixture.date, h: f.teams.home.name, a: f.teams.away.name, hg: f.goals.home, ag: f.goals.away }));
+    const r = await fetchLeagueResults(league, season);
+    trData = r.f;
     try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f: trData })); } catch (e) {}
-    st.textContent = trData.length ? `${trData.length} partidos analizados (temporada ${season}).` : "Sin partidos terminados para esta liga/temporada.";
+    st.textContent = trData.length ? `${trData.length} partidos analizados (temporada ${season}, vía ${r.src}).` : "Sin partidos terminados para esta liga/temporada.";
     renderTrends(); renderExplore();
   } catch (e) { st.textContent = "No se pudo cargar: " + e.message; renderExplore(); }
 }
@@ -2695,8 +2717,7 @@ function msFind(name, teams) {
 async function msLeagueData(league, season) {
   const ck = `radar-trends-${league}-${season}`;
   try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 24 * 3600 * 1000) return c.f; } catch (e) {}
-  const all = await apiFootball(`/fixtures?league=${league}&season=${season}`, getFootballKey());
-  const f = all.filter(x => x.goals.home != null && x.goals.away != null && ["FT", "AET", "PEN"].includes(x.fixture.status.short)).map(x => ({ d: x.fixture.date, h: x.teams.home.name, a: x.teams.away.name, hg: x.goals.home, ag: x.goals.away }));
+  const { f } = await fetchLeagueResults(league, season);
   try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f })); } catch (e) {}
   return f;
 }
@@ -2716,7 +2737,7 @@ async function openMatchSheet(home, away, leagueId, leagueName) {
   ov.style.display = "flex"; document.body.style.overflow = "hidden";
   msCtx = home; msCtx2 = { home, away, leagueId };
   const head = `<div class="ms-title">${home} <span style="color:#3ECF8E">vs</span> ${away}</div><div class="ms-sub">${leagueName || ""} · <a href="#" style="color:#3ECF8E;" onclick="msGoOdds(); return false;">Ver cuotas y valor →</a> · <a href="#" style="color:#3ECF8E;" onclick="msGoExplore(); return false;">Explorar mercados →</a></div>`;
-  if (!getFootballKey()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
+  if (!getFootballKey() && !getFdKey()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
   const season = document.getElementById("trSeason").value || 2024;
   body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Cargando datos de la temporada ${season}...</div>`;
   let data;
