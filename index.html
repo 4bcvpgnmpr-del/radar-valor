@@ -706,6 +706,14 @@
           <div style="font-weight:600; font-size:15px;">Reporte del sistema</div>
           <button class="small" onclick="hbOpenF()">⚙ Filtros</button>
         </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px;">
+          <select id="hbSys" onchange="hbSysLoad(this.value)" style="min-width:170px; flex:1;"><option value="">Sistemas guardados</option></select>
+          <input id="hbSysName" oninput="hbRender()" type="text" placeholder="Nombre del sistema" style="width:170px; flex:1;" />
+          <input id="hbSysNote" oninput="hbRender()" type="text" placeholder="Comentarios (opcional)" style="width:200px; flex:2;" />
+          <button class="small" onclick="hbSysSave()">💾 Guardar sistema</button>
+          <button class="small ghost" onclick="hbSysDel()" title="Borrar el sistema seleccionado">Borrar sistema</button>
+        </div>
+        <div id="hbSysMsg" class="muted" style="font-size:12px; min-height:16px; margin-bottom:6px;"></div>
         <div class="seg" id="hbPeriod" style="display:flex; flex-wrap:wrap; width:fit-content; max-width:100%; margin:10px 0 12px;">
           <button class="seg-b active" data-p="all" onclick="hbSetPer('all')">Todas las temporadas</button><button class="seg-b" data-p="7" onclick="hbSetPer('7')">Últimos 7 días</button><button class="seg-b" data-p="30" onclick="hbSetPer('30')">Últimos 30 días</button><button class="seg-b" data-p="last" onclick="hbSetPer('last')">Última temporada</button>
         </div>
@@ -2371,7 +2379,7 @@ async function updateClosing(id) {
 
 function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
 
-const BACKUP_KEYS = [
+const BACKUP_KEYS = ["radar-bt-hsystems", 
   "radar-valor-clv-log", "radar-valor-value-log", "radar-valor-notes", "radar-valor-outcomes",
   "radar-valor-favorites", "radar-valor-formation-stats", "radar-valor-line-history",
   "radar-valor-bankroll", "radar-valor-kelly-fraction",
@@ -2639,7 +2647,7 @@ function hbInit() {
   if (hbLgSel) { hbLgSel = new Set([...hbLgSel].filter(x => lgs.includes(x))); if (!hbLgSel.size) hbLgSel = null; }
   const bk = document.getElementById("hbBook"), cb = bk.value; bk.innerHTML = hbBooksAvail().map(b => `<option value="${b}">${HB_BOOKN[b]}</option>`).join(""); if (cb) bk.value = cb; else if (hbBooksAvail().includes("b365")) bk.value = "b365";
   const ss = hbSeasonsAll(); if (hbSeasSel) { hbSeasSel = new Set([...hbSeasSel].filter(x => ss.includes(x))); } hbSeasDraw(ss);
-  hbLgDraw();
+  hbLgDraw(); hbSysList();
   ["hbIncLg", "hbExLg"].forEach(id => { const el = document.getElementById(id), cur = el.value; el.innerHTML = lgs.map(l => `<option>${l}</option>`).join(""); if (lgs.includes(cur)) el.value = cur; });
   hbFillTeams("hbIncLg", "hbIncT"); hbFillTeams("hbExLg", "hbExT"); hbExRiv(); hbListDraw();
   hbRender();
@@ -2788,6 +2796,40 @@ function hbPicksRender() {
     out.slice(0, 40).map(x => `<tr style="border-top:1px solid #1A212B;"><td style="padding:6px 5px; white-space:nowrap;">${new Date(x.t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td>${x.lg.split(" · ").pop()}</td><td>${x.m.home_team}</td><td>${x.m.away_team}</td><td style="text-align:right; font-weight:600;">${x.p.price.toFixed(2)}</td><td style="text-align:right; color:${x.p.ev == null ? "#7C8797" : col(x.p.ev)};">${x.p.ev == null ? "—" : (x.p.ev >= 0 ? "+" : "") + (x.p.ev * 100).toFixed(1) + "%"}</td></tr>`).join("") + `</table>` :
     `<div class="muted" style="text-align:center; padding:10px; font-size:12px; line-height:1.6;">${seen ? "Ningún partido de los próximos 8 días cumple este sistema." : "No hay partidos con cuotas cargadas. Abre una liga en Partidos y valor para cargar sus cuotas."}<br>Solo se miran ligas con cuotas ya cargadas y que existan en tus CSV.</div>`;
 }
+const HB_SYS_KEY = "radar-bt-hsystems", HB_SYS_IDS = ["hbSel", "hbBook", "hbWhen", "hbUnit", "hbOMin", "hbOMax", "hbEV", "hbFix", "hbMinN", "hbPhMin", "hbPhMax", "hbPaMin", "hbPaMax", "hbGhMin", "hbGhMax", "hbGaMin", "hbGaMax", "hbWh", "hbWa", "hbUh", "hbUa"];
+function hbSysAll() { try { return JSON.parse(localStorage.getItem(HB_SYS_KEY) || "{}"); } catch (e) { return {}; } }
+function hbSysSet(o) { try { localStorage.setItem(HB_SYS_KEY, JSON.stringify(o)); return true; } catch (e) { return false; } }
+function hbSysState() {
+  const v = {}; HB_SYS_IDS.forEach(id => { v[id] = document.getElementById(id).value; });
+  return { v, lg: hbLgSel ? [...hbLgSel] : null, seas: hbSeasSel ? [...hbSeasSel] : null, inc: hbInc, exc: hbExc, per: hbPer, mode: hbMode, note: document.getElementById("hbSysNote").value.trim(), saved: Date.now() };
+}
+function hbSysList() {
+  const o = hbSysAll(), el = document.getElementById("hbSys"); if (!el) return; const cur = el.value;
+  el.innerHTML = `<option value="">Sistemas guardados${Object.keys(o).length ? " (" + Object.keys(o).length + ")" : ""}</option>` + Object.keys(o).sort().map(k => `<option value="${k.replace(/"/g, "&quot;")}">${k}</option>`).join("");
+  if (o[cur]) el.value = cur;
+}
+function hbSysSave() {
+  const name = document.getElementById("hbSysName").value.trim(), msg = document.getElementById("hbSysMsg");
+  if (!name) { msg.textContent = "Escribe un nombre para el sistema."; return; }
+  const o = hbSysAll(), exists = !!o[name]; o[name] = hbSysState();
+  if (!hbSysSet(o)) { msg.textContent = "No se pudo guardar (almacenamiento lleno)."; return; }
+  hbSysList(); document.getElementById("hbSys").value = name; msg.innerHTML = `<span style="color:#3ECF8E;">Sistema "${name}" ${exists ? "actualizado" : "guardado"}.</span>`;
+}
+function hbSysLoad(name) {
+  const msg = document.getElementById("hbSysMsg"), st = hbSysAll()[name]; if (!st) { document.getElementById("hbSysName").value = ""; document.getElementById("hbSysNote").value = ""; return; }
+  Object.keys(st.v).forEach(id => { const el = document.getElementById(id); if (el) el.value = st.v[id]; });
+  const lgs = Object.keys(hbData), ss = hbSeasonsAll();
+  hbLgSel = st.lg ? new Set(st.lg.filter(x => lgs.includes(x))) : null; if (hbLgSel && !hbLgSel.size) hbLgSel = null;
+  hbSeasSel = st.seas ? new Set(st.seas.filter(x => ss.includes(x))) : null;
+  hbInc = st.inc || []; hbExc = st.exc || []; hbPer = st.per || "all"; hbMode = st.mode || "league";
+  document.getElementById("hbSysName").value = name; document.getElementById("hbSysNote").value = st.note || "";
+  document.querySelectorAll("#hbPeriod .seg-b").forEach(b => b.classList.toggle("active", b.dataset.p === hbPer)); hbSetModeUi();
+  hbLgDraw(); hbSeasDraw(); hbListDraw(); hbRender(); msg.textContent = `Sistema "${name}" cargado.`;
+}
+function hbSysDel() {
+  const name = document.getElementById("hbSys").value, msg = document.getElementById("hbSysMsg"); if (!name) { msg.textContent = "Elige primero un sistema guardado."; return; }
+  if (!confirm(`¿Borrar el sistema "${name}"?`)) return; const o = hbSysAll(); delete o[name]; hbSysSet(o); hbSysList(); document.getElementById("hbSysName").value = ""; document.getElementById("hbSysNote").value = ""; msg.textContent = `Sistema "${name}" borrado.`;
+}
 const hbFmtD = d => { const x = new Date(d * 86400000); return `${String(x.getUTCDate()).padStart(2, "0")}/${String(x.getUTCMonth() + 1).padStart(2, "0")}/${x.getUTCFullYear()}`; };
 const hbEur = v => (v >= 0 ? "" : "-") + Math.abs(v).toFixed(2) + "€";
 function hbRender() {
@@ -2836,6 +2878,7 @@ function hbDescRender(f, sel, bk) {
   const mk = HB_FREQ[sel] ? HB_FREQ[sel][0] : HB_SELN[sel], S = f.st, rg = (g, n) => g ? `${n} ${g[0] === -Infinity ? "" : "desde " + g[0]} ${g[1] === Infinity ? "" : "hasta " + g[1]}`.replace(/\s+/g, " ").trim() : null;
   const stl = S ? [rg(S.ph, "posición local"), rg(S.pa, "posición visitante"), rg(S.gh, "media goles local"), rg(S.ga, "media goles visitante"), S.wh != null ? `local ≥${S.wh} victorias seguidas` : null, S.wa != null ? `visitante ≥${S.wa} victorias seguidas` : null, S.uh != null ? `local ≥${S.uh} sin perder` : null, S.ua != null ? `visitante ≥${S.ua} sin perder` : null].filter(Boolean).join(" · ") : "Sin filtros";
   document.getElementById("hbDesc").innerHTML = `<div style="border:1px solid #1A212B; border-radius:12px; background:#0F141B; padding:8px 14px;">` +
+    (document.getElementById("hbSysName").value ? row("Nombre del sistema", document.getElementById("hbSysName").value) : "") + (document.getElementById("hbSysNote").value ? row("Comentarios", document.getElementById("hbSysNote").value) : "") +
     row("Modo", hbMode === "team" ? "Equipo" : "Liga") + row("Ligas", lg) + (f.inc.length ? row("Equipos incluidos", f.inc.map(e => `${e.t} (${{ b: "L/V", h: "local", a: "visitante" }[e.side]})`).join(", ")) : "") +
     (f.exc.length ? row("Equipos excluidos", f.exc.map(e => `${e.t} ✕ ${e.r.join(", ")}`).join(" · ")) : "") + row("Temporadas", ss) + row("Periodo", { all: "Todas las temporadas", "7": "Últimos 7 días", "30": "Últimos 30 días", last: "Última temporada" }[hbPer]) +
     row("Mercado", mk) + row("Casa de apuestas", `${HB_BOOKN[bk] || bk}${f.open ? " · cuota de apertura" : ""}`) + row("Unidad", `${f.unit}€ por apuesta`) +
