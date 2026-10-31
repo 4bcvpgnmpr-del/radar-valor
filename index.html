@@ -323,6 +323,13 @@
   .ms-score { text-align:center; margin:8px 0; font-size:12px; color:#9AA5B1; }
   .ms-score b { color:#E6E9ED; }
   @media (max-width:760px) { .ms-two { grid-template-columns:1fr; } }
+  /* ---- Alarmas ---- */
+  .al-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
+  .al-grid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
+  .al-grid input, .al-grid select { width:100%; }
+  .al-item { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid #161C25; }
+  .al-item .t { font-weight:600; font-size:13px; } .al-item .d { font-size:12px; color:#7C8797; margin-top:2px; }
+  @media (max-width:900px) { .al-grid { grid-template-columns:repeat(2,1fr); } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -349,6 +356,7 @@
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><svg class="icon" viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg> Backtesting</button>
 
       <div class="sidebar-section">Más</div>
+      <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
       <button class="side-btn" data-v="arbitrage" onclick="switchView('arbitrage')"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M6 8l-3 5a3 3 0 006 0zM18 8l-3 5a3 3 0 006 0zM4 8h16M9 21h6"/></svg> Arbitraje</button>
       <button class="side-btn" data-v="calendar" onclick="switchView('calendar')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg> Calendario favoritos</button>
 
@@ -737,6 +745,44 @@
     <div id="ex-out"></div>
   </div>
 
+  <div id="view-alarms" class="view">
+    <div class="ex-block" style="margin-top:0;">
+      <h3>Nueva alarma</h3>
+      <div class="muted" style="text-align:center; font-size:12px; margin-bottom:12px;">Todas las condiciones que rellenes deben cumplirse a la vez para que salte. Las alarmas se comprueban cuando la app carga cuotas o partidos en vivo, y solo funcionan con la pestaña abierta.</div>
+      <div class="seg" style="display:flex; width:fit-content; margin:0 auto 14px;" id="alType">
+        <button class="seg-b active" data-m="pre" onclick="alSetType('pre')">Pregame (cuotas y valor)</button><button class="seg-b" data-m="live" onclick="alSetType('live')">En vivo (marcador y minuto)</button>
+      </div>
+      <div class="pg-h" style="text-align:center;">Ligas (vacío = todas)</div>
+      <div class="chip-row mini" id="alLeagues"></div>
+      <div id="alPre">
+        <div class="al-grid">
+          <label>Selección<select id="alSel"><option value="any">Cualquiera</option><option value="1">1 (local)</option><option value="X">X (empate)</option><option value="2">2 (visitante)</option><option value="+2.5">Más de 2.5</option><option value="-2.5">Menos de 2.5</option></select></label>
+          <label>Cuota desde<input id="alOMin" type="number" step="0.05" placeholder="1.80" /></label>
+          <label>Cuota hasta<input id="alOMax" type="number" step="0.05" placeholder="3.50" /></label>
+          <label>Valor (EV %) desde<input id="alEMin" type="number" step="1" placeholder="5" /></label>
+          <label>Valor (EV %) hasta<input id="alEMax" type="number" step="1" placeholder="100" /></label>
+          <label>Cuota real (justa) desde<input id="alRMin" type="number" step="0.05" /></label>
+          <label>Cuota real (justa) hasta<input id="alRMax" type="number" step="0.05" /></label>
+        </div>
+      </div>
+      <div id="alLive" style="display:none;">
+        <div class="al-grid">
+          <label>Goles local<input id="alGH" type="number" min="0" placeholder="cualquiera" /></label>
+          <label>Goles visitante<input id="alGA" type="number" min="0" placeholder="cualquiera" /></label>
+          <label>Minuto desde<input id="alMMin" type="number" min="0" max="120" placeholder="0" /></label>
+          <label>Minuto hasta<input id="alMMax" type="number" min="0" max="120" placeholder="90" /></label>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap;">
+        <input id="alName" type="text" placeholder="Descripción (ej. Favoritos con valor)" style="width:280px;" />
+        <button onclick="alSave()">Guardar y activar</button>
+      </div>
+      <div id="alMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
+    </div>
+    <div class="ex-block"><h3>Mis alarmas</h3><div id="alList"></div></div>
+    <div class="ex-block"><h3>Últimos disparos</h3><div id="alLog"></div></div>
+  </div>
+
   <div id="match-overlay" style="display:none;" onclick="if(event.target===this) closeMatchSheet()">
     <div class="ms-box">
       <button class="ms-close" onclick="closeMatchSheet()" aria-label="Cerrar">✕</button>
@@ -837,7 +883,7 @@ async function getTeamBadge(name) {
   }
 }
 
-const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -845,6 +891,7 @@ function switchView(v) {
   if (v === "historial") renderHistorial();
   if (v === "stats") renderStats();
   if (v === "lineups") renderFormationStats();
+  if (v === "alarms") renderAlarms();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { document.getElementById("exLeague").value = document.getElementById("trLeague").value; if (!trData) loadTrends(); else renderExplore(); }
   if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
@@ -1434,7 +1481,7 @@ function applyFilters() {
 }
 
 function renderMatches(matches, sport, isFiltered) {
-  if (!isFiltered) { lastMatches = matches; lastSport = sport; }
+  if (!isFiltered) { lastMatches = matches; lastSport = sport; setTimeout(() => { try { runAlarms(matches, sport); } catch (e) {} }, 300); }
   const contentEl = document.getElementById("content");
   const notes = getNotes();
   const favs = getFavorites();
@@ -2237,6 +2284,7 @@ async function loadLiveScores() {
   document.getElementById("lvCount").textContent = "Buscando partidos en vivo...";
   try {
     liveData = await apiFootball(`/fixtures?live=all`, footballKey);
+    try { runLiveAlarms(liveData); } catch (e) {}
     if (!liveData.length) { document.getElementById("lvRail").innerHTML = ""; document.getElementById("lvCount").textContent = ""; el.innerHTML = `<div class="muted" style="padding:20px;">No hay partidos en juego ahora mismo.</div>`; return; }
     renderLive();
   } catch (e) {
@@ -2363,7 +2411,7 @@ function cpPick(bks, mk, key) {
   if (!shown) return null;
   const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
   const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
-  return { price: o.price, ev: fair ? o.price * fair - 1 : null };
+  return { price: o.price, ev: fair ? o.price * fair - 1 : null, fair };
 }
 function cpRead() {
   cp.q = (document.getElementById("cpSearch").value || "").toLowerCase().trim();
@@ -2529,6 +2577,86 @@ async function openMatchSheet(home, away, leagueId, leagueName) {
     `<div class="ms-h">¿Marcarán?</div><div class="ms-two">${scoreBox(H, A)}${scoreBox(A, H)}</div>` +
     (h2h.length ? `<div class="ms-h">Enfrentamientos de la temporada</div><div class="ms-card" style="max-width:560px; margin:0 auto;"><table class="extable"><tbody>${h2h.slice(0, 10).map(f => `<tr><td>${new Date(f.d).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</td><td class="exm" style="text-align:right;">${f.h}</td><td><span class="codd">${f.hg} - ${f.ag}</span></td><td class="exm" style="text-align:left;">${f.a}</td></tr>`).join("")}</tbody></table></div>` : "") +
     `<div class="muted" style="text-align:center; font-size:11px; margin-top:22px;">Datos de la temporada ${season} (plan gratuito de API-Football), calculados a partir de los resultados de la liga. Córneres y goles por tramos de 15 minutos no están incluidos: requieren estadísticas de cada partido y agotarían tu cuota diaria.</div>`;
+}
+let alType = "pre", alLeaguesSel = [];
+function getAlarms() { try { return JSON.parse(localStorage.getItem("radar-alarms") || "[]"); } catch (e) { return []; } }
+function saveAlarms(a) { try { localStorage.setItem("radar-alarms", JSON.stringify(a)); } catch (e) {} }
+function getAlLog() { try { return JSON.parse(localStorage.getItem("radar-alarm-log") || "[]"); } catch (e) { return []; } }
+function getAlFired() { try { return new Set(JSON.parse(localStorage.getItem("radar-alarm-fired") || "[]")); } catch (e) { return new Set(); } }
+function saveAlFired(set) { try { localStorage.setItem("radar-alarm-fired", JSON.stringify([...set].slice(-600))); } catch (e) {} }
+function alSetType(t) { alType = t; document.querySelectorAll("#alType .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === t)); document.getElementById("alPre").style.display = t === "pre" ? "block" : "none"; document.getElementById("alLive").style.display = t === "live" ? "block" : "none"; }
+function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) alLeaguesSel.splice(i, 1); else alLeaguesSel.push(id); renderAlarms(); }
+function alSave() {
+  const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
+  const a = { id: "a" + Date.now(), type: alType, active: true, leagues: [...alLeaguesSel], name: v("alName") };
+  if (alType === "pre") {
+    Object.assign(a, { sel: v("alSel"), oMin: v("alOMin"), oMax: v("alOMax"), eMin: v("alEMin"), eMax: v("alEMax"), rMin: v("alRMin"), rMax: v("alRMax") });
+    if (a.sel === "any" && !a.oMin && !a.oMax && !a.eMin && !a.eMax && !a.rMin && !a.rMax) { msg.textContent = "Añade al menos una condición (selección o algún rango)."; return; }
+  } else {
+    Object.assign(a, { gh: v("alGH"), ga: v("alGA"), mMin: v("alMMin"), mMax: v("alMMax") });
+    if (!a.gh && !a.ga && !a.mMin && !a.mMax) { msg.textContent = "Añade al menos una condición (marcador o minutos)."; return; }
+  }
+  if (!a.name) a.name = alDescribe(a);
+  const all = getAlarms(); all.unshift(a); saveAlarms(all.slice(0, 40));
+  msg.textContent = "Alarma guardada y activada."; document.getElementById("alName").value = ""; renderAlarms();
+}
+function alDescribe(a) {
+  const r = (l, mn, mx) => mn || mx ? `${l} ${mn || "…"}–${mx || "…"}` : "", parts = [];
+  if (a.type === "pre") { if (a.sel && a.sel !== "any") parts.push("Selección " + a.sel); parts.push(r("cuota", a.oMin, a.oMax), r("EV%", a.eMin, a.eMax), r("cuota real", a.rMin, a.rMax)); }
+  else { if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); }
+  const lg = a.leagues.length ? a.leagues.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).join(", ") : "todas las ligas";
+  return `${a.type === "pre" ? "Pregame" : "En vivo"} · ${parts.filter(Boolean).join(" · ") || "sin rangos"} · ${lg}`;
+}
+function alToggle(id) { const all = getAlarms(), a = all.find(x => x.id === id); if (a) { a.active = !a.active; saveAlarms(all); renderAlarms(); } }
+function alDelete(id) { saveAlarms(getAlarms().filter(x => x.id !== id)); renderAlarms(); }
+function alClearLog() { try { localStorage.removeItem("radar-alarm-log"); } catch (e) {} renderAlarms(); }
+function renderAlarms() {
+  const el = document.getElementById("alList"); if (!el) return;
+  document.getElementById("alLeagues").innerHTML = DD_LEAGUES.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" onclick="alToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
+  const all = getAlarms();
+  el.innerHTML = all.length ? all.map(a => `<div class="al-item"><div><div class="t">${a.name}</div><div class="d">${alDescribe(a)}</div></div><div style="display:flex; gap:8px; align-items:center;"><button class="small ${a.active ? "" : "ghost"}" onclick="alToggle('${a.id}')">${a.active ? "Activa" : "Pausada"}</button><button class="small ghost" onclick="alDelete('${a.id}')" title="Borrar">🗑</button></div></div>`).join("") : `<div class="muted" style="text-align:center; padding:10px;">Aún no tienes alarmas.</div>`;
+  const log = getAlLog();
+  document.getElementById("alLog").innerHTML = log.length ? log.slice(0, 20).map(l => `<div class="al-item"><div><div class="t">${l.name}</div><div class="d">${l.msg}</div></div><div class="muted" style="font-size:11px;">${l.t}</div></div>`).join("") + `<div style="text-align:center; margin-top:8px;"><button class="small ghost" onclick="alClearLog()">Borrar historial</button></div>` : `<div class="muted" style="text-align:center; padding:10px;">Todavía no ha saltado ninguna.</div>`;
+}
+function alFire(a, msg) {
+  showToast(`<b style="color:#F0B429;">⏰ ${a.name}</b><br/>${msg}`); try { playTone(880, 0.15); setTimeout(() => playTone(1175, 0.15), 160); } catch (e) {}
+  const log = getAlLog(); log.unshift({ name: a.name, msg: msg.replace(/<br\/?>/g, " · ").replace(/<[^>]+>/g, ""), t: new Date().toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) });
+  try { localStorage.setItem("radar-alarm-log", JSON.stringify(log.slice(0, 50))); } catch (e) {}
+}
+function alIn(v, mn, mx) { return (mn === "" || mn == null || (v != null && v >= +mn)) && (mx === "" || mx == null || (v != null && v <= +mx)); }
+function runAlarms(matches, sport) {
+  const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
+  const lg = DD_LEAGUES.find(l => l.odds === sport); if (!lg) return;
+  const fired = getAlFired(), today = new Date().toISOString().slice(0, 10); let any = false;
+  matches.forEach(m => {
+    const cells = CP_COLS.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; return { lab: c[2], r: cpPick(m.bookmakers, c[0], key) }; });
+    alarms.forEach(a => {
+      if (a.leagues.length && !a.leagues.includes(lg.id)) return;
+      cells.forEach(c => {
+        if (!c.r || (a.sel !== "any" && a.sel !== c.lab)) return;
+        const ev = c.r.ev != null ? c.r.ev * 100 : null, real = c.r.fair ? 1 / c.r.fair : null;
+        if (!alIn(c.r.price, a.oMin, a.oMax) || !alIn(ev, a.eMin, a.eMax) || !alIn(real, a.rMin, a.rMax)) return;
+        const k = `${a.id}|${m.id}|${c.lab}|${today}`; if (fired.has(k)) return; fired.add(k); any = true;
+        alFire(a, `${m.home_team} vs ${m.away_team}<br/>Selección ${c.lab} a ${c.r.price.toFixed(2)}${ev != null ? ` · valor ${ev >= 0 ? "+" : ""}${ev.toFixed(1)}%` : ""}`);
+      });
+    });
+  });
+  if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
+}
+function runLiveAlarms(fixtures) {
+  const alarms = getAlarms().filter(a => a.active && a.type === "live"); if (!alarms.length) return;
+  const fired = getAlFired(); let any = false;
+  fixtures.forEach(f => {
+    const min = f.fixture.status.elapsed, gh = f.goals.home ?? 0, ga = f.goals.away ?? 0;
+    alarms.forEach(a => {
+      if (a.leagues.length && !a.leagues.includes(String(f.league.id))) return;
+      if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
+      if (!alIn(min, a.mMin, a.mMax)) return;
+      const k = `${a.id}|${f.fixture.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
+      alFire(a, `${f.teams.home.name} ${gh}-${ga} ${f.teams.away.name}<br/>Minuto ${min ?? "—"}'`);
+    });
+  });
+  if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
 }
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
