@@ -195,6 +195,19 @@
   .side-btn { border-left:none; border-radius:10px; }
   .side-btn.active { background:#142B25; color:#3ECF8E; }
   .side-btn.active svg { stroke:#3ECF8E; }
+  /* ---- Tablas y píldoras ---- */
+  th { border-bottom:1px solid #1A212B; text-align:center; }
+  th:first-child { text-align:left; }
+  td { border-bottom:1px solid #161C25; vertical-align:middle; text-align:center; padding:11px 10px; }
+  td:first-child { text-align:left; font-weight:500; }
+  tbody tr:hover td { background:#131A22; }
+  .bk-tag { display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#161E27; color:#7C8797; font-family:'IBM Plex Sans',sans-serif; font-size:10px; letter-spacing:.03em; text-transform:uppercase; }
+  .epill { display:inline-block; min-width:62px; padding:3px 10px; border-radius:999px; font-weight:600; background:#141B23; }
+  .epill.val-high { background:rgba(240,180,41,.16); }
+  .epill.val-mid { background:rgba(62,207,142,.14); }
+  .epill.val-error { background:rgba(229,72,77,.18); }
+  .tag-error, .tag-value { border-radius:999px; margin-left:6px; }
+  .live-row { border-radius:12px; }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -1081,8 +1094,8 @@ function buildMarketTable(market, matchMeta) {
     }
     const parlayRid = `p${rowCounter++}`;
     ROW_REGISTRY[parlayRid] = { home: matchMeta.home, away: matchMeta.away, marketLabel: MARKET_LABELS[market.key] || market.key, selection: gk, bookie: bestBk, odds: best, fairProb: fair[gk] };
-    const bookieLabel = usingFallback ? `<span class="muted">(${bestBk}, referencia — William Hill sin precio aún)</span>` : `<span class="muted">(${bestBk})</span>`;
-    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${trendArrow} ${bookieLabel}</td><td class="mono ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</td><td class="mono">${stake != null ? money(stake) : "—"}</td><td style="display:flex; gap:4px;">${regBtn}<button class="small ghost" title="Añadir a combinada" onclick="addToParlay('${parlayRid}')">➕</button></td></tr>`;
+    const bookieLabel = usingFallback ? `<span class="bk-tag" title="Referencia: William Hill sin precio aún">${bestBk} · ref.</span>` : `<span class="bk-tag">${bestBk}</span>`;
+    return `<tr><td>${gk} ${tag}</td><td class="mono">${fair[gk] != null ? pct(fair[gk]) : "—"}</td><td class="mono">${best.toFixed(2)} ${trendArrow} ${bookieLabel}</td><td class="mono"><span class="epill ${evClass}">${ev != null ? (ev>=0?"+":"")+pct(ev) : "—"}</span></td><td class="mono">${stake != null ? money(stake) : "—"}</td><td style="display:flex; gap:4px;">${regBtn}<button class="small ghost" title="Añadir a combinada" onclick="addToParlay('${parlayRid}')">➕</button></td></tr>`;
   }).filter(Boolean);
   return { table: `<table><thead><tr><th>Selección</th><th>Prob. justa <span class="tooltip" title="Probabilidad real estimada promediando el mercado (sin el margen de la casa). No es la cuota, es la probabilidad que implica.">ⓘ</span></th><th>Cuota</th><th>Edge <span class="tooltip" title="Ventaja esperada: cuánto más alta es la cuota respecto a la probabilidad justa. Positivo = valor a tu favor a largo plazo.">ⓘ</span></th><th>Stake Kelly <span class="tooltip" title="Cuánto apostar según tu bankroll y edge, usando la fracción de Kelly que elegiste en Configuración.">ⓘ</span></th><th></th></tr></thead><tbody>${rows.join("")}</tbody></table>`, flagLevel };
 }
