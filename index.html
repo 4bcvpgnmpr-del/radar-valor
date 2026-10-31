@@ -427,6 +427,7 @@
       <div style="display:flex; flex-direction:column; gap:12px;">
         <div><div class="muted" style="margin-bottom:4px;">Odds API key <span class="tooltip" title="the-odds-api.com — necesaria para ver cuotas de partidos.">ⓘ</span></div><input id="apiKey" type="password" placeholder="the-odds-api.com" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">API-Football key <span class="tooltip" title="api-football.com — necesaria para forma, lesiones, formaciones y estadísticas.">ⓘ</span></div><input id="footballKey" type="password" placeholder="api-football.com" style="width:100%;" /></div>
+        <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
         <div style="display:flex; gap:10px;">
@@ -2276,6 +2277,16 @@ function renderStats() {
   renderBacktestSystem();
 }
 
+async function listBookmakers() {
+  const el = document.getElementById("bkList"), key = document.getElementById("footballKey").value.trim() || getFootballKey();
+  if (!key) { el.textContent = "Pega primero tu API-Football key."; return; }
+  el.textContent = "Consultando...";
+  try {
+    const l = await apiFootball("/odds/bookmakers", key);
+    const b365 = l.find(x => /bet365/i.test(x.name));
+    el.innerHTML = (b365 ? `<b style="color:#3ECF8E">✓ Bet365 está disponible (id ${b365.id}).</b>` : `<b style="color:#E05A5A">Bet365 no aparece en tu plan.</b>`) + `<br/>${l.length} casas: ` + l.map(x => x.name).join(", ");
+  } catch (e) { el.textContent = "No se pudo consultar: " + e.message; }
+}
 async function apiFootball(path, footballKey) {
   const res = await fetch(`https://v3.football.api-sports.io${path}`, { headers: { "x-apisports-key": footballKey } });
   if (res.status === 429) throw new Error("Límite de peticiones alcanzado (plan gratuito: 10/min, 100/día). Espera un minuto y vuelve a intentarlo.");
