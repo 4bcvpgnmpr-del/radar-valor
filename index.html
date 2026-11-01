@@ -5422,7 +5422,7 @@ function aiHist() { try { return JSON.parse(localStorage.getItem("radar-ai-hist"
 function aiBox(html) { let ov = document.getElementById("ai-ov"); if (!ov) { ov = document.createElement("div"); ov.id = "ai-ov"; ov.className = "plov"; ov.onclick = e => { if (e.target === ov) ov.style.display = "none"; }; document.body.appendChild(ov); }
   ov.innerHTML = `<div class="plbox" style="max-width:640px; width:100%; max-height:92vh; overflow-y:auto;"><button class="ms-close" onclick="document.getElementById('ai-ov').style.display='none'">✕</button><div style="font-weight:800; font-size:17px; text-align:center; margin-bottom:4px;">🤖 Oportunidades según la IA</div>${html}</div>`; ov.style.display = "flex"; }
 function aiCard(o, bi, ii) { const conf = n => "●".repeat(Math.max(1, Math.min(5, n | 0))) + "○".repeat(5 - Math.max(1, Math.min(5, n | 0))), hq = (o.h || "").replace(/'/g, "\\'"), aq = (o.a || "").replace(/'/g, "\\'");
-  return `<div style="border:1px solid #232A33; border-radius:12px; padding:12px; margin-top:10px;"><div style="display:flex; justify-content:space-between; gap:8px; align-items:center;"><b>${o.partido}</b><span class="${/viv/i.test(o.tipo) ? "chip-live" : "chip-ft"}">${/viv/i.test(o.tipo) ? "EN VIVO" : "PREGAME"}</span></div><div style="margin:6px 0; font-size:15px;"><b style="color:#3ECF8E;">${o.mercado}</b>${o.cuota ? ` · cuota <b>${Number(o.cuota).toFixed(2)}</b>` : ""}</div><div class="muted" style="font-size:12.5px; line-height:1.5;">${o.motivo || ""}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;"><span title="Confianza">${conf(o.confianza)} <span class="muted">· ${o.momento || ""}</span></span>${o.h ? `<button class="small ghost" onclick="document.getElementById('ai-ov').style.display='none'; vsOpenMatch('${hq}','${aq}','${o.iso}',this)">Ver partido →</button>` : ""}</div><div style="display:flex; gap:6px; align-items:center; margin-top:8px; font-size:12px;"><span class="muted">Resultado:</span>${[["w", "✅ Ganada", "#3ECF8E"], ["l", "❌ Perdida", "#E5484D"], ["v", "↩ Nula", "#9AA5B1"]].map(([k, t, c]) => `<button class="small ghost" style="${o.res === k ? "border-color:" + c + "; color:" + c + "; font-weight:700;" : ""}" onclick="aiMark(${bi},${ii},'${k}')">${t}</button>`).join("")}</div></div>`; }
+  return `<div style="border:1px solid #232A33; border-radius:12px; padding:12px; margin-top:10px;"><div style="display:flex; justify-content:space-between; gap:8px; align-items:center;"><b>${o.partido}</b><span class="${/viv/i.test(o.tipo) ? "chip-live" : "chip-ft"}">${/viv/i.test(o.tipo) ? "EN VIVO" : "PREGAME"}</span></div><div style="margin:6px 0; font-size:15px;"><b style="color:#3ECF8E;">${o.mercado}</b>${o.cuota ? ` · cuota <b>${Number(o.cuota).toFixed(2)}</b>` : ""}</div><div class="muted" style="font-size:12.5px; line-height:1.5;">${o.motivo || ""}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;"><span title="Confianza">${conf(o.confianza)} <span class="muted">· ${o.momento || ""}</span></span>${o.h ? `<button class="small ghost" onclick="document.getElementById('ai-ov').style.display='none'; vsOpenMatch('${hq}','${aq}','${o.iso}',this)">Ver partido →</button>` : ""}</div><div style="display:flex; gap:6px; align-items:center; margin-top:8px; font-size:12px;"><span class="muted">Resultado${o.auto ? " (auto)" : ""}:</span>${[["w", "✅ Ganada", "#3ECF8E"], ["l", "❌ Perdida", "#E5484D"], ["v", "↩ Nula", "#9AA5B1"]].map(([k, t, c]) => `<button class="small ghost" style="${o.res === k ? "border-color:" + c + "; color:" + c + "; font-weight:700;" : ""}" onclick="aiMark(${bi},${ii},'${k}')">${t}</button>`).join("")}</div></div>`; }
 function aiMark(bi, ii, k) { const H = aiHist(); if (!H[bi] || !H[bi].items[ii]) return; const it = H[bi].items[ii]; it.res = it.res === k ? "" : k; try { localStorage.setItem("radar-ai-hist", JSON.stringify(H)); } catch (e) {} aiShow(); }
 function aiRules() { try { return localStorage.getItem("radar-ai-rules") || ""; } catch (e) { return ""; } }
 function aiStats() { const by = {}, tot = { n: 0, w: 0, p: 0 }; aiHist().forEach(r => r.items.forEach(o => { if (o.res !== "w" && o.res !== "l") return; const q = Number(o.cuota) || 0, pr = o.res === "w" ? (q ? q - 1 : 0) : -1;
@@ -5431,7 +5431,44 @@ function aiStats() { const by = {}, tot = { n: 0, w: 0, p: 0 }; aiHist().forEach
 function aiStatsText() { const { by, tot } = aiStats(); if (!tot.n) return ""; return `Total: ${tot.w}/${tot.n} acertadas, beneficio ${tot.p.toFixed(1)} unidades.\n` + Object.entries(by).filter(([k, b]) => b.n >= 2).sort((a, b) => b[1].n - a[1].n).slice(0, 12).map(([k, b]) => `${k}: ${b.w}/${b.n} acertadas, ${b.p >= 0 ? "+" : ""}${b.p.toFixed(1)} u`).join("\n"); }
 function aiPanel() { const st = aiStats(), t = st.tot, txt = t.n ? `${t.w} de ${t.n} acertadas · ${t.p >= 0 ? "+" : ""}${t.p.toFixed(1)} unidades` : "Marca cada idea como ganada o perdida y la IA aprenderá de tu historial.";
   return `<details style="margin:6px 0;"><summary class="muted" style="cursor:pointer; font-size:12.5px;">⚙️ Mis reglas para la IA · ${txt}</summary><textarea id="aiRulesTx" rows="4" placeholder="Ej.: solo 1X2 y más/menos goles; cuota mínima 1.60; prefiero ligas nórdicas; máximo 3 ideas" style="width:100%; margin-top:8px;" oninput="try{localStorage.setItem('radar-ai-rules', this.value)}catch(e){}">${aiRules().replace(/</g, "&lt;")}</textarea></details>`; }
-function aiShow() {
+
+/* ===== Auto-marcado de ideas de la IA con resultados de ESPN ===== */
+let aiGradeBusy = false; const aiResMemo = {};
+function aiParseGrade(o, r) {
+  const m = String(o.mercado || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""), tot = r.hg + r.ag;
+  if (/corner|tarjeta|amarill|roja|tiro|remate|falta|1t|2t|primera|segunda|mitad|parte|jugador|marca|asist|hand|penal|\bht\b/.test(m) && !/ambos marcan/.test(m)) return null;
+  let x;
+  if ((x = /(mas|over|\+)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)/.exec(m))) { const L = parseFloat(x[2].replace(",", ".")); return tot > L ? "w" : tot < L ? "l" : "v"; }
+  if ((x = /(menos|under|-)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)/.exec(m))) { const L = parseFloat(x[2].replace(",", ".")); return tot < L ? "w" : tot > L ? "l" : "v"; }
+  if (/ambos marcan/.test(m)) { const both = r.hg > 0 && r.ag > 0, yes = !/\bno\b/.test(m.split("marcan")[1] || ""); return both === yes ? "w" : "l"; }
+  const nm = t => (typeof msNorm === "function" ? msNorm(t) : String(t).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), res = r.hg > r.ag ? "H" : r.hg < r.ag ? "A" : "D";
+  if (/^(empate|x)$/.test(m.trim()) || /\bempate\b/.test(m) && !/gana|o /.test(m)) return res === "D" ? "w" : "l";
+  if (/local gana|gana local|^1$/.test(m.trim())) return res === "H" ? "w" : "l";
+  if (/visitante gana|gana visitante|^2$/.test(m.trim())) return res === "A" ? "w" : "l";
+  const g = /(?:gana|victoria de|1x2:?)\s+(.+)$/.exec(m); if (g && !/ o /.test(g[1])) { const t = nm(g[1]); if (near(nm(o.h), t)) return res === "H" ? "w" : "l"; if (near(nm(o.a), t)) return res === "A" ? "w" : "l"; }
+  return null;
+}
+async function aiResults(t0) {
+  const day = d => { const x = new Date(d); return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, "0")}${String(x.getUTCDate()).padStart(2, "0")}`; }, rng = day(t0 - 86400000) + "-" + day(t0 + 86400000);
+  if (aiResMemo[rng] && Date.now() - aiResMemo[rng].t < 600000) return aiResMemo[rng].list;
+  prInit(); const slugs = [...document.querySelectorAll("#plLeague option")].map(o => o.value), list = [], nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase());
+  await prPool(slugs, 8, async sl => { try { const j = await espnGet(`${sl}/scoreboard?dates=${rng}`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const t = (c.status || e.status || {}).type || {}; if (!t.completed) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return; list.push({ h: nm(hc.team.displayName || hc.team.name), a: nm(ac.team.displayName || ac.team.name), hg: +hc.score, ag: +ac.score, t: Date.parse(e.date) }); }); } catch (e) { } });
+  aiResMemo[rng] = { t: Date.now(), list }; return list;
+}
+async function aiAutoGrade(silent) {
+  if (aiGradeBusy) return; aiGradeBusy = true; let changed = 0;
+  try {
+    const H = aiHist(), now = Date.now(), todo = []; H.forEach((b, bi) => b.items.forEach((o, ii) => { const t = Date.parse(o.iso || ""); if (!o.res && !o.noauto && o.h && !isNaN(t) && t < now - 2.7 * 3600000 && t > now - 6 * 86400000) todo.push([bi, ii, t, o]); }));
+    if (!todo.length) return;
+    const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), days = {}; todo.forEach(x => { days[new Date(x[2]).toISOString().slice(0, 10)] = x[2]; });
+    const lists = []; for (const t of Object.values(days)) lists.push(...await aiResults(t));
+    todo.forEach(([bi, ii, t, o]) => { const r = lists.find(z => near(z.h, nm(o.h)) && near(z.a, nm(o.a)) && Math.abs(z.t - t) < 36 * 3600000); if (!r) return; const g = aiParseGrade(o, r); if (g) { H[bi].items[ii].res = g; H[bi].items[ii].auto = 1; changed++; } else H[bi].items[ii].noauto = 1; });
+    if (changed || todo.some(x => H[x[0]].items[x[1]].noauto)) { try { localStorage.setItem("radar-ai-hist", JSON.stringify(H)); } catch (e) { } }
+  } catch (e) { } finally { aiGradeBusy = false; }
+  if (changed) { const ov = document.getElementById("ai-ov"); if (ov && ov.style.display !== "none") aiShow(); if (!silent) showToast(`🤖 ${changed} idea${changed > 1 ? "s" : ""} marcada${changed > 1 ? "s" : ""} automáticamente`); }
+}
+setInterval(() => { try { if (aiHist().length) aiAutoGrade(true); } catch (e) { } }, 900000);
+function aiShow() { setTimeout(() => { try { aiAutoGrade(); } catch (e) { } }, 300);
   const H = aiHist(), fmt = t => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   const btns = `<div style="display:flex; gap:8px; justify-content:center; margin:10px 0; flex-wrap:wrap;"><button class="small" onclick="aiOpp(true)">🔄 Buscar de nuevo (~4 céntimos)</button>${H.length ? `<button class="small ghost" onclick="aiSendPhone()">📱 Enviar al móvil</button><button class="small ghost" onclick="if(confirm('¿Borrar las ideas guardadas?')){localStorage.removeItem('radar-ai-hist'); aiShow();}">Borrar</button>` : ""}</div>`;
   if (!H.length) { aiBox(btns + aiPanel() + '<div class="muted" style="text-align:center; padding:12px;">Todavía no hay ideas guardadas. Pulsa «Buscar de nuevo».</div>'); return; }
