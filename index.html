@@ -3875,8 +3875,11 @@ function vsPhSwap(id, url) { document.querySelectorAll(`[data-pid="${id}"]`).for
 async function vsPhRun() {
   if (vsQB) return; vsQB = true; const c = vsPCget();
   while (vsQ.length) { const id = vsQ.shift(); if (id in c) continue;
-    try { const r = await fetch("https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=" + encodeURIComponent(VS_NM[id])), j = await r.json(), pl = (j.player || []).find(x => x.strSport === "Soccer") || (j.player || [])[0]; c[id] = (pl && (pl.strCutout || pl.strThumb)) || ""; }
-    catch (e) { break; }
+    let u = null, px = getFdProxy();
+    if (px) { try { u = (await (await fetch(`${px}/photo?id=${id}&n=${encodeURIComponent(VS_NM[id])}`)).json()).url || ""; } catch (e) {} }
+    if (u === null) { try { const a = await (await fetch("https://sports.core.api.espn.com/v2/sports/soccer/athletes/" + id)).json(); u = (a.headshot && a.headshot.href) || ""; } catch (e) {} }
+    if (!u) { try { const j = await (await fetch("https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=" + encodeURIComponent(VS_NM[id]))).json(), pl = (j.player || []).find(x => x.strSport === "Soccer") || (j.player || [])[0]; u = (pl && (pl.strCutout || pl.strThumb)) || ""; } catch (e) { if (u === null) { vsQB = false; return; } } }
+    c[id] = u || "";
     try { localStorage.setItem("radar-photo-cache", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 2200)); }
   vsQB = false;
 }
