@@ -610,6 +610,17 @@
   .alp-save { text-align:center; margin:22px 0 26px; } .alp-save > b { display:block; font-size:12px; margin-bottom:6px; } .alp-save input { width:240px; text-align:center; display:block; margin:0 auto 10px; }
   @media (max-width:700px){ .alp-box,.alp-box.w3 { max-width:none; flex:1 1 100%; } .alp-top { gap:14px; } }
   .lvxs { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:6px; justify-content:center; } .lvx { font-size:10.5px; color:#E6EAF0; background:#0D1117; border:1px solid #1A212B; border-radius:8px; padding:2px 7px; white-space:nowrap; } .lvx i { font-style:normal; color:#7C8797; margin-right:3px; }
+  .plov { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:900; align-items:center; justify-content:center; padding:16px; } .plbox { position:relative; background:#10151C; border:1px solid #232C38; border-radius:16px; padding:20px; width:min(620px,100%); max-height:88vh; overflow:auto; }
+  .plt { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; } .plt span { font-size:11.5px; padding:4px 10px; border-radius:12px; background:#1A212B; color:#9AA6B6; cursor:pointer; } .plt span.on { background:#3ECF8E; color:#06210F; font-weight:700; }
+  .plrow { display:grid; grid-template-columns:minmax(150px,1.2fr) 2fr 34px; gap:10px; align-items:center; padding:5px 0; border-top:1px solid #1A212B; font-size:12.5px; } .plrow .n i { display:block; font-style:normal; font-size:10.5px; color:#7C8797; } .plrow .bar { height:8px; background:#1A212B; border-radius:4px; } .plrow .bar b { display:block; height:100%; background:#3ECF8E; border-radius:4px; } .plrow .v { text-align:right; font-weight:700; }
+  .pl-wrap { max-width:1280px; width:100%; margin:0 auto; } .pl-hero { text-align:center; margin:6px 0 16px; } .pl-hero h2 { margin:4px 0; } .pl-k { font-size:10.5px; letter-spacing:1px; color:#3ECF8E; }
+  .pl-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:14px; justify-content:center; } .pl-filters label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; min-width:120px; } .pl-filters label.pl-ck { flex-direction:row; align-items:center; gap:6px; min-width:0; padding-bottom:9px; color:#E6EAF0; } .pl-filters .seg { display:flex; }
+  .pl-bar2 { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:6px 0 12px; flex-wrap:wrap; } .pl-bar2 input { width:260px; }
+  .pl-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:12px; }
+  .plc { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:12px; } .plc .h { display:flex; justify-content:space-between; font-size:11px; color:#7C8797; margin-bottom:8px; } .plc .nm { font-weight:700; font-size:15px; } .plc .tm { font-size:12px; color:#9AA6B6; } .plc .vs { font-size:11.5px; color:#9AA6B6; background:#0D1117; border-radius:8px; padding:6px 8px; margin:8px 0; }
+  .plc .hit { display:flex; align-items:center; gap:10px; background:#0F2A1F; border-left:3px solid #3ECF8E; border-radius:8px; padding:8px 10px; font-size:12px; } .plc .hit b.p { font-size:20px; color:#3ECF8E; } .plc .hit .bar { flex:1; height:6px; background:#1A3A2C; border-radius:3px; } .plc .hit .bar i { display:block; height:100%; background:#3ECF8E; border-radius:3px; }
+  .plc .mini { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; text-align:center; font-size:10px; color:#7C8797; margin:10px 0 6px; } .plc .mini b { display:block; font-size:13px; color:#E6EAF0; }
+  .plc .res { display:flex; flex-wrap:wrap; gap:3px; } .plc .res span { min-width:24px; text-align:center; font-size:11px; padding:3px 4px; border-radius:6px; background:#1A212B; color:#7C8797; } .plc .res span.y { background:#12382A; color:#3ECF8E; font-weight:700; }
   .al-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
   .al-grid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
   .al-grid input, .al-grid select { width:100%; }
@@ -641,6 +652,9 @@
       <div class="sidebar-section">Mi actividad</div>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h7v7"/></svg> Historial y CLV</button>
       <button class="side-btn" data-v="stats" onclick="switchView('stats')"><svg class="icon" viewBox="0 0 24 24"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg> Backtesting</button>
+
+      <div class="sidebar-section">Jugadores y tarjetas</div>
+      <button class="side-btn" data-v="players" onclick="switchView('players')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg> Jugadores (props)</button>
 
       <div class="sidebar-section">Más</div>
       <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
@@ -1310,6 +1324,26 @@
     <div class="ex-block"><h3>Últimos disparos</h3><div id="alLog"></div></div>
   </div>
 
+  <div id="view-players" class="view">
+    <div class="pl-wrap">
+      <div class="pl-hero"><div class="pl-k">ANÁLISIS DE MERCADOS · BETA</div><h2>Radar de props de jugadores</h2><div class="muted">Encuentra jugadores cuya línea (tiros, faltas, tarjetas…) se ha cumplido casi siempre en sus últimos 5, 10 o 20 partidos. Datos de ESPN; los partidos ya vistos se guardan en tu navegador.</div></div>
+      <div class="pl-filters">
+        <label>Liga<select id="plLeague"></select></label>
+        <label>Día<select id="plDay"></select></label>
+        <label>Mercado<select id="plMarket" onchange="prFillLines()"></select></label>
+        <label>Línea<select id="plLine"></select></label>
+        <label>Histórico<div class="seg" id="plLSeg"><button class="seg-b" data-l="5" onclick="prSetL(5)">L5</button><button class="seg-b active" data-l="10" onclick="prSetL(10)">L10</button><button class="seg-b" data-l="20" onclick="prSetL(20)">L20</button></div></label>
+        <label>Condición<div class="seg" id="plCSeg"><button class="seg-b active" data-c="all" onclick="prSetC('all')">Todas</button><button class="seg-b" data-c="home" onclick="prSetC('home')">Local</button><button class="seg-b" data-c="away" onclick="prSetC('away')">Visitante</button></div></label>
+        <label>Acierto mínimo %<input id="plMin" type="number" min="0" max="100" value="70" /></label>
+        <label class="pl-ck"><input type="checkbox" id="plStart" /> Solo titulares</label>
+        <button id="plBtn" onclick="prSearch()">Buscar candidatos</button>
+      </div>
+      <div id="plMsg" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+      <div class="pl-bar2"><div id="plCount" style="font-weight:700;"></div><input id="plQ" type="text" placeholder="Jugador o equipo" oninput="prRender()" /></div>
+      <div id="plGrid" class="pl-grid"></div>
+    </div>
+  </div>
+
   <div id="alq-overlay" style="display:none;" onclick="if(event.target===this) alqClose()">
     <div class="ms-box" style="max-width:520px;">
       <button class="ms-close" onclick="alqClose()" aria-label="Cerrar">✕</button>
@@ -1439,7 +1473,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1449,6 +1483,7 @@ function switchView(v) {
   if (v === "stats") renderStats();
   if (v === "lineups") { renderFormationStats(); luRenderChips(); if (!document.querySelector("#lineup-picker .lv-row")) loadTodayForLineups(); }
   if (v === "alarms") renderAlarms();
+  if (v === "players") prInit();
   if (v === "profile") pfRender();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
@@ -3204,7 +3239,7 @@ function hbNowMetrics(l, home, away) {
 const MOV_KEY = "radar-valor-mov-cache";
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
 const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
-function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; return { h: f(st.home), a: f(st.away), t: st.updated_at || null }; }
+function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; const pl = (st.players || []).map(x => ({ n: x.name, t: x.team, s: x.shirt, g: x.goals || 0, sh: x.shots || 0, sot: x.shots_on_target || 0, xg: x.xg || 0, yc: x.yellow_cards || 0, rc: x.red_cards || 0, f: x.fouls || 0, fd: x.fouls_drawn || 0, tk: x.tackles || 0, as: x.assists || 0, sv: x.saves || 0 })).filter(x => x.g || x.sh || x.sot || x.xg || x.yc || x.rc || x.f || x.fd || x.tk || x.as || x.sv); return { h: f(st.home), a: f(st.away), t: st.updated_at || null, pl }; }
 function movConvert(d) {
   const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0 };
   (d.matches || []).forEach(x => {
@@ -3694,7 +3729,90 @@ function lvTimeline(r) {
 function lvStats(r) {
   const s = r.hit && r.hit.m.mov_stats; if (!s) return "";
   const p = (l, k, sfx, d) => { const a = s.h[k], b = s.a[k]; if (a == null || b == null) return ""; const f = v => d ? Number(v).toFixed(d) : v; return `<span class="lvx"><i>${l}</i> ${f(a)}${sfx || ""} - ${f(b)}${sfx || ""}</span>`; };
-  return `<div class="lvxs">${p("Córners", "corners")}${p("Tiros a puerta", "shots_on_target")}${p("Tiros", "shots")}${p("Posesión", "possession", "%")}${p("xG", "xg", "", 2)}${p("Ataq. peligrosos", "dangerous_attacks")}${p("Amarillas", "yellow_cards")}${p("Rojas", "red_cards")}</div>`;
+  return `<div class="lvxs">${p("Córners", "corners")}${p("Tiros a puerta", "shots_on_target")}${p("Tiros", "shots")}${p("Posesión", "possession", "%")}${p("xG", "xg", "", 2)}${p("Ataq. peligrosos", "dangerous_attacks")}${p("Amarillas", "yellow_cards")}${p("Rojas", "red_cards")}${s.pl && s.pl.length ? `<button class="small ghost" style="padding:2px 8px; font-size:10.5px;" onclick="event.stopPropagation(); plLive('${r.hit.m.id}')">Jugadores ▸</button>` : ""}</div>`;
+}
+
+const PL_TABS = [["f", "Faltas (FC)"], ["fd", "Faltas recibidas (FD)"], ["tk", "Entradas (TCK)"], ["yc", "Amarillas (YC)"], ["sot", "Tiros a puerta (SOT)"], ["sh", "Tiros (SHT)"], ["sv", "Paradas (SV)"], ["g", "Goles"], ["xg", "xG"]];
+let plLiveSt = { id: null, tab: "sot", team: "all" };
+function plLive(id, tab, team) {
+  if (id) plLiveSt.id = id; if (tab) plLiveSt.tab = tab; if (team) plLiveSt.team = team;
+  const c = movGet(), m = c && c.data.find(x => x.id === plLiveSt.id); if (!m || !m.mov_stats) return;
+  let ov = document.getElementById("pl-ov"); if (!ov) { ov = document.createElement("div"); ov.id = "pl-ov"; ov.className = "plov"; ov.onclick = e => { if (e.target === ov) ov.style.display = "none"; }; document.body.appendChild(ov); }
+  const k = plLiveSt.tab, T = plLiveSt.team, list = (m.mov_stats.pl || []).filter(x => T === "all" || x.t === T).slice().sort((a, b) => (b[k] || 0) - (a[k] || 0)).filter(x => (x[k] || 0) > 0), mx = Math.max(1, ...list.map(x => x[k] || 0));
+  ov.innerHTML = `<div class="plbox"><button class="ms-close" onclick="document.getElementById('pl-ov').style.display='none'">✕</button><div style="text-align:center; font-weight:700; font-size:15px;">${m.home_team} ${m.mov_score || ""} ${m.away_team}</div><div class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;">${m.mov_min != null ? m.mov_min + "'" : "En juego"} · estadísticas por jugador (Bet365)</div>
+    <div class="plt">${PL_TABS.map(t => `<span class="${t[0] === k ? "on" : ""}" onclick="plLive(null,'${t[0]}')">${t[1]}</span>`).join("")}</div>
+    <div class="plt" style="margin-top:6px;"><span class="${T === "all" ? "on" : ""}" onclick="plLive(null,null,'all')">Ambos</span><span class="${T === "home" ? "on" : ""}" onclick="plLive(null,null,'home')">${m.home_team}</span><span class="${T === "away" ? "on" : ""}" onclick="plLive(null,null,'away')">${m.away_team}</span></div>
+    <div style="margin-top:10px;">${list.length ? list.map(x => `<div class="plrow"><span class="n">${x.s ? "#" + x.s + " " : ""}${x.n}<i>${x.t === "home" ? m.home_team : m.away_team}</i></span><div class="bar"><b style="width:${(x[k] || 0) / mx * 100}%"></b></div><span class="v">${k === "xg" ? Number(x[k]).toFixed(2) : x[k]}</span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía nadie tiene esta estadística.</div>'}</div></div>`;
+  ov.style.display = "flex";
+}
+
+/* ===== Radar de props de jugadores (ESPN) ===== */
+const PL_MK = { shots: ["Tiros totales", "totalShots", [0.5, 1.5, 2.5, 3.5]], sot: ["Tiros a puerta", "shotsOnTarget", [0.5, 1.5, 2.5]], fc: ["Faltas cometidas", "foulsCommitted", [0.5, 1.5, 2.5, 3.5]], fs: ["Faltas recibidas", "foulsSuffered", [0.5, 1.5, 2.5, 3.5]], yc: ["Tarjetas amarillas", "yellowCards", [0.5]], gl: ["Goles", "totalGoals", [0.5]], as: ["Asistencias", "goalAssists", [0.5]], sv: ["Paradas", "saves", [1.5, 2.5, 3.5, 4.5]], off: ["Fueras de juego", "offsides", [0.5, 1.5]] };
+let prL = 10, prC = "all", prRes = [], prBusy = false, prMeta = {}, prCache = null;
+function prCacheLoad() { if (prCache) return; prCache = new Map(); try { JSON.parse(localStorage.getItem("radar-pl-cache") || "[]").forEach(([k, v]) => prCache.set(k, v)); } catch (e) {} }
+function prCacheSave() { try { const arr = [...prCache.entries()].sort((a, b) => (b[1].d || "").localeCompare(a[1].d || "")).slice(0, 700); prCache = new Map(arr); localStorage.setItem("radar-pl-cache", JSON.stringify(arr)); } catch (e) { try { localStorage.removeItem("radar-pl-cache"); } catch (_) {} } }
+function prInit() {
+  prCacheLoad(); const lg = document.getElementById("plLeague"); if (!lg || lg.dataset.x) return; lg.dataset.x = 1;
+  const base = [["esp.1", "🇪🇸 La Liga"], ["eng.1", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League"], ["ita.1", "🇮🇹 Serie A"], ["ger.1", "🇩🇪 Bundesliga"], ["fra.1", "🇫🇷 Ligue 1"], ["ned.1", "🇳🇱 Eredivisie"], ["por.1", "🇵🇹 Primeira Liga"], ["eng.2", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Championship"], ["uefa.champions", "🇪🇺 Champions League"], ["bra.1", "🇧🇷 Brasileirão"], ["usa.1", "🇺🇸 MLS"], ["mex.1", "🇲🇽 Liga MX"], ["arg.1", "🇦🇷 Liga Profesional"]];
+  const seen = new Set(base.map(x => x[0])); try { ESPN_EXTRA.forEach(g => g[1].forEach(x => { if (!seen.has(x[0])) { seen.add(x[0]); base.push(x); } })); } catch (e) {}
+  lg.innerHTML = base.map(x => `<option value="${x[0]}">${x[1]}</option>`).join("");
+  const dy = document.getElementById("plDay"); dy.innerHTML = [0, 1, 2, 3].map(i => { const d = new Date(Date.now() + i * 864e5); return `<option value="${i}">${["Hoy", "Mañana"][i] || "En " + i + " días"} · ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}</option>`; }).join("");
+  document.getElementById("plMarket").innerHTML = Object.entries(PL_MK).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join(""); prFillLines();
+}
+function prFillLines() { const m = PL_MK[document.getElementById("plMarket").value]; document.getElementById("plLine").innerHTML = m[2].map((l, i) => `<option value="${l}" ${i === 1 || m[2].length === 1 ? "selected" : ""}>Más de ${String(l).replace(".", ",")}</option>`).join(""); }
+function prSetL(n) { prL = n; document.querySelectorAll("#plLSeg .seg-b").forEach(b => b.classList.toggle("active", +b.dataset.l === n)); }
+function prSetC(c) { prC = c; document.querySelectorAll("#plCSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.c === c)); }
+async function prPool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const it = items[i++]; await fn(it); } })); }
+function prCompact(su) {
+  const ros = su.rosters || [], hd = (su.header && su.header.competitions && su.header.competitions[0]) || {}, home = ros.find(r => r.homeAway === "home"), out = { d: hd.date || (su.header && su.header.date) || "", h: home ? String(home.team.id) : null, pl: [] };
+  ros.forEach(r => (r.roster || []).forEach(x => { const k = {}; (x.stats || []).forEach(s => { k[s.name] = +s.value || 0; }); if (!(x.starter || x.subbedIn || k.appearances > 0)) return; out.pl.push({ i: String(x.athlete.id), n: x.athlete.displayName || x.athlete.fullName, t: String(r.team.id), p: (x.position && x.position.abbreviation) || "", s: x.starter ? 1 : 0, k }); }));
+  return out;
+}
+async function prSearch() {
+  if (prBusy) return; prCacheLoad(); prBusy = true;
+  const $ = id => document.getElementById(id), msg = $("plMsg"), btn = $("plBtn"), slug = $("plLeague").value, dayOff = +$("plDay").value, mk = $("plMarket").value, line = +$("plLine").value;
+  btn.disabled = true; prRes = []; $("plGrid").innerHTML = ""; $("plCount").textContent = "";
+  try {
+    const d = new Date(Date.now() + dayOff * 864e5), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    msg.textContent = "Buscando partidos…"; const sb = await espnGet(`${slug}/scoreboard?dates=${ds}`);
+    const evs = (sb.events || []).filter(e => !(e.status && e.status.type && e.status.type.completed));
+    if (!evs.length) { msg.textContent = "No hay partidos pendientes ese día en esta liga."; return; }
+    const teams = new Map(); evs.forEach(e => ((e.competitions || [])[0] || {}).competitors.forEach(c => teams.set(String(c.team.id), c.team.displayName || c.team.name)));
+    const take = prC === "all" ? prL : Math.min(20, prL * 2), sched = {}; let n = 0;
+    await prPool([...teams.keys()], 5, async id => { try { const sc = await espnGet(`${slug}/teams/${id}/schedule`); sched[id] = (sc.events || []).filter(e => { const st = e.status || ((e.competitions || [])[0] || {}).status; return st && st.type && st.type.completed; }).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, take).map(e => String(e.id)); } catch (e) { sched[id] = []; } msg.textContent = `Calendarios ${++n}/${teams.size}`; });
+    const need = [...new Set(Object.values(sched).flat())].filter(id => !prCache.has(slug + "|" + id)); let m = 0;
+    await prPool(need, 6, async id => { try { prCache.set(slug + "|" + id, prCompact(await espnGet(`${slug}/summary?event=${id}`))); } catch (e) {} m++; if (m % 3 === 0 || m === need.length) msg.textContent = `Descargando partidos ${m}/${need.length} (los ya vistos se guardan)`; });
+    prCacheSave();
+    const stat = PL_MK[mk][1], minP = +$("plMin").value || 0, onlyS = $("plStart").checked, res = [];
+    evs.forEach(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return;
+      [[hc, ac, "home"], [ac, hc, "away"]].forEach(([me, rv, side]) => {
+        const tid = String(me.team.id), ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(Boolean), byP = new Map();
+        ms.forEach((mt, idx) => mt.pl.filter(x => x.t === tid).forEach(x => { if (!byP.has(x.i)) byP.set(x.i, { n: x.n, p: x.p, rows: [] }); byP.get(x.i).rows.push({ idx, v: x.k[stat] || 0, home: mt.h === tid, s: x.s }); }));
+        const last = ms[0];
+        byP.forEach((o, pid) => {
+          if (!last || !(last.pl.some(x => x.i === pid && x.t === tid)) && o.rows.filter(r => r.idx < 3).length < 2) return;
+          let rows = o.rows; if (prC !== "all") rows = rows.filter(r => prC === "home" ? r.home : !r.home); rows = rows.slice(0, prL); if (rows.length < Math.min(prL, 5)) return;
+          const hits = rows.filter(r => r.v > line).length, pct = hits / rows.length * 100, st = rows.filter(r => r.s).length / rows.length * 100, lastStart = !!(last && last.pl.find(x => x.i === pid && x.t === tid && x.s));
+          if (pct < minP || (onlyS && !lastStart)) return;
+          const hr = rows.filter(r => r.home), ar = rows.filter(r => !r.home), avg = rows.reduce((a, r) => a + r.v, 0) / rows.length, l5 = rows.slice(0, 5);
+          res.push({ name: o.n, pos: o.p, team: me.team.displayName || me.team.name, rival: rv.team.displayName || rv.team.name, home: side === "home", time: e.date, lg: (sb.leagues && sb.leagues[0] && sb.leagues[0].name) || slug, hits, n: rows.length, pct, avg, st, lastStart, hr: [hr.filter(r => r.v > line).length, hr.length], ar: [ar.filter(r => r.v > line).length, ar.length], l5: [l5.filter(r => r.v > line).length, l5.length], vals: rows.map(r => r.v), ht: [hc.team.displayName || hc.team.name, ac.team.displayName || ac.team.name] });
+        });
+      }); });
+    res.sort((a, b) => b.pct - a.pct || b.avg - a.avg); prRes = res; prMeta = { mk, line, L: prL };
+    msg.textContent = res.length ? "" : "Ningún jugador cumple estos filtros. Prueba a bajar el acierto mínimo o la línea.";
+    prRender();
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  finally { prBusy = false; btn.disabled = false; }
+}
+function prRender() {
+  const q = (document.getElementById("plQ").value || "").trim().toLowerCase(), list = prRes.filter(r => !q || r.name.toLowerCase().includes(q) || r.team.toLowerCase().includes(q)), mk = PL_MK[prMeta.mk || "shots"], ln = String(prMeta.line).replace(".", ",");
+  document.getElementById("plCount").innerHTML = prRes.length ? `${mk[0].toUpperCase()} · L${prMeta.L} — <span style="color:#3ECF8E">${list.length}</span> candidatos` : "";
+  document.getElementById("plGrid").innerHTML = list.slice(0, 120).map(r => `<div class="plc"><div class="h"><span>${r.lg}</span><span>${new Date(r.time).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span></div>
+    <div class="nm">${r.name}</div><div class="tm">${r.team}${r.pos ? " · " + r.pos : ""} ${r.lastStart ? '<span style="color:#3ECF8E;">· titular último partido</span>' : ""}</div>
+    <div class="vs">${r.ht[0]} vs ${r.ht[1]} · ${r.home ? "juega en casa" : "juega fuera"}</div>
+    <div class="hit"><span>Más de ${ln}</span><div class="bar"><i style="width:${r.pct}%"></i></div><b class="p">${Math.round(r.pct)}%</b><span>${r.hits}/${r.n}</span></div>
+    <div class="mini"><div><b>${r.avg.toFixed(2)}</b>media</div><div><b>${r.l5[0]}/${r.l5[1]}</b>últ. 5</div><div><b>${r.hr[1] ? r.hr[0] + "/" + r.hr[1] : "–"}</b>en casa</div><div><b>${r.ar[1] ? r.ar[0] + "/" + r.ar[1] : "–"}</b>fuera</div></div>
+    <div class="muted" style="font-size:10px; margin-bottom:4px;">ÚLTIMOS RESULTADOS (el más reciente primero) · titular ${Math.round(r.st)}%</div><div class="res">${r.vals.map(v => `<span class="${v > prMeta.line ? "y" : ""}">${v}</span>`).join("")}</div></div>`).join("") || (prRes.length ? '<div class="muted" style="grid-column:1/-1; text-align:center; padding:16px;">Ninguno coincide con la búsqueda.</div>' : "");
 }
 function renderLive() {
   const el = document.getElementById("live-scores"); if (!el) return;
