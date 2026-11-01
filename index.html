@@ -586,6 +586,29 @@
   .ms-score b { color:#E6E9ED; }
   @media (max-width:760px) { .ms-two { grid-template-columns:1fr; } }
   /* ---- Alarmas ---- */
+  .alp { max-width:1180px; margin:0 auto; }
+  .alp-top { display:flex; justify-content:center; gap:60px; flex-wrap:wrap; margin-bottom:22px; }
+  .alp-dd { position:relative; } .alp-pill { background:#1A212B; border:1px solid #232C38; color:#E6EAF0; border-radius:14px; padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+  .alp-panel { display:none; position:absolute; top:34px; left:50%; transform:translateX(-50%); z-index:50; background:#10151C; border:1px solid #232C38; border-radius:12px; padding:12px; width:min(560px,90vw); max-height:320px; overflow:auto; }
+  .alp-panel.open { display:block; }
+  .alp-t { text-align:center; font-size:12px; font-weight:700; margin-bottom:12px; } .alp-t small { display:block; font-weight:400; font-style:italic; color:#7C8797; font-size:10px; }
+  .alp-card { background:#141A23; border:1px solid #1A212B; border-radius:14px; padding:18px 22px 22px; margin-bottom:16px; }
+  .alp-h { text-align:center; font-weight:700; font-size:13px; letter-spacing:.5px; margin-bottom:14px; }
+  .alp-row { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+  .alp-box { background:#0D1117; border:1px solid #1A212B; border-radius:12px; padding:10px 14px 12px; flex:1 1 150px; max-width:210px; text-align:center; }
+  .alp-box.w2 { max-width:230px; } .alp-box.w3 { max-width:440px; flex:2 1 300px; } .alp-box.w4 { max-width:none; flex:1 1 100%; text-align:left; }
+  .alp-box > b { display:block; font-size:12px; margin-bottom:8px; } .alp-box small { display:block; color:#7C8797; font-size:10px; margin-top:6px; }
+  .alp-box select { width:100%; }
+  .alp-de { display:flex; gap:8px; } .alp-de label { flex:1; font-size:10px; color:#7C8797; display:flex; flex-direction:column; gap:3px; } .alp-de input { width:100%; text-align:center; padding:6px 4px; }
+  .alp-sl { display:flex; align-items:center; gap:10px; margin-top:10px; font-size:11px; color:#7C8797; }
+  .alp-rng { position:relative; flex:1; height:22px; } .alp-rng::before { content:""; position:absolute; left:0; right:0; top:9px; height:4px; background:#232C38; border-radius:2px; }
+  .alp-fill { position:absolute; top:9px; height:4px; background:#3ECF8E; border-radius:2px; }
+  .alp-rng input { position:absolute; left:0; width:100%; top:0; margin:0; background:none; pointer-events:none; -webkit-appearance:none; appearance:none; height:22px; padding:0; border:0; }
+  .alp-rng input::-webkit-slider-thumb { pointer-events:auto; -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:#E6EAF0; border:2px solid #3ECF8E; cursor:pointer; }
+  .alp-rng input::-moz-range-thumb { pointer-events:auto; width:12px; height:12px; border-radius:50%; background:#E6EAF0; border:2px solid #3ECF8E; cursor:pointer; }
+  .alp-rng input::-webkit-slider-runnable-track { background:transparent; } .alp-rng input::-moz-range-track { background:transparent; }
+  .alp-save { text-align:center; margin:22px 0 26px; } .alp-save > b { display:block; font-size:12px; margin-bottom:6px; } .alp-save input { width:240px; text-align:center; display:block; margin:0 auto 10px; }
+  @media (max-width:700px){ .alp-box,.alp-box.w3 { max-width:none; flex:1 1 100%; } .alp-top { gap:14px; } }
   .al-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
   .al-grid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
   .al-grid input, .al-grid select { width:100%; }
@@ -1242,51 +1265,44 @@
 
   <div id="view-alarms" class="view">
     <div data-help="alarms"></div>
-    <div class="ex-block" style="margin-top:0;">
-      <h3>Nueva alarma</h3>
-      <div class="muted" style="text-align:center; font-size:12px; margin-bottom:12px;">Todas las condiciones que rellenes deben cumplirse a la vez para que salte. Las alarmas se comprueban cuando la app carga cuotas o partidos en vivo, y solo funcionan con la pestaña abierta.</div>
-      <div class="seg" style="display:flex; width:fit-content; margin:0 auto 14px;" id="alType">
-        <button class="seg-b active" data-m="pre" onclick="alSetType('pre')">Pregame (cuotas y valor)</button><button class="seg-b" data-m="live" onclick="alSetType('live')">En vivo (marcador y minuto)</button>
+    <div class="alp">
+      <div class="alp-top">
+        <div class="alp-dd"><button class="alp-pill" onclick="alDd('alDdL')">Ligas ▾</button><div class="alp-panel" id="alDdL"><div class="chip-row mini" id="alLeagues"></div></div></div>
+        <div class="alp-dd"><button class="alp-pill" onclick="alDd('alDdS')">Ligas seleccionadas <b id="alLgN">(todas)</b> ▾</button><div class="alp-panel" id="alDdS"><div id="alLgSel" class="muted" style="font-size:12px; line-height:1.7;"></div></div></div>
       </div>
-      <div class="pg-h" style="text-align:center;">Ligas (vacío = todas)</div>
-      <div class="chip-row mini" id="alLeagues"></div>
-      <div id="alPre">
-        <div class="al-grid">
-          <label>Selección<select id="alSel"><option value="any">Cualquiera</option><option value="1">1 (local)</option><option value="X">X (empate)</option><option value="2">2 (visitante)</option><option value="+2.5">Más de 2.5</option><option value="-2.5">Menos de 2.5</option></select></label>
-          <label>Cuota desde<input id="alOMin" type="number" step="0.05" placeholder="1.80" /></label>
-          <label>Cuota hasta<input id="alOMax" type="number" step="0.05" placeholder="3.50" /></label>
-          <label>Valor (EV %) desde<input id="alEMin" type="number" step="1" placeholder="5" /></label>
-          <label>Valor (EV %) hasta<input id="alEMax" type="number" step="1" placeholder="100" /></label>
-          <label>Cuota real (justa) desde<input id="alRMin" type="number" step="0.05" /></label>
-          <label>Cuota real (justa) hasta<input id="alRMax" type="number" step="0.05" /></label>
-          <label>Diferencia vs otras casas % desde<input id="alDMin" type="number" step="0.5" placeholder="3" /></label>
-          <label>Diferencia vs otras casas % hasta<input id="alDMax" type="number" step="0.5" /></label>
+      <div class="alp-t">Parámetros añadidos a tu alarma<small>(Se deben cumplir todos para que la alarma te notifique)</small></div>
+      <div class="alp-card"><div class="alp-h">PREGAME</div>
+        <div class="alp-row">
+          <div class="alp-box w2"><b>Selección</b><select id="alSel"><option value="any">Cualquiera</option><option value="1">1 (local)</option><option value="X">X (empate)</option><option value="2">2 (visitante)</option><option value="+2.5">Más de 2.5</option><option value="-2.5">Menos de 2.5</option><option value="+0.5">Más de 0.5</option><option value="-0.5">Menos de 0.5</option><option value="+1.5">Más de 1.5</option><option value="-1.5">Menos de 1.5</option></select></div>
+          <div class="alp-box"><b>Odds</b><div class="alp-de"><label>De<input id="alOMin" type="number" step="0.05" placeholder="1.80" /></label><label>A<input id="alOMax" type="number" step="0.05" placeholder="3.50" /></label></div></div>
+          <div class="alp-box"><b>Valor %</b><div class="alp-de"><label>De<input id="alEMin" type="number" step="1" placeholder="5" /></label><label>A<input id="alEMax" type="number" step="1" placeholder="100" /></label></div></div>
+          <div class="alp-box"><b>Diferencia %</b><div class="alp-de"><label>De<input id="alDMin" type="number" step="0.5" placeholder="3" /></label><label>A<input id="alDMax" type="number" step="0.5" /></label></div></div>
+          <div class="alp-box"><b>Cuota real</b><div class="alp-de"><label>De<input id="alRMin" type="number" step="0.05" /></label><label>A<input id="alRMax" type="number" step="0.05" /></label></div></div>
         </div>
       </div>
-      <div id="alLive" style="display:none;">
-        <div class="al-grid">
-          <label>Goles local<input id="alGH" type="number" min="0" placeholder="cualquiera" /></label>
-          <label>Goles visitante<input id="alGA" type="number" min="0" placeholder="cualquiera" /></label>
-          <label>Minuto desde<input id="alMMin" type="number" min="0" max="120" placeholder="0" /></label>
-          <label>Minuto hasta<input id="alMMax" type="number" min="0" max="120" placeholder="90" /></label>
+      <div class="alp-card"><div class="alp-h">LIVE</div>
+        <div class="alp-row">
+          <div class="alp-box"><b>Marcador correcto</b><div class="alp-de"><label>Local<input id="alGH" type="number" min="0" placeholder="–" /></label><label>Visit.<input id="alGA" type="number" min="0" placeholder="–" /></label></div></div>
+          <div class="alp-box w3"><b>Establece los límites de tiempo</b><small>(solo para alarmas en directo)</small>
+            <div class="alp-sl"><span id="alMinL">0'</span><div class="alp-rng"><div class="alp-fill" id="alFill"></div><input type="range" id="alRa" min="0" max="90" value="0" oninput="alRng()" /><input type="range" id="alRb" min="0" max="90" value="90" oninput="alRng()" /></div><span id="alMinR">90'</span></div>
+            <input id="alMMin" type="hidden" /><input id="alMMax" type="hidden" /></div>
         </div>
-        <div class="pg-h" style="text-align:center; margin-top:16px;">Condición dentro de un tramo del partido (opcional)</div>
-        <div class="al-grid">
-          <label>Qué contar<select id="alWKind"><option value="">— nada —</option><option value="sot">Tiros a puerta</option><option value="soff">Tiros fuera</option><option value="shots">Tiros totales</option><option value="goals">Goles</option><option value="corners">Córners</option><option value="yellow">Tarjetas amarillas</option></select></label>
-          <label>Equipo<select id="alWTeam"><option value="any">Cualquiera de los dos</option><option value="home">Local</option><option value="away">Visitante</option><option value="sum">Suma de ambos</option></select></label>
-          <label>Al menos (cantidad)<input id="alWMin" type="number" min="1" placeholder="3" /></label>
-          <label>Tramo<select id="alWMode" onchange="alWModeSet()"><option value="fixed">Entre dos minutos</option><option value="last">En los últimos X minutos</option></select></label>
-          <label id="alWFromL">Desde el minuto<input id="alWFrom" type="number" min="0" max="120" placeholder="60" /></label>
-          <label id="alWToL">Hasta el minuto<input id="alWTo" type="number" min="1" max="120" placeholder="75" /></label>
-          <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
+        <div class="alp-row" style="margin-top:12px;">
+          <div class="alp-box w4"><b>Estadísticas en un tramo del partido</b>
+            <div class="al-grid">
+              <label>Qué contar<select id="alWKind"><option value="">— nada —</option><option value="sot">Tiros a puerta</option><option value="soff">Tiros fuera</option><option value="shots">Tiros totales</option><option value="goals">Goles</option><option value="corners">Córners</option><option value="yellow">Tarjetas amarillas</option></select></label>
+              <label>Equipo<select id="alWTeam"><option value="any">Cualquiera de los dos</option><option value="home">Local</option><option value="away">Visitante</option><option value="sum">Suma de ambos</option></select></label>
+              <label>Al menos (cantidad)<input id="alWMin" type="number" min="1" placeholder="3" /></label>
+              <label>Tramo<select id="alWMode" onchange="alWModeSet()"><option value="fixed">Entre dos minutos</option><option value="last">En los últimos X minutos</option></select></label>
+              <label id="alWFromL">Desde el minuto<input id="alWFrom" type="number" min="0" max="120" placeholder="60" /></label>
+              <label id="alWToL">Hasta el minuto<input id="alWTo" type="number" min="1" max="120" placeholder="75" /></label>
+              <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
+            </div>
+            <small>Ej.: "Tiros a puerta · cualquiera · al menos 3 · entre el 60 y el 75". Los tiros se calculan comparando fotos de las estadísticas cada ~90 s: la app debe estar abierta.</small>
+          </div>
         </div>
-        <div class="muted" style="text-align:center; font-size:11px; margin-top:8px; line-height:1.6;">Ejemplo: "Tiros a puerta · cualquiera de los dos · al menos 3 · entre el 60 y el 75". Los goles se leen al minuto exacto; los tiros se calculan comparando fotos de las estadísticas cada ~90 s, así que la app debe estar abierta durante el tramo. Cada partido vigilado gasta peticiones de API-Football (recomendable el plan Pro).</div>
       </div>
-      <div style="display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap;">
-        <input id="alName" type="text" placeholder="Descripción (ej. Favoritos con valor)" style="width:280px;" />
-        <button onclick="alSave()">Guardar y activar</button>
-      </div>
-      <div id="alMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
+      <div class="alp-save"><b>Añade una descripción</b><input id="alName" type="text" placeholder="Enter description here..." /><button onclick="alSave()">Guardar &amp; Activar</button><div id="alMsg" class="muted" style="font-size:12px; margin-top:8px;"></div></div>
     </div>
     <div class="ex-block"><h3>Mis alarmas</h3><div id="alWatch" class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;"></div><div id="alList"></div></div>
     <div class="ex-block"><h3>Últimos disparos</h3><div id="alLog"></div></div>
@@ -4258,10 +4274,22 @@ function alqSave() {
   a.name = v("alqName") || `${alqCtx.label}`;
   const all = getAlarms(); all.unshift(a); saveAlarms(all.slice(0, 40)); alqClose(); showToast(`Alarma creada: ${a.name}`); renderAlarms();
 }
+function alDd(id) { document.querySelectorAll(".alp-panel").forEach(p => { if (p.id !== id) p.classList.remove("open"); }); document.getElementById(id).classList.toggle("open"); }
+document.addEventListener("click", e => { if (!e.target.closest(".alp-dd")) document.querySelectorAll(".alp-panel.open").forEach(p => p.classList.remove("open")); });
+function alRng() {
+  let a = +document.getElementById("alRa").value, b = +document.getElementById("alRb").value; if (a > b) { const t = a; a = b; b = t; }
+  document.getElementById("alMinL").textContent = a + "'"; document.getElementById("alMinR").textContent = b + "'";
+  const f = document.getElementById("alFill"); f.style.left = a / 90 * 100 + "%"; f.style.width = (b - a) / 90 * 100 + "%";
+  document.getElementById("alMMin").value = a > 0 ? a : ""; document.getElementById("alMMax").value = b < 90 ? b : "";
+}
 function alSetType(t) { alType = t; document.querySelectorAll("#alType .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === t)); document.getElementById("alPre").style.display = t === "pre" ? "block" : "none"; document.getElementById("alLive").style.display = t === "live" ? "block" : "none"; }
 function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) alLeaguesSel.splice(i, 1); else alLeaguesSel.push(id); renderAlarms(); }
 function alSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
+  const hasPre = ["alOMin","alOMax","alEMin","alEMax","alRMin","alRMax","alDMin","alDMax"].some(i => v(i)) || v("alSel") !== "any";
+  const hasLive = ["alGH","alGA","alMMin","alMMax","alWKind"].some(i => v(i));
+  if (hasPre && hasLive) { msg.textContent = "Mezcla Pregame y Live: guarda primero una y luego la otra (son alarmas distintas)."; return; }
+  alType = hasLive ? "live" : "pre";
   const a = { id: "a" + Date.now(), type: alType, active: true, leagues: [...alLeaguesSel], name: v("alName") };
   if (alType === "pre") {
     Object.assign(a, { sel: v("alSel"), oMin: v("alOMin"), oMax: v("alOMax"), eMin: v("alEMin"), eMax: v("alEMax"), rMin: v("alRMin"), rMax: v("alRMax"), dMin: v("alDMin"), dMax: v("alDMax") });
@@ -4295,6 +4323,7 @@ function renderAlarms() {
   const el = document.getElementById("alList"); if (!el) return;
   try { alWatchRender(); } catch (e) {}
   document.getElementById("alLeagues").innerHTML = DD_LEAGUES.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" onclick="alToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
+  try { const nm = alLeaguesSel.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).filter(Boolean); document.getElementById("alLgN").textContent = nm.length ? "(" + nm.length + ")" : "(todas)"; document.getElementById("alLgSel").innerHTML = nm.length ? nm.map(n => "• " + n).join("<br>") : "Ninguna elegida: la alarma vale para todas las ligas."; alRng(); } catch (e) {}
   const all = getAlarms();
   el.innerHTML = all.length ? all.map(a => `<div class="al-item"><div><div class="t">${a.name}</div><div class="d">${alDescribe(a)}</div></div><div style="display:flex; gap:8px; align-items:center;"><button class="small ${a.active ? "" : "ghost"}" onclick="alToggle('${a.id}')">${a.active ? "Activa" : "Pausada"}</button><button class="small ghost" onclick="alDelete('${a.id}')" title="Borrar">🗑</button></div></div>`).join("") : `<div class="muted" style="text-align:center; padding:10px;">Aún no tienes alarmas.</div>`;
   const log = getAlLog();
