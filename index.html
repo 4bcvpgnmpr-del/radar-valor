@@ -3974,6 +3974,11 @@ async function bsdGet(path) {
   if (!px) throw new Error("BSD no responde desde el navegador; añade tu Worker en ⚙️");
   const r = await fetch(px + "/bsd/" + path, { headers: k ? { "X-BSD-Key": k } : {} }); if (!r.ok) throw new Error("BSD " + r.status); return await r.json();
 }
+async function bsdRefByName(name) {
+  let list = null; try { const c = JSON.parse(localStorage.getItem("radar-bsd-refs") || "null"); if (c && Date.now() - c.t < 6048e5 && c.l.length) list = c.l; } catch (e) { }
+  if (!list) { list = []; let url = "referees/?limit=100", n = 0; while (url && n++ < 40) { const j = await bsdGet(url); (j.results || []).forEach(r => list.push({ name: r.name, country: r.country, matches: r.matches, career_games: r.career_games, avg_yellow_per_match: r.avg_yellow_per_match, avg_red_per_match: r.avg_red_per_match, avg_goals_per_match: r.avg_goals_per_match, avg_fouls_per_match: r.avg_fouls_per_match })); url = j.next ? j.next.replace(/^.*\/api\/v2\//, "") : null; } try { localStorage.setItem("radar-bsd-refs", JSON.stringify({ t: Date.now(), l: list })); } catch (e) { } }
+  const w = ppNm(name); if (!w.length) return null; return list.find(x => { const v = ppNm(x.name); if (!v.length) return false; const [sh, lo] = v.length <= w.length ? [v, w] : [w, v]; return sh.length >= 2 && sh.every(t => lo.includes(t)); }) || null;
+}
 async function vsBsd(ev) {
   const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), day = new Date(ev.date).toISOString().slice(0, 10);
   let url = `events/?date_from=${day}&date_to=${day}&limit=200`, found = null;
@@ -4000,6 +4005,7 @@ async function vsMatch(key) {
       vsM.stand = en.map(e => { const st = {}; (e.stats || []).forEach(x => st[x.name] = x.value); return { id: String(e.team.id), n: e.team.displayName || e.team.name, pj: st.gamesPlayed, g: st.wins, e: st.ties, p: st.losses, gf: st.pointsFor, gc: st.pointsAgainst, dg: st.pointDifferential, pts: st.points, rk: st.rank }; }).sort((a, b) => (a.rk || 99) - (b.rk || 99)); } catch (e) { }
     try { vsM.bsd = await vsBsd(ev); } catch (e) { vsM.bsd = null; vsM.bsdErr = e.message; }
     try { vsM.ref = await vsRefFetch(ev); } catch (e) { vsM.ref = null; }
+    try { if (!(vsM.bsd && vsM.bsd.ref)) { const nmx = (vsM.ref && vsM.ref.name) || ""; if (nmx) vsM.refB = await bsdRefByName(nmx); } } catch (e) { vsM.refB = null; }
     try { if (!Object.keys(hbData).length) await hbLoad(); } catch (e) { }
     vsMatchDraw();
   } catch (e) { box.innerHTML = `<div class="muted" style="padding:40px; text-align:center;">Error: ${e.message}</div>`; }
@@ -4052,7 +4058,7 @@ function vsMLin() {
 }
 function vsRefKey(n) { const t = String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean); return t.length > 1 ? { ini: t[0][0], sur: t.slice(1).join(" ") } : { ini: "", sur: t[0] || "" }; }
 function vsMArb() {
-  const M = vsM, rf = M.ref, bf = M.bsd && M.bsd.ref;
+  const M = vsM, rf = M.ref, bf = (M.bsd && M.bsd.ref) || M.refB;
   if (bf) { const f2 = x => (Math.round(x * 100) / 100).toString().replace(".", ","); return `<div class="vs-card2"><div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;"><div><div style="font-size:22px; font-weight:800;">${bf.name}</div><div class="muted">${bf.country || ""} · ${bf.matches ?? "?"} partidos arbitrados · ${bf.career_games ?? "?"} en su carrera</div></div><div style="margin-left:auto; display:flex; gap:22px; text-align:center;"><div><b style="font-size:22px; color:#b07d00;">${f2(bf.avg_yellow_per_match)}</b><div class="muted" style="font-size:11px;">Amarillas/partido</div></div><div><b style="font-size:22px; color:#b3261e;">${f2(bf.avg_red_per_match)}</b><div class="muted" style="font-size:11px;">Rojas/partido</div></div><div><b style="font-size:22px;">${f2(bf.avg_fouls_per_match)}</b><div class="muted" style="font-size:11px;">Faltas/partido</div></div><div><b style="font-size:22px;">${f2(bf.avg_goals_per_match)}</b><div class="muted" style="font-size:11px;">Goles/partido</div></div></div></div></div><div class="muted" style="font-size:11px; margin-top:8px;">Medias de Bzzoiro Sports Data. Los partidos concretos y las medias de córners salen de tus CSV si los importaste.</div>`; }
   const bsdWhy = M.bsdErr ? "BSD: " + M.bsdErr + "." : !M.bsd ? "BSD no tiene este partido (liga no cubierta o nombres de equipo distintos)." : !M.bsd.ev.referee_id ? "BSD todavía no tiene árbitro asignado a este partido." : "BSD tiene un árbitro asignado (id " + M.bsd.ev.referee_id + ") pero no pude leer su ficha.";
   if (!rf) return `<div class="vs-card2" style="text-align:center; padding:26px;"><b>Árbitro</b><div class="muted" style="margin:10px auto; max-width:540px; font-size:13px; line-height:1.6;">${bsdWhy} ${getFdKey() ? "football-data.org tampoco lo devuelve (o la liga no entra en su plan gratuito)." : "Para otra fuente, configura tu Worker de football-data.org en ⚙️."} Puedes mirar las medias de todos los árbitros en la pantalla de Árbitros.</div><button onclick="switchView('refs')">Ir a Árbitros</button></div>`;
