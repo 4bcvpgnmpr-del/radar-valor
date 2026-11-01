@@ -521,6 +521,7 @@
       <option value="soccer_epl">Premier League</option><option value="soccer_spain_la_liga">La Liga</option><option value="soccer_italy_serie_a">Serie A</option><option value="soccer_germany_bundesliga">Bundesliga</option><option value="soccer_uefa_champs_league">Champions League</option>
     </select>
     <div class="chip-row mini" id="pvChips"></div>
+    <div id="pvMore" style="margin:6px 0;"></div>
     <div class="lv-bar">
       <input id="teamSearch" type="text" placeholder="Buscar equipo..." style="width:170px;" oninput="applyFilters()" />
       <div class="seg" id="pvDay"><button class="seg-b active" data-d="null" onclick="pvSetDay(null)">Todos</button><button class="seg-b" data-d="0" onclick="pvSetDay(0)">Hoy</button><button class="seg-b" data-d="1" onclick="pvSetDay(1)">Mañana</button></div>
@@ -1797,7 +1798,24 @@ function pvChips() {
   el.innerHTML = pfLeaguesOrdered().map(l => { let n = 0; try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) n = c.data.filter(m => Date.parse(m.commence_time) >= now - 3 * 3600000).length; } catch (e) {}
     const sc = !n && fdSched ? fdSched[l.id] || 0 : 0;
     return `<div class="chip ${l.odds === cur ? "active" : ""}" onclick="pvPickLeague('${l.odds}')" title="${n ? n + " partidos con cuotas cargadas" : sc ? sc + " partidos en los próximos 7 días (toca para cargar sus cuotas)" : "Toca para cargar las cuotas de esta liga"}"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span><span class="ct ${n ? "" : sc ? "sched" : "zero"}">${n || sc}</span></div>`; }).join("");
-  fdSchedLoad();
+  fdSchedLoad(); pvMoreDraw();
+}
+let pvMovSel = "";
+const PV_MOV_SKIP = /^(England Premier League|Spain La Liga|Italy Serie A|Germany Bundesliga I|France Ligue 1|UEFA Champions League|Netherlands Eredivisie|Portugal Primeira Liga|England Championship|Brazil Serie A)$/;
+function pvMoreDraw() {
+  const el = document.getElementById("pvMore"); if (!el) return;
+  const c = movGet(); if (!c || !c.data.length) { el.innerHTML = `<span class="muted" style="font-size:12px;">🌍 Más ligas: toca "Cuotas Bet365" para descargar cientos de ligas más.</span>`; return; }
+  const L = {}; c.data.forEach(m => { if (!m.bookmakers.length || PV_MOV_SKIP.test(m.mov_league)) return; const o = L[m.mov_league] = L[m.mov_league] || { n: 0, live: 0 }; o.n++; if (m.mov_live) o.live++; });
+  const names = Object.keys(L).sort((a, b) => a.localeCompare(b));
+  el.innerHTML = `<select id="pvMovSel" onchange="pvPickMov(this.value)" style="max-width:100%;"><option value="">🌍 Más ligas (Bet365) — ${names.length} ligas</option>${names.map(n => `<option value="${n.replace(/"/g, "&quot;")}" ${n === pvMovSel ? "selected" : ""}>${n} (${L[n].n}${L[n].live ? " · " + L[n].live + " en vivo" : ""})</option>`).join("")}</select>`;
+}
+function pvPickMov(name) {
+  pvMovSel = name; if (!name) return;
+  const c = movGet(); if (!c) return;
+  const ms = c.data.filter(m => m.mov_league === name && m.bookmakers.length).sort((a, b) => (b.mov_live ? 1 : 0) - (a.mov_live ? 1 : 0) || a.commence_time.localeCompare(b.commence_time));
+  const mins = Math.round((Date.now() - c.timestamp) / 60000);
+  document.getElementById("status").innerHTML = `${name}: ${ms.length} partidos de Bet365 (${ms.filter(m => m.mov_live).length} en vivo) · datos de hace ${mins} min. Solo hay una casa, así que no se calcula valor.`;
+  renderMatches(ms, "mov");
 }
 function applyFilters() {
   const term = (document.getElementById("teamSearch")?.value || "").toLowerCase().trim();
@@ -1952,7 +1970,7 @@ async function loadBet365(idx) {
     box.innerHTML = `<div class="ms-h" style="margin:6px 0 8px;">Bet365</div><table class="cptable" style="max-width:640px; margin:0 auto;"><thead><tr><th>Selección</th><th>Bet365</th><th>Mejor otra casa</th><th>Prob. justa</th><th>Edge Bet365</th></tr></thead><tbody>${rows}</tbody></table><div class="muted" style="font-size:11px; margin-top:6px;">Cuota de Bet365 vía API-Football; la probabilidad justa sale del promedio de las demás casas.</div>`;
   } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px;">No se pudo cargar Bet365: ${e.message}</div><button class="small ghost" style="margin-top:6px;" onclick="loadBet365(${idx})">Reintentar</button>`; }
 }
-function pvStats(idx) { const it = pvItems[idx]; if (!it) return; const l = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0]; closePv(); openMatchSheet(it.m.home_team, it.m.away_team, l.id, l.nm); }
+function pvStats(idx) { const it = pvItems[idx]; if (!it) return; if (lastSport === "mov") { showToast("Esta liga solo tiene cuotas de Bet365: no hay ficha con estadísticas."); return; } const l = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0]; closePv(); openMatchSheet(it.m.home_team, it.m.away_team, l.id, l.nm); }
 
 function renderMatches(matches, sport, isFiltered) {
   if (!isFiltered) { lastMatches = matches; lastSport = sport; setTimeout(() => { try { runAlarms(matches, sport); } catch (e) {} }, 300); }
@@ -2826,6 +2844,7 @@ async function movLoad(silent) {
   } catch (e) { say("No se pudo descargar Bet365: " + e.message); return; }
   try { hbPicksRender(); } catch (e) {}
   try { if (document.getElementById("cpChips")) renderCoupon(); } catch (e) {}
+  try { if (lastSport === "mov" && pvMovSel) pvPickMov(pvMovSel); else pvMoreDraw(); } catch (e) {}
   try { renderDdChips(); } catch (e) {}
 }
 let movTimer = null;
