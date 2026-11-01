@@ -403,6 +403,32 @@
   .ex-rng { display:flex; gap:24px; width:100%; justify-content:center; flex-wrap:wrap; } .ex-rng > div { display:flex; flex-direction:column; align-items:center; width:42%; min-width:200px; font-size:11px; font-weight:700; } .ex-rng b { font-size:18px; } .ex-rng input { width:100%; accent-color:#1EC8A5; }
   .ex-btns { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; } .ex-btns select { background:rgba(0,0,0,.35); border:none; color:#1EC8A5; border-radius:999px; padding:5px 12px; font-size:13px; }
   .ex-gm { font-size:11px; color:#B8C3CF; text-align:center; min-height:14px; }
+
+  /* --- En vivo estilo BetPractice --- */
+  .lv2 .pg-main { overflow-x:auto; }
+  .lvh, .lvr { display:grid; align-items:center; gap:8px; min-width:760px; }
+  .lvh { padding:0 14px 8px; }
+  .lvh .lh1, .lvh .lh2 { font-weight:700; text-align:center; font-size:13px; }
+  .lvh .lh3 { background:#1EC8A5; color:#06231A; border-radius:8px; font-size:10.5px; font-weight:700; padding:6px 6px; text-align:center; }
+  .lv-list2 { display:flex; flex-direction:column; gap:0; }
+  .lvr { padding:18px 14px; border-top:3px solid #0E131A; background:#131A23; cursor:pointer; }
+  .lvr:hover { background:#16202B; }
+  .lvl { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .lvlive { color:#E5484D; font-size:11px; font-weight:800; letter-spacing:.04em; }
+  .lvfl { font-size:20px; line-height:1; } .lvcode { font-size:10px; font-weight:700; color:#9AA5B1; }
+  .lvm { display:flex; flex-direction:column; align-items:center; gap:3px; min-width:0; }
+  .lvt { display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px; font-size:14px; font-weight:700; }
+  .lvt .n { display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .lvt .n.r { justify-content:flex-end; text-align:right; } .lvt img { width:22px; height:22px; object-fit:contain; } .lvt .vs { font-size:11px; color:#9AA5B1; font-weight:600; }
+  .lvs { font-size:22px; font-weight:800; font-family:'IBM Plex Mono',monospace; margin-top:4px; } .lvst { font-size:11px; color:#9AA5B1; margin-bottom:6px; }
+  .lvtl { width:100%; padding:0 2px; } .lvbar { position:relative; height:8px; background:#CBD2D9; border-radius:4px; } .lvbar i { position:absolute; left:0; top:0; bottom:0; background:#3FB984; border-radius:4px; } .lvbar b { position:absolute; left:50%; top:-4px; transform:translateX(-50%); background:#0E131A; color:#E6EBF1; font-size:9px; padding:1px 5px; border-radius:4px; }
+  .lvev { position:relative; height:18px; } .lve { position:absolute; transform:translateX(-50%); font-size:11px; top:2px; }
+  .lvc { display:inline-block; width:7px; height:10px; border-radius:1px; } .lvc.y { background:#F0B429; } .lvc.r { background:#E5484D; }
+  .lvo { display:flex; flex-direction:column; align-items:center; gap:4px; font-variant-numeric:tabular-nums; }
+  .lvo .cf { color:#1EC8A5; font-weight:700; font-size:14px; display:flex; gap:5px; align-items:center; } .lvo .cb { font-size:13px; display:flex; gap:5px; align-items:center; } .lvo .cb.v { color:#3ECF8E; font-weight:700; }
+  .lvo .ic { font-size:8px; font-style:normal; font-weight:800; border-radius:3px; padding:1px 3px; background:#2F6BFF; color:#fff; } .lvo .ic.b3 { background:#3ECF8E; color:#06231A; }
+  .pm-btn.on { border-color:#1EC8A5; color:#1EC8A5; }
+  #view-live .lv-bar { margin-bottom:10px; }
+  .wrap:has(#view-live.active) { max-width:1480px; }
   .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
   .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
   .pm-item:last-child { border-bottom:none; }
@@ -782,18 +808,32 @@
   <div id="view-live" class="view">
     <div data-help="live"></div>
     <div class="lv-bar">
-      <button onclick="loadLiveScores()">Actualizar en vivo</button>
+      <button onclick="lvRefresh()">Actualizar en vivo</button>
       <label class="pg-ck"><input type="checkbox" id="lvAuto" onchange="lvToggleAuto()" /> Auto (cada 90 s)</label>
-      <select id="lvSort" onchange="renderLive()"><option value="time">Orden: hora</option><option value="min">Orden: minuto</option><option value="league">Orden: liga</option></select>
-      <label class="pg-ck"><input type="checkbox" id="lvOdds" onchange="renderLive()" /> Solo con cuotas</label>
-      <button class="small ghost" onclick="loadIsportsLive()" title="Fuente alternativa">iSports</button>
+      <button class="small ghost" onclick="loadIsportsLive()" title="Fuente alternativa" style="display:none;">iSports</button>
+      <select id="lvSort" style="display:none;"><option value="time">hora</option><option value="min">minuto</option><option value="league">liga</option></select>
+      <input type="checkbox" id="lvOdds" style="display:none;" />
     </div>
     <div class="pg-count" id="lvCount">Pulsa "Actualizar en vivo" para ver los partidos que se juegan ahora mismo.</div>
-    <div class="lv-layout">
-      <div class="lv-rail" id="lvRail"></div>
-      <div id="live-scores" class="lv-list"></div>
+    <div class="pg-layout lv2">
+      <aside class="pg-side">
+        <div class="pm-menu">
+          <div class="pm-item" onclick="lvPop('lg')">Ligas</div>
+          <div class="pm-item" onclick="lvPop('mk')">Mercados</div>
+          <div class="pm-item" onclick="lvPop('rc')">Rachas</div>
+          <div class="pm-item" onclick="lvPop('st')">Eventos en directo</div>
+        </div>
+        <button class="pm-btn" onclick="lvPop('sort')">Ordenar</button>
+        <button class="pm-btn" onclick="switchView('alarms')">Alarmas múltiples</button>
+        <button class="pm-btn" id="lvFavBtn" onclick="lv.fav = !lv.fav; renderLive()">☆ Favoritos</button>
+        <button class="pm-btn" style="margin-top:6px;" onclick="lvPop('flt')">Añadir filtros</button>
+        <div class="pm-note" id="lvFilterNote">No has añadido ningún filtro</div>
+        <div class="pm-row" style="justify-content:center; gap:10px; font-size:12px; color:#9AA5B1;"><span style="text-align:center;">Mostrar partidos<br>terminados</span><label class="sw"><input type="checkbox" id="lvFin" onchange="lv.fin = this.checked; renderLive()" /><i></i></label></div>
+      </aside>
+      <div class="pg-main" style="padding:0 6px 10px;"><div id="lvHead"></div><div id="live-scores" class="lv-list2"></div></div>
     </div>
-    <div class="muted" style="text-align:center; font-size:11px; margin-top:12px;">Las cuotas de cada fila son las pre-partido que tengas cargadas (no cambian en directo). Cada actualización usa 1 petición de API-Football.</div>
+    <div id="lv-modal" class="cp-modal" onclick="if (event.target === this) lvPopClose()"><div class="cp-mbox"><div class="cp-mh"><b id="lvMT"></b><button class="pg-nav" onclick="lvPopClose()" style="width:30px; height:30px; font-size:14px;">✕</button></div><div id="lvMB"></div><div style="margin-top:14px; text-align:right;"><button class="small" onclick="lvPopClose()">Listo</button></div></div></div>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:12px;">Marcador y minutos de gol: API-Football (1 petición por actualización). Cuotas en directo: bet365 vía MoviOdds si pulsaste «Cuotas Bet365» en Backtesting → Picks. «b» = cuota justa estimada.</div>
   </div>
 
   <div id="view-lineups" class="view">
@@ -3550,34 +3590,81 @@ function lvOddsFor(f) {
   if (!hit) return null;
   return CP_COLS.map(c => { const key = c[1] === "home" ? hit.m.home_team : c[1] === "away" ? hit.m.away_team : c[1]; return { lab: c[2], r: cpPick(hit.m.bookmakers, c[0], key) }; });
 }
-function lvToggleAuto() { clearInterval(lvTimer); lvTimer = null; if (document.getElementById("lvAuto").checked) lvTimer = setInterval(() => { if (document.getElementById("view-live").classList.contains("active")) loadLiveScores(); }, 90000); }
-function lvToggleLeague(id) { const i = lvLeagues.indexOf(id); if (i >= 0) lvLeagues.splice(i, 1); else lvLeagues.push(id); renderLive(); }
+function lvToggleAuto() { clearInterval(lvTimer); lvTimer = null; if (document.getElementById("lvAuto").checked) lvTimer = setInterval(() => { if (document.getElementById("view-live").classList.contains("active")) lvRefresh(); }, 90000); }
+
+let lv = { leagues: [], cols: ["1", "X", "2", "+2.5", "-2.5", "BTTS+"], sort: "time", fav: false, fin: false, onlyOdds: false, minMin: 0, maxMin: 120, rw: 0 };
+function lvToggleLeague(id) { const i = lv.leagues.indexOf(id); if (i >= 0) lv.leagues.splice(i, 1); else lv.leagues.push(id); renderLive(); }
+function lvColOff(c) { lv.cols = lv.cols.filter(x => x !== c); renderLive(); }
+function lvRefresh() { loadLiveScores(); try { if (movGet() || true) movLoad(true); } catch (e) {} }
+function lvRows() {
+  // partidos de API-Football + partidos solo de bet365 (MoviOdds) que estén en juego
+  const rows = liveData.map(f => ({ f, kind: "af", id: String(f.league.id), flag: f.league.flag ? `<img src="${f.league.flag}" style="width:22px; height:15px; object-fit:cover; border-radius:2px;" />` : "⚽", code: String(f.league.name).slice(0, 8).toUpperCase(), lname: f.league.name, home: f.teams.home.name, away: f.teams.away.name, hl: f.teams.home.logo, al: f.teams.away.logo, gh: f.goals.home ?? 0, ga: f.goals.away ?? 0, min: f.fixture.status.elapsed, st: f.fixture.status.short, ev: f.events || [], hid: f.teams.home.id, t: f.fixture.date }));
+  const used = new Set(rows.map(r => lvNorm(r.home) + "|" + lvNorm(r.away)));
+  let all = []; try { all = cpAll(); } catch (e) {}
+  all.filter(x => x.m.mov_live).forEach(x => { const k = lvNorm(x.m.home_team) + "|" + lvNorm(x.m.away_team); if ([...used].some(u => { const [h, a] = u.split("|"); const mh = lvNorm(x.m.home_team), ma = lvNorm(x.m.away_team); return (h.includes(mh) || mh.includes(h)) && (a.includes(ma) || ma.includes(a)); })) return; used.add(k);
+    const sc = /(\d+)\s*[-:]\s*(\d+)/.exec(x.m.mov_score || ""); rows.push({ f: null, kind: "mov", id: x.l.id, flag: x.l.fl, code: String(x.l.nm).slice(0, 8).toUpperCase(), lname: x.l.nm + " · " + (x.m.mov_league || ""), home: x.m.home_team, away: x.m.away_team, gh: sc ? +sc[1] : 0, ga: sc ? +sc[2] : 0, min: x.m.mov_min, st: x.m.mov_min != null ? "LIVE" : "LIVE", ev: [], t: x.m.commence_time, hit: x }); });
+  return rows;
+}
+function lvPickHit(r) {
+  let all = []; try { all = cpAll(); } catch (e) {} if (r.hit) return r.hit;
+  const h = lvNorm(r.home), a = lvNorm(r.away); if (!h || !a) return null;
+  const c = all.filter(x => { const mh = lvNorm(x.m.home_team), ma = lvNorm(x.m.away_team); return (mh.includes(h) || h.includes(mh)) && (ma.includes(a) || a.includes(ma)); });
+  return c.find(x => x.m.mov_live) || c[0] || null;
+}
+function lvTimeline(r) {
+  const total = 90, el = Math.max(0, Math.min(r.min || 0, total)), fin = ["FT", "AET", "PEN"].includes(r.st), pct = fin ? 100 : Math.min(100, el / total * 100);
+  const pos = m => Math.max(0.5, Math.min(99.5, Math.min(m, 94) / 94 * 100));
+  const up = [], dn = [];
+  (r.ev || []).forEach(e => { const m = e.time && e.time.elapsed; if (m == null) return; const home = e.team && e.team.id === r.hid, ic = e.type === "Goal" ? (e.detail === "Missed Penalty" ? "" : "⚽") : e.type === "Card" ? (/Red/.test(e.detail) ? '<i class="lvc r"></i>' : '<i class="lvc y"></i>') : ""; if (!ic) return; (home ? up : dn).push(`<span class="lve" style="left:${pos(m)}%" title="${m}' ${e.player && e.player.name || ""}">${ic}</span>`); });
+  return `<div class="lvtl"><div class="lvev up">${up.join("")}</div><div class="lvbar"><i style="width:${pct}%"></i><b>HT</b></div><div class="lvev dn">${dn.join("")}</div></div>`;
+}
 function renderLive() {
   const el = document.getElementById("live-scores"); if (!el) return;
-  if (!liveData.length) { document.getElementById("lvRail").innerHTML = ""; return; }
-  const onlyOdds = document.getElementById("lvOdds").checked, sort = document.getElementById("lvSort").value;
-  let rows = liveData.map(f => ({ f, odds: lvOddsFor(f) }));
-  const leagues = {}; rows.forEach(r => { const id = r.f.league.id; leagues[id] = leagues[id] || { n: 0, flag: r.f.league.flag, name: r.f.league.name }; leagues[id].n++; });
-  document.getElementById("lvRail").innerHTML = Object.entries(leagues).map(([id, l]) => `<div class="chip ${lvLeagues.includes(id) ? "active" : ""}" onclick="lvToggleLeague('${id}')" title="${l.name}"><div class="fl">${l.flag ? `<img src="${l.flag}" style="width:24px; height:16px; object-fit:cover; border-radius:3px;" />` : "⚽"}</div><div class="ct">${l.n}</div></div>`).join("");
-  if (lvLeagues.length) rows = rows.filter(r => lvLeagues.includes(String(r.f.league.id)));
-  if (onlyOdds) rows = rows.filter(r => r.odds);
-  rows.sort((a, b) => sort === "league" ? a.f.league.name.localeCompare(b.f.league.name) : sort === "min" ? (b.f.fixture.status.elapsed || 0) - (a.f.fixture.status.elapsed || 0) : a.f.fixture.date.localeCompare(b.f.fixture.date));
-  document.getElementById("lvCount").innerHTML = `Mostrando <b style="color:#3ECF8E">${rows.length}</b> partidos en <b style="color:#3ECF8E">${new Set(rows.map(r => r.f.league.id)).size}</b> ligas`;
-  const stTxt = f => { const s2 = f.fixture.status; return ["FT", "AET", "PEN"].includes(s2.short) ? ["Final", true] : s2.short === "HT" ? ["Descanso", false] : s2.elapsed != null ? [`${s2.elapsed}'`, false] : [s2.short || "—", false]; };
-  el.innerHTML = rows.map(({ f, odds }) => { const [t, fin] = stTxt(f);
-    return `<div class="lv-row" style="cursor:pointer;" onclick="openMatchSheet('${f.teams.home.name.replace(/'/g, "\\'")}', '${f.teams.away.name.replace(/'/g, "\\'")}', '${f.league.id}', '${f.league.name.replace(/'/g, "\\'")}')" title="Ver ficha del partido"><div class="lv-lg"><b>${(f.league.country || "").slice(0, 3).toUpperCase()}-${f.league.name.slice(0, 6)}</b><span class="lv-st ${fin ? "ft" : ""}">${t}</span><div style="margin-top:4px;">${new Date(f.fixture.date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div></div>
-      <div class="lv-teams"><div class="lv-team">${f.teams.home.logo ? `<img src="${f.teams.home.logo}" />` : ""}${f.teams.home.name}<span class="sc">${f.goals.home ?? 0}</span></div><div class="lv-team">${f.teams.away.logo ? `<img src="${f.teams.away.logo}" />` : ""}${f.teams.away.name}<span class="sc">${f.goals.away ?? 0}</span></div></div>
-      ${odds ? `<div class="lv-odds">${odds.map(c => `<div><div class="h">${c.lab}</div>${c.r ? `<span class="codd ${c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""}" style="min-width:0; padding:3px 6px;">${c.r.price.toFixed(2)}</span>` : '<span class="muted">–</span>'}</div>`).join("")}</div>` : `<div class="muted" style="text-align:center; font-size:11px;">Sin cuotas cargadas para este partido</div>`}</div>`; }).join("") || `<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>`;
+  let rows = lvRows(); const fav = getFavorites();
+  document.getElementById("lvFavBtn").classList.toggle("on", lv.fav);
+  if (!rows.length) { document.getElementById("lvHead").innerHTML = ""; el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">No hay partidos en juego ahora mismo (o pulsa «Actualizar en vivo»).</div>'; return; }
+  rows.forEach(r => { r.hit = lvPickHit(r); });
+  if (!lv.fin) rows = rows.filter(r => !["FT", "AET", "PEN", "CANC", "PST"].includes(r.st));
+  if (lv.leagues.length) rows = rows.filter(r => lv.leagues.includes(r.id));
+  if (lv.fav) rows = rows.filter(r => fav.has(r.home) || fav.has(r.away));
+  if (lv.onlyOdds) rows = rows.filter(r => r.hit);
+  rows = rows.filter(r => (r.min == null) || (r.min >= lv.minMin && r.min <= lv.maxMin));
+  if (lv.rw > 0) rows = rows.filter(r => { const mt = cpMetrics({ home_team: r.home, away_team: r.away }); return mt && Math.max(mt.hw, mt.aw, mt.hu, mt.au) >= lv.rw; });
+  rows.sort((a, b) => lv.sort === "league" ? a.lname.localeCompare(b.lname) : lv.sort === "min" ? (b.min || 0) - (a.min || 0) : String(a.t).localeCompare(String(b.t)));
+  const nL = new Set(rows.map(r => r.id)).size;
+  document.getElementById("lvCount").innerHTML = `Mostrando <b style="color:#3ECF8E">${rows.length}</b> partidos en <b style="color:#3ECF8E">${nL}</b> ligas`;
+  { const f = []; if (lv.leagues.length) f.push(lv.leagues.length + " liga(s)"); if (lv.onlyOdds) f.push("Con cuotas"); if (lv.minMin > 0 || lv.maxMin < 120) f.push(`Min ${lv.minMin}'–${lv.maxMin}'`); if (lv.rw > 0) f.push("Racha ≥ " + lv.rw); const n = document.getElementById("lvFilterNote"); if (n) n.textContent = f.length ? f.join(" · ") : "No has añadido ningún filtro"; }
+  document.getElementById("lvHead").innerHTML = `<div class="lvh"><div class="lh1">Liga</div><div class="lh2">Partido</div>${lv.cols.map(c => `<div class="lh3"><span class="thp">${CP_LABF[c]}<i onclick="lvColOff('${c}')">✕</i></span></div>`).join("")}</div>`;
+  const grid = `grid-template-columns:78px minmax(240px,2.1fr) repeat(${lv.cols.length}, minmax(70px,1fr));`;
+  document.getElementById("lvHead").firstChild.style.cssText = grid;
+  const stTxt = r => ["FT", "AET", "PEN"].includes(r.st) ? "Full Time" : r.st === "HT" ? "Half Time" : r.min != null ? `${r.min}'` : "En juego";
+  el.innerHTML = rows.map(r => {
+    const hit = r.hit, hq = r.home.replace(/'/g, "\\'"), aq = r.away.replace(/'/g, "\\'"), lq = String(r.lname).replace(/'/g, "\\'");
+    const cells = lv.cols.map(c => { const d = CP_COLS.find(x => x[2] === c); if (!hit) return '<div class="lvo muted">–</div>'; const key = d[1] === "home" ? hit.m.home_team : d[1] === "away" ? hit.m.away_team : d[1]; const p = cpPick(hit.m.bookmakers, d[0], key); if (!p) return '<div class="lvo muted">–</div>'; const fo = p.fair ? 1 / p.fair : null; return `<div class="lvo">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb ${p.ev != null && p.ev >= 0.02 ? "v" : ""}"><i class="ic b3">365</i>${p.price.toFixed(2)}</div></div>`; }).join("");
+    return `<div class="lvr" style="${grid}" onclick="${r.kind === "af" ? `openMatchSheet('${hq}', '${aq}', '${r.id}', '${lq}')` : ""}"><div class="lvl"><span class="lvlive">${["FT", "AET", "PEN"].includes(r.st) ? "FIN" : "LIVE"}</span><span class="lvfl">${r.flag}</span><span class="lvcode">${r.code}</span></div>
+      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div>${r.kind === "af" ? lvTimeline(r) : ""}</div>${cells}</div>`;
+  }).join("") || '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>';
 }
+function lvPop(kind) {
+  const T = { lg: "Ligas", mk: "Mercados", rc: "Rachas", st: "Eventos en directo", sort: "Ordenar", flt: "Filtros" }[kind];
+  document.getElementById("lvMT").textContent = T; let h = "";
+  if (kind === "lg") { const m = {}; lvRows().forEach(r => { (m[r.id] = m[r.id] || { r, n: 0 }).n++; }); h = `<div class="pm-chips"><span class="pf-chip ${lv.leagues.length ? "" : "on"}" onclick="lv.leagues=[]; renderLive(); lvPop('lg')">Todas</span>${Object.values(m).sort((a, b) => b.n - a.n).map(o => `<span class="pf-chip ${lv.leagues.includes(o.r.id) ? "on" : ""}" onclick="lvToggleLeague('${o.r.id}'); lvPop('lg')">${o.r.lname} · ${o.n}</span>`).join("") || '<span class="muted">Actualiza en vivo para ver ligas.</span>'}</div>`; }
+  else if (kind === "mk") h = CP_COLS.map(c => `<label class="pg-ck"><input type="checkbox" ${lv.cols.includes(c[2]) ? "checked" : ""} onchange="lv.cols = CP_COLS.map(x => x[2]).filter(x => x === '${c[2]}' ? this.checked : lv.cols.includes(x)); renderLive()" /> ${CP_LABF[c[2]]}</label>`).join("");
+  else if (kind === "rc") h = `<div class="muted" style="font-size:12px; margin-bottom:8px;">Solo partidos donde algún equipo lleve esta racha (ganados o sin perder seguidos). 0 = sin filtro. Necesita historial cargado.</div><div class="pm-row"><span>Racha mínima ≥</span><input type="number" min="0" value="${lv.rw}" oninput="lv.rw = parseInt(this.value) || 0; renderLive()" /></div>`;
+  else if (kind === "st") h = `<div class="muted" style="font-size:12px; line-height:1.6;">Bajo cada partido se dibuja la línea del tiempo con los goles (⚽) y tarjetas. Arriba van los del local y abajo los del visitante. Los datos salen de API-Football en cada actualización. Los partidos que solo vienen de bet365 no traen eventos.</div>`;
+  else if (kind === "sort") h = [["time", "Por hora de inicio"], ["min", "Por minuto de juego"], ["league", "Por liga"]].map(([v, l]) => `<label class="pg-ck"><input type="radio" name="lvso" ${lv.sort === v ? "checked" : ""} onchange="lv.sort='${v}'; renderLive()" /> ${l}</label>`).join("");
+  else h = `<label class="pg-ck"><input type="checkbox" ${lv.onlyOdds ? "checked" : ""} onchange="lv.onlyOdds=this.checked; renderLive()" /> Solo partidos con cuotas</label><div class="pm-row"><span>Minuto desde</span><input type="number" min="0" max="120" value="${lv.minMin}" oninput="lv.minMin = parseInt(this.value) || 0; renderLive()" /></div><div class="pm-row"><span>Minuto hasta</span><input type="number" min="0" max="120" value="${lv.maxMin}" oninput="lv.maxMin = isNaN(parseInt(this.value)) ? 120 : parseInt(this.value); renderLive()" /></div><button class="small ghost" style="margin-top:10px;" onclick="lv.onlyOdds=false; lv.minMin=0; lv.maxMin=120; lv.rw=0; lv.leagues=[]; lv.fav=false; renderLive(); lvPop('flt')">Quitar todos los filtros</button>`;
+  document.getElementById("lvMB").innerHTML = h; document.getElementById("lv-modal").classList.add("on");
+}
+function lvPopClose() { document.getElementById("lv-modal").classList.remove("on"); }
 async function loadLiveScores() {
   const footballKey = getFootballKey();
   const el = document.getElementById("live-scores");
-  if (!footballKey) { el.innerHTML = `<div class="muted" style="padding:14px;">Añade tu API-Football key en ⚙️ Configuración para ver el marcador en vivo.</div>`; return; }
   document.getElementById("lvCount").textContent = "Buscando partidos en vivo...";
+  if (!footballKey) { liveData = []; renderLive(); document.getElementById("lvCount").innerHTML = '<span class="muted">Sin API-Football key: solo se muestran partidos en vivo de bet365 (pulsa «Cuotas Bet365» en Backtesting → Picks).</span>'; return; }
   try {
     liveData = await apiFootball(`/fixtures?live=all`, footballKey);
     try { runLiveAlarms(liveData); } catch (e) {}
-    if (!liveData.length) { document.getElementById("lvRail").innerHTML = ""; document.getElementById("lvCount").textContent = ""; el.innerHTML = `<div class="muted" style="padding:20px;">No hay partidos en juego ahora mismo.</div>`; return; }
     renderLive();
   } catch (e) {
     document.getElementById("lvCount").textContent = "";
