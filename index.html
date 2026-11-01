@@ -1029,7 +1029,7 @@
           <button class="seg-b active" data-p="all" onclick="hbSetPer('all')">Todas las temporadas</button><button class="seg-b" data-p="7" onclick="hbSetPer('7')">Últimos 7 días</button><button class="seg-b" data-p="30" onclick="hbSetPer('30')">Últimos 30 días</button><button class="seg-b" data-p="last" onclick="hbSetPer('last')">Última temporada</button>
         </div>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; margin-bottom:12px;">
-          <label>Mercado<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><optgroup label="Sin cuota en el CSV (solo frecuencia)"><option value="Pbs">Ambos marcan: Sí</option><option value="Pbn">Ambos marcan: No</option><option value="Po5">Más de 0.5 goles</option><option value="Pu5">Menos de 0.5 goles</option><option value="Po15">Más de 1.5 goles</option><option value="Pu15">Menos de 1.5 goles</option><option value="1To5">1T: más de 0.5 goles</option><option value="1Tu5">1T: menos de 0.5 goles</option><option value="1To15">1T: más de 1.5 goles</option><option value="1Tu15">1T: menos de 1.5 goles</option><option value="1Tbs">1T: ambos marcan</option><option value="2To5">2T: más de 0.5 goles</option><option value="2Tu5">2T: menos de 0.5 goles</option><option value="2To15">2T: más de 1.5 goles</option><option value="2Tu15">2T: menos de 1.5 goles</option></optgroup><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
+          <label>Mercado<select id="hbSel" onchange="hbRender()"><option value="A">Visitante gana</option><option value="H">Local gana</option><option value="D">Empate</option><option value="O">Más de 2.5 goles</option><option value="U">Menos de 2.5 goles</option><optgroup label="Con cuota (CSV del harvester)"><option value="xO0.5">Más de 0.5 goles</option><option value="xU0.5">Menos de 0.5 goles</option><option value="xO1.5">Más de 1.5 goles</option><option value="xU1.5">Menos de 1.5 goles</option><option value="xHO0.5">1T: Más de 0.5 goles</option><option value="xHU0.5">1T: Menos de 0.5 goles</option><option value="xHO1.5">1T: Más de 1.5 goles</option><option value="xHU1.5">1T: Menos de 1.5 goles</option><option value="xHO2.5">1T: Más de 2.5 goles</option><option value="xHU2.5">1T: Menos de 2.5 goles</option></optgroup><optgroup label="Sin cuota en el CSV (solo frecuencia)"><option value="Pbs">Ambos marcan: Sí</option><option value="Pbn">Ambos marcan: No</option><option value="Po5">Más de 0.5 goles</option><option value="Pu5">Menos de 0.5 goles</option><option value="Po15">Más de 1.5 goles</option><option value="Pu15">Menos de 1.5 goles</option><option value="1To5">1T: más de 0.5 goles</option><option value="1Tu5">1T: menos de 0.5 goles</option><option value="1To15">1T: más de 1.5 goles</option><option value="1Tu15">1T: menos de 1.5 goles</option><option value="1Tbs">1T: ambos marcan</option><option value="2To5">2T: más de 0.5 goles</option><option value="2Tu5">2T: menos de 0.5 goles</option><option value="2To15">2T: más de 1.5 goles</option><option value="2Tu15">2T: menos de 1.5 goles</option></optgroup><option value="X">Hándicap asiático local</option><option value="Y">Hándicap asiático visitante</option></select></label>
           <label>Casa de apuestas<select id="hbBook" onchange="hbRender()"></select></label>
         </div>
         <div id="hbDetail" style="text-align:center;"></div>
@@ -3156,6 +3156,10 @@ const HB_SELS = ["H", "D", "A", "O", "U", "X", "Y"];
 const HB_AH = { pin: [["PCAHH", "PCAHA"], ["PAHH", "PAHA"]], b365: [["B365CAHH", "B365CAHA"], ["B365AHH", "B365AHA"]], max: [["MaxCAHH", "MaxCAHA"], ["MaxAHH", "MaxAHA"]], avg: [["AvgCAHH", "AvgCAHA"], ["AvgAHH", "AvgAHA"]] };
 function hbAhSettle(h, price, diff0) { /* diff0 = goles a favor - en contra del equipo apostado; h = hándicap de ese equipo */ const one = (hh) => { const d = diff0 + hh; return d > 1e-9 ? price - 1 : d < -1e-9 ? -1 : 0; }; const q = Math.abs(h * 4) % 2 === 1; return q ? (one(h - 0.25) + one(h + 0.25)) / 2 : one(h); }
 const HB_ORDER = ["H", "D", "A", "O", "U"];
+/* Mercados extra con cuota (CSV del harvester): más/menos 0.5 y 1.5 en tiempo completo, y 0.5/1.5/2.5 en la 1ª parte */
+const HB_XP = { pin: "PC", b365: "B365C", max: "MaxC", avg: "AvgC" };
+const HB_X = (() => { const o = {}; [[false, [0.5, 1.5]], [true, [0.5, 1.5, 2.5]]].forEach(([ht, ls]) => ls.forEach(l => ["O", "U"].forEach(sd => { const key = (ht ? "H" : "") + sd + l, opp = (ht ? "H" : "") + (sd === "O" ? "U" : "O") + l; o["x" + key] = { ht, s: sd, l, key, opp, n: `${ht ? "1T: " : ""}${sd === "O" ? "Más" : "Menos"} de ${l} goles` }; }))); return o; })();
+Object.keys(HB_X).forEach(k => { HB_SELN[k] = HB_X[k].n; });
 let hbData = {};
 function hbDb() { return new Promise((res, rej) => { const r = indexedDB.open("radar-valor-hist", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function hbSave() { try { const db = await hbDb(); await new Promise((res, rej) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").put(hbData, "hist"); t.oncomplete = res; t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); return true; } catch (e) { return false; } }
@@ -3180,6 +3184,7 @@ function hbFromCsv(text, fname) {
   if (iD < 0 || iH < 0 || iA < 0 || iHG < 0 || iAG < 0) throw new Error("no parece un CSV de football-data.co.uk (faltan Date/Home/Away/goles)");
   const code = (fname || "").replace(/\.csv$/i, "").replace(/\s*\(\d+\)$/, ""), out = {};
   const iRef = col("Referee"), iX = ["HY", "AY", "HR", "AR", "HF", "AF", "HC", "AC"].map(n => col(n)), iHTH = col("HTHG"), iHTA = col("HTAG"), iAH = col("AHh"), iAHC = col("AHCh"), ahc = {}; Object.keys(HB_AH).forEach(b => { ahc[b] = HB_AH[b].map(p => [col(p[0]), col(p[1])]); });
+  const xcols = {}; Object.keys(HB_XP).forEach(b => { xcols[b] = []; Object.values(HB_X).forEach(X => { const i = col(`${HB_XP[b]}${X.ht ? "HT" : ""}${X.s === "O" ? ">" : "<"}${X.l}`); if (i >= 0) xcols[b].push([X.key, i]); }); });
   const ocols = {}; Object.keys(HB_COLS).forEach(b => { ocols[b] = HB_ORDER.map(k => col(...HB_COLS[b][k])); });
   for (let r = 1; r < rows.length; r++) {
     const x = rows[r], ts = hbParseDate(x[iD]); const hg = parseInt(x[iHG]), ag = parseInt(x[iAG]); if (ts == null || isNaN(hg) || isNaN(ag)) continue;
@@ -3191,6 +3196,7 @@ function hbFromCsv(text, fname) {
       if (a.some(v => v)) o[b] = a;
       const op = HB_ORDER.map(k => { const i = col(HB_OPEN[b][k]); const v = i >= 0 ? parseFloat(x[i]) : NaN; return v > 1 ? Math.round(v * 1000) / 1000 : 0; });
       if (op.some(v => v) && HB_COLS[b].H.some(n => col(n) >= 0 && n !== HB_OPEN[b].H)) { (o.op = o.op || {})[b] = op; } });
+    Object.keys(xcols).forEach(b => { const xo = {}; xcols[b].forEach(([k, i]) => { const v = parseFloat(x[i]); if (v > 1) xo[k] = Math.round(v * 1000) / 1000; }); if (Object.keys(xo).length) (o.x = o.x || {})[b] = xo; });
     const hth = iHTH >= 0 ? parseInt(x[iHTH]) : NaN, hta = iHTA >= 0 ? parseInt(x[iHTA]) : NaN, ht = isNaN(hth) || isNaN(hta) ? null : [hth, hta];
     const rf = iRef >= 0 ? (x[iRef] || "").trim() : "", row = [Math.round(ts / 86400000), (x[iH] || "").trim(), (x[iA] || "").trim(), hg, ag, hbSeasonOf(ts, iS >= 0 ? x[iS] : ""), o, ht]; if (rf) row.push([rf, ...iX.map(i => { const v = i >= 0 ? parseInt(x[i]) : NaN; return isNaN(v) ? null : v; })]); (out[lg] = out[lg] || []).push(row);
   }
@@ -3310,7 +3316,10 @@ function hbClearF() {
 }
 function hbSetModeUi() { document.querySelectorAll("#hbModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === hbMode)); }
 function hbBets(rows, sel, bk, f) {
-  const si = HB_SELS.indexOf(sel), out = [];
+  const si = HB_SELS.indexOf(sel), out = [], X = HB_X[sel];
+  if (X) { rows.forEach(r => { if (!hbRowOk(r, f) || (X.ht && !r[7])) return; const xs = r[6].x, price = xs && xs[bk] && xs[bk][X.key]; if (!price) return; if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
+      const fb = ["pin", "avg"].find(b => xs[b] && xs[b][X.key] && xs[b][X.opp]); let ev = null; if (fb) { const a = 1 / xs[fb][X.key], c = 1 / xs[fb][X.opp]; ev = price * (a / (a + c)) - 1; } if (f.ev != null && (ev == null || ev * 100 < f.ev)) return;
+      const tot = X.ht ? r[7][0] + r[7][1] : r[3] + r[4], win = X.s === "O" ? tot > X.l : tot < X.l; out.push({ r, d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev, t: `${r[1]} - ${r[2]}` }); }); return out; }
   rows.forEach(r => {
     if (!hbRowOk(r, f)) return;
     const o = f.open ? (r[6].op && r[6].op[bk] && r[6].op[bk].concat([0, 0, null])) : r[6][bk]; if (!o || !o[si]) return; const price = o[si];
