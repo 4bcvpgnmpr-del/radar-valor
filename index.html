@@ -1376,12 +1376,11 @@
               <label>Qué contar<select id="alWKind"><option value="">— nada —</option><option value="sot">Tiros a puerta</option><option value="soff">Tiros fuera</option><option value="shots">Tiros totales</option><option value="goals">Goles</option><option value="corners">Córners</option><option value="yellow">Tarjetas amarillas</option></select></label>
               <label>Equipo<select id="alWTeam"><option value="any">Cualquiera de los dos</option><option value="home">Local</option><option value="away">Visitante</option><option value="sum">Suma de ambos</option></select></label>
               <label>Al menos (cantidad)<input id="alWMin" type="number" min="1" placeholder="3" /></label>
-              <label>Tramo<select id="alWMode" onchange="alWModeSet()"><option value="fixed">Entre dos minutos</option><option value="last">En los últimos X minutos</option></select></label>
-              <label id="alWFromL">Desde el minuto<input id="alWFrom" type="number" min="0" max="120" placeholder="60" /></label>
-              <label id="alWToL">Hasta el minuto<input id="alWTo" type="number" min="1" max="120" placeholder="75" /></label>
+              <label>Tramo<select id="alWMode" onchange="alWModeSet()"><option value="fixed">Dentro de los límites de tiempo de arriba</option><option value="last">En los últimos X minutos</option></select></label>
+              <input id="alWFrom" type="hidden" /><input id="alWTo" type="hidden" />
               <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
             </div>
-            <small>Ej.: "Tiros a puerta · cualquiera · al menos 3 · entre el 60 y el 75". Las estadísticas (tiros, córners, tarjetas) vienen de Bet365 en directo y se comprueban cada minuto: la app debe estar abierta.</small>
+            <small>Ej.: "Tiros a puerta · cualquiera · al menos 3" con los límites de tiempo de arriba en 60' y 75'. Las estadísticas (tiros, córners, tarjetas) vienen de Bet365 en directo y se comprueban cada minuto: la app debe estar abierta.</small>
           </div>
         </div>
       </div>
@@ -1565,7 +1564,7 @@
           <input id="trSearch" type="text" placeholder="Buscar equipo..." style="width:150px;" oninput="renderTrends()" />
         </div>
       </div>
-      <div class="muted" style="margin-bottom:10px; font-size:12px;">Calculado con una sola petición a API-Football (todos los partidos jugados de la temporada). Pulsa una columna para ordenar. Verde = porcentaje alto.</div>
+      <div class="muted" style="margin-bottom:10px; font-size:12px;">Calculado con los partidos jugados de la temporada (ESPN, o API-Football si lo tienes). Pulsa una columna para ordenar. Verde = porcentaje alto.</div>
       <div id="trStatus" class="muted"></div>
       <div id="trStreaks" class="streak-grid"></div>
       <div style="overflow-x:auto;"><table class="trtable" id="trTable"></table></div>
@@ -4079,14 +4078,14 @@ async function vsBsd(ev) {
 /* ===== Página de partido (Previa · Alineaciones · Árbitro · Clasificación) ===== */
 let vsM = null;
 const VS_MROWS = [["Córners", "wonCorners"], ["Faltas", "foulsCommitted"], ["Tarjetas amarillas", "yellowCards"], ["Tarjetas rojas", "redCards"], ["Fueras de juego", "offsides"], ["Paradas", "saves"], ["Tiros", "totalShots"], ["Tiros a puerta", "shotsOnTarget"], ["Posesión (%)", "possessionPct"]];
-const VS_MPCT = [["Equipo +0,5 goles", (m, t) => m.me.s >= 1], ["Equipo +1,5 goles", (m, t) => m.me.s >= 2], ["Portería a cero", (m, t) => m.op.s === 0], ["Sin marcar", (m, t) => m.me.s === 0], ["Over 8,5 córners", (m, t) => m.tot("wonCorners") >= 9], ["Over 9,5 córners", (m, t) => m.tot("wonCorners") >= 10], ["Over 20,5 faltas", (m, t) => m.tot("foulsCommitted") >= 21], ["Over 24,5 faltas", (m, t) => m.tot("foulsCommitted") >= 25], ["Over 3,5 tarjetas", (m, t) => m.cards() >= 4], ["Over 4,5 tarjetas", (m, t) => m.cards() >= 5], ["Over 7,5 tiros a puerta", (m, t) => m.tot("shotsOnTarget") >= 8], ["Over 20,5 tiros", (m, t) => m.tot("totalShots") >= 21]];
+const VS_MPCT = [["Partido +0,5 goles (FT)", (m, t) => m.me.s + m.op.s >= 1], ["Partido +1,5 goles (FT)", (m, t) => m.me.s + m.op.s >= 2], ["Partido +0,5 goles (1ª parte)", (m, t) => { const h = m.ht(); return h == null ? null : h >= 1; }], ["Partido +1,5 goles (1ª parte)", (m, t) => { const h = m.ht(); return h == null ? null : h >= 2; }], ["Equipo +0,5 goles", (m, t) => m.me.s >= 1], ["Equipo +1,5 goles", (m, t) => m.me.s >= 2], ["Portería a cero", (m, t) => m.op.s === 0], ["Sin marcar", (m, t) => m.me.s === 0], ["Over 8,5 córners", (m, t) => m.tot("wonCorners") >= 9], ["Over 9,5 córners", (m, t) => m.tot("wonCorners") >= 10], ["Over 20,5 faltas", (m, t) => m.tot("foulsCommitted") >= 21], ["Over 24,5 faltas", (m, t) => m.tot("foulsCommitted") >= 25], ["Over 3,5 tarjetas", (m, t) => m.cards() >= 4], ["Over 4,5 tarjetas", (m, t) => m.cards() >= 5], ["Over 7,5 tiros a puerta", (m, t) => m.tot("shotsOnTarget") >= 8], ["Over 20,5 tiros", (m, t) => m.tot("totalShots") >= 21]];
 async function vsMatch(key) {
   const ev = VS_EV[key]; if (!ev) return; vsRemember(); vsM = { ...ev, tab: (Date.now() >= Date.parse(ev.date) - 36e5 && Date.now() - Date.parse(ev.date) < 4 * 36e5) ? "live" : "prev", ms: {}, h2h: [], stand: null }; clearInterval(vsLiveT); switchView("vsmatch");
   const box = document.getElementById("vsMatchBox"); box.innerHTML = `<div class="muted" style="padding:40px; text-align:center;" id="vsMMsg">Cargando partido…</div>`;
   try { const slug = ev.slug, ids = {}, evs = {};
     await prPool([ev.hid, ev.aid], 2, async tid => { const sc = await espnGet(`${slug}/teams/${tid}/schedule`); evs[tid] = sc.events || []; ids[tid] = evs[tid].filter(vsDone).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 20).map(e => String(e.id)); });
     await vsEnsure(slug, [...new Set([...ids[ev.hid], ...ids[ev.aid]])], document.getElementById("vsMMsg"), true);
-    [ev.hid, ev.aid].forEach(tid => { vsM.ms[tid] = ids[tid].map(id => { const m = prCache.get(slug + "|" + id); if (!m || m.v !== 2 || !m.c || m.c.length !== 2) return null; const me = m.c.find(x => x.id === tid), op = m.c.find(x => x.id !== tid); return me && op ? { m, me, op, a: m.ts[tid] || {}, b: m.ts[op.id] || {}, tot: k => ((m.ts[m.c[0].id] || {})[k] || 0) + ((m.ts[m.c[1].id] || {})[k] || 0), cards: () => ["yellowCards", "redCards"].reduce((x, k) => x + ((m.ts[m.c[0].id] || {})[k] || 0) + ((m.ts[m.c[1].id] || {})[k] || 0), 0) } : null; }).filter(Boolean); });
+    [ev.hid, ev.aid].forEach(tid => { vsM.ms[tid] = ids[tid].map(id => { const m = prCache.get(slug + "|" + id); if (!m || m.v !== 2 || !m.c || m.c.length !== 2) return null; const me = m.c.find(x => x.id === tid), op = m.c.find(x => x.id !== tid); return me && op ? { m, me, op, ht: () => (m.c[0].hs != null && m.c[1].hs != null) ? m.c[0].hs + m.c[1].hs : null, a: m.ts[tid] || {}, b: m.ts[op.id] || {}, tot: k => ((m.ts[m.c[0].id] || {})[k] || 0) + ((m.ts[m.c[1].id] || {})[k] || 0), cards: () => ["yellowCards", "redCards"].reduce((x, k) => x + ((m.ts[m.c[0].id] || {})[k] || 0) + ((m.ts[m.c[1].id] || {})[k] || 0), 0) } : null; }).filter(Boolean); });
     const sc = id => { const v = id && id.score; return parseInt(v && (v.displayValue ?? v.value ?? v)) || 0; };
     vsM.h2h = (evs[ev.hid] || []).filter(vsDone).filter(e => (((e.competitions || [])[0] || {}).competitors || []).some(c => String(c.team.id) === ev.aid)).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6).map(e => { const cs = e.competitions[0].competitors, h = cs.find(c => c.homeAway === "home"), a = cs.find(c => c.homeAway === "away"); return { d: e.date, hn: h.team.displayName || h.team.name, an: a.team.displayName || a.team.name, hs: sc(h), as: sc(a), hid: String(h.team.id) }; });
     try { const j = await (await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${slug}/standings`)).json(), en = (((j.children || [])[0] || j).standings || {}).entries || [];
@@ -4150,7 +4149,7 @@ function vsMPrev() {
   const M = vsM, H = M.ms[M.hid] || [], A = M.ms[M.aid] || [], f1 = v => (Math.round(v * 10) / 10).toString().replace(".", ","), av = (a, k) => a.length ? a.reduce((x, m) => x + (m.a[k] || 0), 0) / a.length : 0;
   const last = (arr, tid) => arr.slice(0, 5).map(m => `<div style="display:flex; align-items:center; gap:8px; font-size:12px; padding:4px 0; border-top:1px solid #1A212B;"><span class="muted" style="width:46px;">${vsFmtD(m.m.d)}</span>${vsLg(m.op.id)}<span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.op.n}</span><span class="sc ${m.me.s > m.op.s ? "w" : m.me.s < m.op.s ? "lo" : "dr"}" style="font-weight:700; border-radius:5px; padding:1px 6px;">${m.me.s}-${m.op.s}</span></div>`).join("") || '<div class="muted">Sin datos.</div>';
   const bar = (lab, k) => { const x = av(H, k), y = av(A, k), mx = Math.max(x, y, 0.01); return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span>${f1(x)}</span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span>${f1(y)}</span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#1A212B; border-radius:3px; display:flex; justify-content:flex-end;"><i style="width:${x / mx * 100}%; background:var(--v-g); border-radius:3px;"></i></div><div style="flex:1; background:#1A212B; border-radius:3px;"><i style="display:block; width:${y / mx * 100}%; height:100%; background:#2b8f6a; border-radius:3px;"></i></div></div></div>`; };
-  const pct = ([lab, fn]) => { const h = H.filter(m => fn(m)).length, a = A.filter(m => fn(m)).length, ph = H.length ? h / H.length * 100 : 0, pa = A.length ? a / A.length * 100 : 0; return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span style="color:var(--v-g);">${Math.round(ph)}% <small class="muted" style="font-weight:500;">(${h}/${H.length})</small></span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span style="color:var(--v-g);">${Math.round(pa)}% <small class="muted" style="font-weight:500;">(${a}/${A.length})</small></span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#1A212B; border-radius:3px; display:flex; justify-content:flex-end;"><i style="width:${ph}%; background:var(--v-g); border-radius:3px;"></i></div><div style="flex:1; background:#1A212B; border-radius:3px;"><i style="display:block; width:${pa}%; height:100%; background:#2b8f6a; border-radius:3px;"></i></div></div></div>`; };
+  const pct = ([lab, fn]) => { const KH = H.filter(m => fn(m) !== null), KA = A.filter(m => fn(m) !== null), h = KH.filter(m => fn(m)).length, a = KA.filter(m => fn(m)).length, ph = KH.length ? h / KH.length * 100 : 0, pa = KA.length ? a / KA.length * 100 : 0; return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span style="color:var(--v-g);">${Math.round(ph)}% <small class="muted" style="font-weight:500;">(${h}/${KH.length})</small></span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span style="color:var(--v-g);">${Math.round(pa)}% <small class="muted" style="font-weight:500;">(${a}/${KA.length})</small></span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#1A212B; border-radius:3px; display:flex; justify-content:flex-end;"><i style="width:${ph}%; background:var(--v-g); border-radius:3px;"></i></div><div style="flex:1; background:#1A212B; border-radius:3px;"><i style="display:block; width:${pa}%; height:100%; background:#2b8f6a; border-radius:3px;"></i></div></div></div>`; };
   const trend = (arr, tid, name) => { const out = []; Object.keys(TT_DEF).forEach(cat => TT_DEF[cat].forEach(([label, fn, ths]) => { let best = null; ths.forEach(t => { const th = t + (t % 1 ? .5 : 0); let k = 0; while (k < arr.length && fn(arr[k].m, tid) >= th) k++; if (k >= 4 && (!best || t > best.t)) best = { t, k }; }); if (best) out.push(`${label} +${String(best.t % 1 ? best.t : best.t - .5).replace(".", ",")} · racha de ${best.k}`); })); return `<div class="vs-card2"><b style="display:flex; align-items:center; gap:8px;">${vsLg(tid)}${name}</b>${out.length ? "<ul style='margin:8px 0 0; padding-left:18px; font-size:12.5px; line-height:1.7;'>" + out.map(x => `<li>${x}</li>`).join("") + "</ul>" : '<div class="muted" style="margin-top:6px; font-size:12px;">Sin rachas de 4 o más.</div>'}</div>`; };
   const bh = M.bsd && M.bsd.ev && M.bsd.ev.head_to_head, mo = vsMOdds(M.hn, M.an, M.date), h2h = bh && (bh.recent_matches || []).length ? bh.recent_matches.slice(0, 8).map(x => ({ d: x.date, hn: x.home, an: x.away, hs: x.home_score, as: x.away_score, hid: String(x.home_team_id) === String(M.bsd.ev.home_team_id) ? M.hid : M.aid })) : M.h2h, hw = h2h.filter(x => (x.hid === M.hid ? x.hs > x.as : x.as > x.hs)).length, aw = h2h.filter(x => (x.hid === M.hid ? x.hs < x.as : x.as < x.hs)).length;
   return `<div class="vs-g2"><div class="vs-card2"><b>Últimos partidos · ${M.hn}</b>${last(H, M.hid)}</div><div class="vs-card2"><b>Últimos partidos · ${M.an}</b>${last(A, M.aid)}</div></div>
@@ -4300,7 +4299,7 @@ async function lgLoad() {
 }
 /* ===== Rachas de equipos (ESPN) ===== */
 let ttRes = [], ttBusy = false, ttC = "all", ttV = "all";
-const TT_DEF = { goals: [["Goles del partido", (m, t) => m.c[0].s + m.c[1].s, [1.5, 2.5, 3.5]], ["Goles del equipo", (m, t) => (m.c.find(x => x.id === t) || {}).s, [1, 2]], ["Ambos marcan", (m, t) => (m.c[0].s > 0 && m.c[1].s > 0) ? 1 : 0, [1]]],
+const TT_DEF = { goals: [["Goles del partido", (m, t) => m.c[0].s + m.c[1].s, [0.5, 1.5, 2.5, 3.5]], ["Goles 1ª parte", (m, t) => (m.c[0].hs == null || m.c[1].hs == null) ? -1 : m.c[0].hs + m.c[1].hs, [0.5, 1.5]], ["Goles del equipo", (m, t) => (m.c.find(x => x.id === t) || {}).s, [1, 2]], ["Ambos marcan", (m, t) => (m.c[0].s > 0 && m.c[1].s > 0) ? 1 : 0, [1]]],
   corners: [["Córners del partido", (m, t) => ((m.ts[m.c[0].id] || {}).wonCorners || 0) + ((m.ts[m.c[1].id] || {}).wonCorners || 0), [8.5, 9.5, 10.5, 11.5]]],
   cards: [["Tarjetas del partido", (m, t) => [0, 1].reduce((a, i) => a + ((m.ts[m.c[i].id] || {}).yellowCards || 0) + ((m.ts[m.c[i].id] || {}).redCards || 0), 0), [2.5, 3.5, 4.5, 5.5]]],
   shots: [["Tiros del equipo", (m, t) => (m.ts[t] || {}).totalShots || 0, [10, 12, 14]], ["Tiros a puerta del equipo", (m, t) => (m.ts[t] || {}).shotsOnTarget || 0, [4, 5, 6]]] };
@@ -4348,7 +4347,7 @@ function vsBack() { switchView(vsFrom || "players"); }
 const VS_EV = {};
 function vsRemember() { const a = document.querySelector(".view.active"); if (a && !/^view-vs(team|player|match)$/.test(a.id)) vsFrom = a.id.replace("view-", ""); }
 async function vsEnsure(slug, ids, msgEl, needTs) {
-  prCacheLoad(); const need = ids.filter(id => { const c = prCache.get(slug + "|" + id); return !c || (needTs && c.v !== 2); }); let m = 0;
+  prCacheLoad(); const need = ids.filter(id => { const c = prCache.get(slug + "|" + id); return !c || (needTs && c.v !== 2) || (c.c && c.c[0] && c.c[0].hs === undefined); }); let m = 0;
   await prPool(need, 6, async id => { try { prCache.set(slug + "|" + id, prCompact(await espnGet(`${slug}/summary?event=${id}`))); } catch (e) {} m++; if (msgEl) msgEl.textContent = `Descargando partidos ${m}/${need.length}…`; });
   if (need.length) prCacheSave();
 }
@@ -4541,7 +4540,7 @@ async function prPool(items, n, fn) { let i = 0; await Promise.all(Array.from({ 
 function prCompact(su) {
   const ros = su.rosters || [], hd = (su.header && su.header.competitions && su.header.competitions[0]) || {}, home = ros.find(r => r.homeAway === "home"), out = { d: hd.date || (su.header && su.header.date) || "", h: home ? String(home.team.id) : null, pl: [] };
   ros.forEach(r => (r.roster || []).forEach(x => { const k = {}; (x.stats || []).forEach(s => { k[s.name] = +s.value || 0; }); if (!(x.starter || x.subbedIn || k.appearances > 0)) return; if (x.athlete.headshot && x.athlete.headshot.href) VS_HEAD[String(x.athlete.id)] = x.athlete.headshot.href; VS_NM[String(x.athlete.id)] = x.athlete.displayName || x.athlete.fullName; out.pl.push({ i: String(x.athlete.id), n: x.athlete.displayName || x.athlete.fullName, t: String(r.team.id), p: (x.position && x.position.abbreviation) || "", s: x.starter ? 1 : 0, hd: (x.athlete.headshot && x.athlete.headshot.href) || "", k }); }));
-  out.v = 2; out.c = (hd.competitors || []).map(x => ({ id: String(x.team ? x.team.id : x.id), n: (x.team && (x.team.displayName || x.team.name)) || "", s: parseInt(x.score) || 0, h: x.homeAway === "home" ? 1 : 0 }));
+  out.v = 2; out.c = (hd.competitors || []).map(x => ({ hs: (x.linescores && x.linescores[0] && x.linescores[0].value != null && !isNaN(+x.linescores[0].value)) ? +x.linescores[0].value : null, id: String(x.team ? x.team.id : x.id), n: (x.team && (x.team.displayName || x.team.name)) || "", s: parseInt(x.score) || 0, h: x.homeAway === "home" ? 1 : 0 }));
   out.ts = {}; ((su.boxscore && su.boxscore.teams) || []).forEach(t => { const o = {}; (t.statistics || []).forEach(st => { const v = parseFloat(st.displayValue); o[st.name] = isNaN(v) ? 0 : v; }); out.ts[String(t.team.id)] = o; });
   return out;
 }
@@ -4743,20 +4742,20 @@ async function loadTrends() {
   } catch (e) { st.textContent = "No se pudo cargar: " + e.message; renderExplore(); }
 }
 const STREAK_DEFS = [["win", "Más victorias seguidas", x => x.gf > x.ga], ["o15", "Más over 1.5 seguidos", x => x.gf + x.ga > 1], ["o25", "Más over 2.5 seguidos", x => x.gf + x.ga > 2], ["btts", "Más BTTS seguidos", x => x.gf > 0 && x.ga > 0], ["unb", "Más sin perder", x => x.gf >= x.ga], ["cs", "Más porterías a cero", x => x.ga === 0],
-  ["u25", "Más under 2.5 seguidos", x => x.gf + x.ga < 3], ["o35", "Más over 3.5 seguidos", x => x.gf + x.ga > 3], ["bttsn", "Más BTTS No seguidos", x => x.gf === 0 || x.ga === 0], ["loss", "Más derrotas seguidas", x => x.gf < x.ga], ["draw", "Más empates seguidos", x => x.gf === x.ga], ["nows", "Más sin ganar", x => x.gf <= x.ga], ["fts", "Más sin marcar", x => x.gf === 0]];
+  ["u25", "Más under 2.5 seguidos", x => x.gf + x.ga < 3], ["o35", "Más over 3.5 seguidos", x => x.gf + x.ga > 3], ["bttsn", "Más BTTS No seguidos", x => x.gf === 0 || x.ga === 0], ["loss", "Más derrotas seguidas", x => x.gf < x.ga], ["draw", "Más empates seguidos", x => x.gf === x.ga], ["nows", "Más sin ganar", x => x.gf <= x.ga], ["fts", "Más sin marcar", x => x.gf === 0], ["o05", "Más over 0.5 FT seguidos", x => x.gf + x.ga > 0], ["h05", "Más over 0.5 HT seguidos", x => x.h != null && x.h > 0], ["h15", "Más over 1.5 HT seguidos", x => x.h != null && x.h > 1]];
 function renderTrends() {
   const tb = document.getElementById("trTable"); if (!tb) return;
   if (!trData) { tb.innerHTML = ""; return; }
   const T = {};
-  const add = (n, gf, ga, venue, d) => { const t = T[n] || (T[n] = { n, rows: [] }); t.rows.push({ gf, ga, venue, d }); };
-  trData.forEach(f => { add(f.h, f.hg, f.ag, "home", f.d); add(f.a, f.ag, f.hg, "away", f.d); });
-  const pct = (a, fn) => a.length ? Math.round(100 * a.filter(fn).length / a.length) : 0;
+  const add = (n, gf, ga, venue, d, h) => { const t = T[n] || (T[n] = { n, rows: [] }); t.rows.push({ gf, ga, venue, d, h }); };
+  trData.forEach(f => { const ht = f.hh != null && f.ha != null ? f.hh + f.ha : null; add(f.h, f.hg, f.ag, "home", f.d, ht); add(f.a, f.ag, f.hg, "away", f.d, ht); });
+  const pct = (a, fn) => a.length ? Math.round(100 * a.filter(fn).length / a.length) : 0, pctH = (a, fn) => { const b = a.filter(x => x.h != null); return b.length ? Math.round(100 * b.filter(fn).length / b.length) : -1; };
   const q = (document.getElementById("trSearch").value || "").toLowerCase();
   let list = Object.values(T).map(t => {
     const r = t.rows.filter(x => trVenue === "all" || x.venue === trVenue), n = r.length;
     const last = [...t.rows].sort((a, b) => b.d.localeCompare(a.d)).slice(0, 5).reverse();
     return { n: t.n, pj: n, gf: n ? r.reduce((s, x) => s + x.gf, 0) / n : 0, gc: n ? r.reduce((s, x) => s + x.ga, 0) / n : 0,
-      ov15: pct(r, x => x.gf + x.ga > 1), ov25: pct(r, x => x.gf + x.ga > 2), ov35: pct(r, x => x.gf + x.ga > 3),
+      ov05: pct(r, x => x.gf + x.ga > 0), h05: pctH(r, x => x.h > 0), h15: pctH(r, x => x.h > 1), ov15: pct(r, x => x.gf + x.ga > 1), ov25: pct(r, x => x.gf + x.ga > 2), ov35: pct(r, x => x.gf + x.ga > 3),
       btts: pct(r, x => x.gf > 0 && x.ga > 0), cs: pct(r, x => x.ga === 0), fts: pct(r, x => x.gf === 0), last };
   }).filter(t => t.pj && (!q || t.n.toLowerCase().includes(q)));
   list.sort((a, b) => (typeof a[trSort.k] === "string" ? a[trSort.k].localeCompare(b[trSort.k]) : a[trSort.k] - b[trSort.k]) * trSort.d);
@@ -4769,12 +4768,12 @@ function renderTrends() {
   }).join("");
   document.getElementById("trStreaks").innerHTML = streakHtml;
   const ddS = document.getElementById("dd-streaks"); if (ddS) ddS.innerHTML = streakHtml;
-  const cols = [["n","Equipo"],["pj","PJ"],["gf","GF"],["gc","GC"],["ov15","+1.5"],["ov25","+2.5"],["ov35","+3.5"],["btts","Ambos"],["cs","Portería 0"],["fts","Sin marcar"]];
+  const cols = [["n","Equipo"],["pj","PJ"],["gf","GF"],["gc","GC"],["ov05","FT +0.5"],["ov15","FT +1.5"],["h05","HT +0.5"],["h15","HT +1.5"],["ov25","+2.5"],["ov35","+3.5"],["btts","Ambos"],["cs","Portería 0"],["fts","Sin marcar"]];
   const heat = (v, inv) => { const a = Math.min(1, v / 100) * 0.45; return `background:${inv ? `rgba(224,90,90,${a})` : `rgba(62,207,142,${a})`}`; };
   const dot = x => { const r = x.gf > x.ga ? ["V","#3ECF8E"] : x.gf < x.ga ? ["D","#E05A5A"] : ["E","#9AA5B1"]; return `<span class="fdot" style="background:${r[1]}" title="${x.gf}-${x.ga}">${r[0]}</span>`; };
   tb.innerHTML = `<thead><tr><th>#</th>${cols.map(c => `<th onclick="sortTrends('${c[0]}')">${c[1]}${trSort.k === c[0] ? (trSort.d > 0 ? " ▲" : " ▼") : ""}</th>`).join("")}<th style="cursor:default">Forma</th></tr></thead><tbody>` +
     list.map((t, i) => `<tr><td class="rk">${i + 1}</td><td class="tn">${t.n}</td><td>${t.pj}</td><td>${t.gf.toFixed(2)}</td><td>${t.gc.toFixed(2)}</td>` +
-      ["ov15","ov25","ov35","btts","cs"].map(k => `<td><span class="pcell" style="${heat(t[k])}">${t[k]}%</span></td>`).join("") +
+      ["ov05","ov15","h05","h15","ov25","ov35","btts","cs"].map(k => t[k] < 0 ? `<td class="muted" title="ESPN no dio el resultado al descanso">–</td>` : `<td><span class="pcell" style="${heat(t[k])}">${t[k]}%</span></td>`).join("") +
       `<td><span class="pcell" style="${heat(t.fts, true)}">${t.fts}%</span></td><td>${t.last.map(dot).join("")}</td></tr>`).join("") + "</tbody>";
 }
 const DD_LEAGUES = [
@@ -5271,7 +5270,7 @@ function alSave() {
     if (v("alWKind")) {
       const mode = v("alWMode"), n = parseInt(v("alWMin"));
       if (!(n >= 1)) { msg.textContent = "Indica la cantidad mínima (por ejemplo 3)."; return; }
-      if (mode === "fixed" && !(v("alWTo") !== "" && +v("alWTo") > +(v("alWFrom") || 0))) { msg.textContent = "Indica el tramo: minuto de inicio y de fin (el fin mayor que el inicio)."; return; }
+      if (mode === "fixed") { document.getElementById("alWFrom").value = v("alMMin") || 0; document.getElementById("alWTo").value = v("alMMax") || 90; if (!(+v("alWTo") > +v("alWFrom"))) { msg.textContent = "Ajusta los límites de tiempo de arriba: el final debe ser mayor que el inicio."; return; } }
       if (mode === "last" && !(parseInt(v("alWLast")) >= 1)) { msg.textContent = "Indica cuántos minutos quieres mirar hacia atrás."; return; }
       a.w = { kind: v("alWKind"), team: v("alWTeam"), min: n, mode, from: +(v("alWFrom") || 0), to: +v("alWTo"), last: parseInt(v("alWLast")) || 10 };
     }
@@ -5328,7 +5327,7 @@ function runAlarms(matches, sport) {
   if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
 }
 const WIN_KINDS = { sot: ["Tiros a puerta", "Shots on Goal"], soff: ["Tiros fuera", "Shots off Goal"], shots: ["Tiros totales", "Total Shots"], corners: ["Córners", "Corner Kicks"], yellow: ["Tarjetas amarillas", "Yellow Cards"], goals: ["Goles", null] };
-function alWModeSet() { const m = document.getElementById("alWMode").value; document.getElementById("alWFromL").style.display = document.getElementById("alWToL").style.display = m === "fixed" ? "" : "none"; document.getElementById("alWLastL").style.display = m === "last" ? "" : "none"; }
+function alWModeSet() { const m = document.getElementById("alWMode").value; document.getElementById("alWLastL").style.display = m === "last" ? "" : "none"; }
 let liveSnap = (() => { try { return JSON.parse(localStorage.getItem("radar-live-snap") || "{}"); } catch (e) { return {}; } })();
 function snapSave() { const lim = Date.now() - 8 * 3600000; Object.keys(liveSnap).forEach(k => { if ((liveSnap[k].t || 0) < lim) delete liveSnap[k]; }); try { localStorage.setItem("radar-live-snap", JSON.stringify(liveSnap)); } catch (e) {} }
 function reqTrack(n) { const d = new Date().toISOString().slice(0, 10); let r; try { r = JSON.parse(localStorage.getItem("radar-live-reqs") || "{}"); } catch (e) { r = {}; } if (r.d !== d) r = { d, n: 0 }; r.n += n || 1; try { localStorage.setItem("radar-live-reqs", JSON.stringify(r)); } catch (e) {} }
