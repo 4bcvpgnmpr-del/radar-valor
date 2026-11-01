@@ -626,6 +626,7 @@
 
   /* Tema claro: se invierte la paleta oscura y se devuelven a su color las imágenes */
   html.theme-light { filter: invert(1) hue-rotate(180deg); background:#0D1117; }
+  html.theme-light .flg { display:inline-block; filter: invert(1) hue-rotate(180deg); }
   html.theme-light img, html.theme-light video, html.theme-light canvas, html.theme-light .vs-head .big, html.theme-light .radar-logo, html.theme-light .pl-ph, html.theme-light svg image { filter: invert(1) hue-rotate(180deg); }
   .vs-view { }
   .view.vs-view.active { background:transparent; color:var(--v-text); padding:0 0 28px; }
@@ -3444,7 +3445,22 @@ function hbNowMetrics(l, home, away) {
 /* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
 const MOV_KEY = "radar-valor-mov-cache";
 
-function themeApply(t) { document.documentElement.classList.toggle("theme-light", t === "light"); const b = document.getElementById("themeBtn"); if (b) b.textContent = t === "light" ? "🌙" : "☀️"; }
+const FLAG_RE = /(?:[\u{1F1E6}-\u{1F1FF}]{2}|\u{1F3F4}[\u{E0061}-\u{E007A}]+\u{E007F}|\u{1F30D}|\u{1F30E}|\u{1F30F})/gu;
+let flagObs = null, flagTimer = null;
+function flagWrap(root) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => { const p = n.parentNode; return p && !["SCRIPT", "STYLE", "TEXTAREA", "OPTION", "TITLE"].includes(p.nodeName) && !(p.classList && p.classList.contains("flg")) && n.nodeValue && /[\u{1F1E6}-\u{1F1FF}\u{1F3F4}\u{1F30D}-\u{1F30F}]/u.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } }), list = [];
+  while (w.nextNode()) list.push(w.currentNode);
+  list.forEach(n => { const t = n.nodeValue, f = document.createDocumentFragment(); let last = 0, m; FLAG_RE.lastIndex = 0;
+    while ((m = FLAG_RE.exec(t))) { if (m.index > last) f.appendChild(document.createTextNode(t.slice(last, m.index))); const sp = document.createElement("span"); sp.className = "flg"; sp.textContent = m[0]; f.appendChild(sp); last = m.index + m[0].length; }
+    if (last < t.length) f.appendChild(document.createTextNode(t.slice(last))); if (last) n.parentNode.replaceChild(f, n); });
+}
+function themeApply(t) {
+  document.documentElement.classList.toggle("theme-light", t === "light"); const b = document.getElementById("themeBtn"); if (b) b.textContent = t === "light" ? "🌙" : "☀️";
+  if (t === "light") { const run = () => { flagTimer = null; try { flagObs && flagObs.disconnect(); flagWrap(document.body); } finally { flagObs && flagObs.observe(document.body, { childList: true, subtree: true, characterData: true }); } };
+    if (!flagObs) flagObs = new MutationObserver(() => { if (!flagTimer) flagTimer = setTimeout(run, 120); });
+    if (document.body) run(); else document.addEventListener("DOMContentLoaded", run); }
+  else if (flagObs) { flagObs.disconnect(); document.querySelectorAll(".flg").forEach(e => e.replaceWith(document.createTextNode(e.textContent))); }
+}
 function themeToggle() { let t = "dark"; try { t = localStorage.getItem("radar-theme") === "light" ? "dark" : "light"; localStorage.setItem("radar-theme", t); } catch (e) { t = document.documentElement.classList.contains("theme-light") ? "dark" : "light"; } themeApply(t); }
 try { themeApply(localStorage.getItem("radar-theme") || "dark"); } catch (e) { }
 function movInject(m) {
