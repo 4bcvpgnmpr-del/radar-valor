@@ -3154,9 +3154,11 @@ function movConvert(d) {
     const ft = qs.filter(q => /^Full ?Time Result$/i.test(q.group_name || "")), oc = [];
     [[x.home, x.home], ["Draw", "Draw"], [x.away, x.away]].forEach(([lab, nm]) => { const q = ft.find(z => (z.label || "").trim() === lab); if (q) oc.push({ name: nm, price: q.odds_dec }); });
     if (oc.length === 3) { mk.push({ key: "h2h", outcomes: oc }); st.h2h++; }
-    const to = qs.filter(q => (/Goals Over\/Under/i.test(q.group_name || "") || (live && / Goals$/i.test(q.group_name || ""))) && (q.line || q.handicap)), tout = [];
+    const teamG = g => [x.home, x.away].some(t => t && String(g).toLowerCase().includes(String(t).toLowerCase())), isHT = g => /(1st|first)\s*half|half\s*time\s*goals|\bHT\b/i.test(g);
+    const to = qs.filter(q => { const g = q.group_name || ""; return !teamG(g) && !isHT(g) && (/Goals Over\/Under/i.test(g) || (live && / Goals$/i.test(g))) && (q.line || q.handicap); }), tout = [];
     to.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) tout.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) tout.push({ name: "Under", price: q.odds_dec, point: pt }); });
     if (tout.length >= 2) { mk.push({ key: "totals", outcomes: tout }); st.tot++; }
+    { const th = [], toh = qs.filter(q => { const g = q.group_name || ""; return !teamG(g) && isHT(g) && /goals|over|total/i.test(g) && !/both|result|corner|card/i.test(g) && (q.line || q.handicap); }); toh.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) th.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) th.push({ name: "Under", price: q.odds_dec, point: pt }); }); if (th.length >= 2) { mk.push({ key: "totals_ht", outcomes: th }); st.tht = (st.tht || 0) + 1; } }
     const bt = qs.filter(q => /Both Teams/i.test(q.group_name || "") && /^(yes|no)$/i.test((q.label || "").trim())).map(q => ({ name: /^yes$/i.test(q.label.trim()) ? "Yes" : "No", price: q.odds_dec }));
     if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
     if (!mk.length && !live) return;
@@ -3818,9 +3820,9 @@ function pickDdLeague(id) {
   document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
   trData = null; renderDdChips(); loadTrends();
 }
-const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"],["btts","Yes","BTTS+"],["btts","No","BTTS-"]];
-const CP_LAB = { "1": "1", X: "X", "2": "2", "+2.5": "Más 2.5", "-2.5": "Menos 2.5", "BTTS+": "Ambos Sí", "BTTS-": "Ambos No" };
-const CP_LABF = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visitante)", "+2.5": "Más de 2.5 goles", "-2.5": "Menos de 2.5 goles", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No" };
+const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"],["btts","Yes","BTTS+"],["btts","No","BTTS-"],["totals","Over +0.5","+0.5"],["totals","Under +0.5","-0.5"],["totals","Over +1.5","+1.5"],["totals","Under +1.5","-1.5"],["totals_ht","Over +0.5","+0.5 HT"],["totals_ht","Under +0.5","-0.5 HT"],["totals_ht","Over +1.5","+1.5 HT"],["totals_ht","Under +1.5","-1.5 HT"]];
+const CP_LAB = { "1": "1", X: "X", "2": "2", "+2.5": "Más 2.5", "-2.5": "Menos 2.5", "BTTS+": "Ambos Sí", "BTTS-": "Ambos No", "+0.5": "Más 0.5", "-0.5": "Menos 0.5", "+1.5": "Más 1.5", "-1.5": "Menos 1.5", "+0.5 HT": "Más 0.5 HT", "-0.5 HT": "Menos 0.5 HT", "+1.5 HT": "Más 1.5 HT", "-1.5 HT": "Menos 1.5 HT" };
+const CP_LABF = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visitante)", "+2.5": "Más de 2.5 goles", "-2.5": "Menos de 2.5 goles", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No", "+0.5": "Más de 0.5 goles", "-0.5": "Menos de 0.5 goles", "+1.5": "Más de 1.5 goles", "-1.5": "Menos de 1.5 goles", "+0.5 HT": "Más de 0.5 goles 1ª parte", "-0.5 HT": "Menos de 0.5 goles 1ª parte", "+1.5 HT": "Más de 1.5 goles 1ª parte", "-1.5 HT": "Menos de 1.5 goles 1ª parte" };
 const CP_CODES = { "39": "ENG-PRE", "140": "ESP-PRE", "135": "ITA-SRA", "78": "GER-BUN", "61": "FRA-LG1", "2": "UEFA-CL", "88": "NED-ERE", "94": "POR-PRI", "40": "ENG-CHA", "71": "BRA-SRA", "1": "WORLD", "4": "EURO" };
 function cpCode(l) { if (CP_CODES[l.id]) return CP_CODES[l.id]; const c = (l.cty || "").slice(0, 3).toUpperCase(), rest = String(l.nm).replace(l.cty || "", "").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 3).toUpperCase(); return c ? c + "-" + (rest || "") : String(l.nm).slice(0, 7).toUpperCase(); }
 const CP_PAGE = 15;
@@ -3846,8 +3848,9 @@ function cpMetrics(m) {
   return (cpMetrics.c[k] = r);
 }
 function cpBadge(pos, n) { if (!pos) return `<span class="bdg n">–</span>`; const c = n ? (pos <= n / 3 ? "g" : pos <= 2 * n / 3 ? "y" : "r") : "n"; return `<span class="bdg ${c}" title="Posición en la liga">${pos}º</span>`; }
+function cpPt(key, mk) { const m = /([+-]?\d+(\.\d+)?)$/.exec(String(key)); return m ? parseFloat(m[1]) : 2.5; }
 function cpPick(bks, mk, key) {
-  const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: mk === "totals" ? m.outcomes.filter(x => x.point === 2.5) : m.outcomes } : null; }).filter(Boolean);
+  const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: /^totals/.test(mk) ? m.outcomes.filter(x => x.point === cpPt(key, mk)) : m.outcomes } : null; }).filter(Boolean);
   const fairs = [];
   rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
   let shown = null;
@@ -3946,7 +3949,7 @@ function cpFlt(tab) {
   const cell = (store, key) => { const r = cp[store][key]; return `<td><span class="rg ${r ? "on" : ""}" onclick="cpRpOpen('${store}','${key}')">${r ? cpRngTxt(r) : "⊕"}</span></td>`; };
   let body = "";
   if (tab === "mk") {
-    const NM = { "1": ["Match Odds", "Team 1 (FT)"], X: ["Match Odds", "Empate (FT)"], "2": ["Match Odds", "Team 2 (FT)"], "+2.5": ["Over/Under 2.5", "Over 2.5"], "-2.5": ["Over/Under 2.5", "Under 2.5"], "BTTS+": ["Ambos marcan", "Sí"], "BTTS-": ["Ambos marcan", "No"] };
+    const NM = { "1": ["Match Odds", "Team 1 (FT)"], X: ["Match Odds", "Empate (FT)"], "2": ["Match Odds", "Team 2 (FT)"], "+2.5": ["Over/Under 2.5", "Over 2.5"], "-2.5": ["Over/Under 2.5", "Under 2.5"], "BTTS+": ["Ambos marcan", "Sí"], "BTTS-": ["Ambos marcan", "No"], "+0.5": ["Over/Under 0.5", "Over 0.5"], "-0.5": ["Over/Under 0.5", "Under 0.5"], "+1.5": ["Over/Under 1.5", "Over 1.5"], "-1.5": ["Over/Under 1.5", "Under 1.5"], "+0.5 HT": ["Over/Under 0.5 (1ª parte)", "Over 0.5 HT"], "-0.5 HT": ["Over/Under 0.5 (1ª parte)", "Under 0.5 HT"], "+1.5 HT": ["Over/Under 1.5 (1ª parte)", "Over 1.5 HT"], "-1.5 HT": ["Over/Under 1.5 (1ª parte)", "Under 1.5 HT"] };
     body = `<table class="rgt"><thead><tr><th style="text-align:left;">Mercado</th><th>Rango de cuota real</th><th>Rango de cuotas</th><th>Rango de valor %</th></tr></thead><tbody>${CP_COLS.map(c => `<tr><td style="text-align:left;"><div class="muted" style="font-size:12px;">${NM[c[2]][0]}</div><b>${NM[c[2]][1]}</b></td>${cell("rng", c[2] + "|r")}${cell("rng", c[2] + "|c")}${cell("rng", c[2] + "|v")}</tr>`).join("")}</tbody></table>`;
   } else if (tab === "st") {
     body = `<table class="rgt"><thead><tr><th style="text-align:left;">Estadística</th><th>Rango</th></tr></thead><tbody>${[["gl", "Goles prom. del local"], ["gv", "Goles prom. del visitante"], ["gt", "Goles prom. total (media)"]].map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="muted" style="font-size:11px; margin-top:8px;">Usa el historial cargado en Backtesting; los partidos sin datos se ocultan al filtrar.</div>`;
