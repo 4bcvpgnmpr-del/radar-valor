@@ -3983,22 +3983,44 @@ function lvTimeline(r) {
 function lvStats(r) {
   const s = r.hit && r.hit.m.mov_stats; if (!s) return "";
   const p = (l, k, sfx, d) => { const a = s.h[k], b = s.a[k]; if (a == null || b == null) return ""; const f = v => d ? Number(v).toFixed(d) : v; return `<span class="lvx"><i>${l}</i> ${f(a)}${sfx || ""} - ${f(b)}${sfx || ""}</span>`; };
-  return `<div class="lvxs">${p("Córners", "corners")}${p("Tiros a puerta", "shots_on_target")}${p("Tiros", "shots")}${p("Posesión", "possession", "%")}${p("xG", "xg", "", 2)}${p("Ataq. peligrosos", "dangerous_attacks")}${p("Amarillas", "yellow_cards")}${p("Rojas", "red_cards")}${s.pl && s.pl.length ? `<button class="small ghost" style="padding:2px 8px; font-size:10.5px;" onclick="event.stopPropagation(); plLive('${r.hit.m.id}')">Jugadores ▸</button>` : ""}</div>`;
+  return `<div class="lvxs">${p("Córners", "corners")}${p("Tiros a puerta", "shots_on_target")}${p("Tiros", "shots")}${p("Posesión", "possession", "%")}${p("xG", "xg", "", 2)}${p("Ataq. peligrosos", "dangerous_attacks")}${p("Amarillas", "yellow_cards")}${p("Rojas", "red_cards")}<button class="small ghost" style="padding:2px 8px; font-size:10.5px;" onclick="event.stopPropagation(); plLive('${r.hit.m.id}')">Detalle ▸</button></div>`;
 }
 
 const PL_TABS = [["f", "Faltas (FC)"], ["fd", "Faltas recibidas (FD)"], ["tk", "Entradas (TCK)"], ["yc", "Amarillas (YC)"], ["sot", "Tiros a puerta (SOT)"], ["sh", "Tiros (SHT)"], ["sv", "Paradas (SV)"], ["g", "Goles"], ["xg", "xG"]];
-let plLiveSt = { id: null, tab: "sot", team: "all" };
+let plLiveSt = { id: null, tab: "f", team: "all" }, plEv = {};
+const PL_TABS2 = [["ev", "Eventos"], ["f", "FC"], ["fd", "FD"], ["tk", "TCK"], ["yc", "YC"], ["sot", "SOT"], ["sh", "SHT"], ["sv", "SV"], ["g", "G"], ["xg", "xG"]];
+const PL_TEAMROWS = [["Posesión", "possession", "%"], ["Tiros a puerta", "shots_on_target"], ["Tiros totales", "shots"], ["Córners", "corners"], ["Faltas", "fouls"], ["Amarillas", "yellow_cards"], ["Rojas", "red_cards"], ["Fueras de juego", "offsides"], ["Paradas", "saves"], ["Ataques peligrosos", "dangerous_attacks"], ["Centros", "crosses"], ["Precisión de pase", "passing_accuracy", "%"], ["xG", "xg", "", 2]];
+async function plEvLoad(m) {
+  if (plEv[m.id] && Date.now() - plEv[m.id].t < 30000) return; plEv[m.id] = { t: Date.now(), list: (plEv[m.id] || {}).list || null, err: null };
+  try { const f = await vsResolve(m.home_team, m.away_team, m.commence_time); if (!f) throw new Error("No encuentro este partido en ESPN, no puedo sacar los eventos.");
+    const su = await espnGet(`${f.slug}/summary?event=${f.e.id}`), ke = su.keyEvents || [], ty = e => { const t = ((e.type && (e.type.text || e.type.type)) || "").toLowerCase(); return /own goal|goal|penalty - scored/.test(t) && !/disallow|no goal/.test(t) ? "⚽" : /yellow/.test(t) ? "🟨" : /red/.test(t) ? "🟥" : /substitution/.test(t) ? "🔁" : /var/.test(t) ? "📺" : ""; };
+    plEv[m.id].list = ke.map(e => ({ min: (e.clock && e.clock.displayValue) || "", ic: ty(e), tx: e.shortText || e.text || (e.type && e.type.text) || "", tm: (e.team && (e.team.displayName || e.team.name)) || "" })).filter(x => x.ic).reverse();
+  } catch (e) { plEv[m.id].err = e.message; }
+  if (plLiveSt.id === m.id && plLiveSt.tab === "ev") plLive();
+}
 function plLive(id, tab, team) {
   if (id) plLiveSt.id = id; if (tab) plLiveSt.tab = tab; if (team) plLiveSt.team = team;
   const c = movGet(), m = c && c.data.find(x => x.id === plLiveSt.id); if (!m || !m.mov_stats) return;
   let ov = document.getElementById("pl-ov"); if (!ov) { ov = document.createElement("div"); ov.id = "pl-ov"; ov.className = "plov"; ov.onclick = e => { if (e.target === ov) ov.style.display = "none"; }; document.body.appendChild(ov); }
-  const k = plLiveSt.tab, T = plLiveSt.team, list = (m.mov_stats.pl || []).filter(x => T === "all" || x.t === T).slice().sort((a, b) => (b[k] || 0) - (a[k] || 0)).filter(x => (x[k] || 0) > 0), mx = Math.max(1, ...list.map(x => x[k] || 0));
-  ov.innerHTML = `<div class="plbox"><button class="ms-close" onclick="document.getElementById('pl-ov').style.display='none'">✕</button><div style="text-align:center; font-weight:700; font-size:15px;">${m.home_team} ${m.mov_score || ""} ${m.away_team}</div><div class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;">${m.mov_min != null ? m.mov_min + "'" : "En juego"} · estadísticas por jugador (Bet365)</div>
-    <div class="plt">${PL_TABS.map(t => `<span class="${t[0] === k ? "on" : ""}" onclick="plLive(null,'${t[0]}')">${t[1]}</span>`).join("")}</div>
-    <div class="plt" style="margin-top:6px;"><span class="${T === "all" ? "on" : ""}" onclick="plLive(null,null,'all')">Ambos</span><span class="${T === "home" ? "on" : ""}" onclick="plLive(null,null,'home')">${m.home_team}</span><span class="${T === "away" ? "on" : ""}" onclick="plLive(null,null,'away')">${m.away_team}</span></div>
-    <div style="margin-top:10px;">${list.length ? list.map(x => `<div class="plrow"><span class="n">${x.s ? "#" + x.s + " " : ""}${x.n}<i>${x.t === "home" ? m.home_team : m.away_team}</i></span><div class="bar"><b style="width:${(x[k] || 0) / mx * 100}%"></b></div><span class="v">${k === "xg" ? Number(x[k]).toFixed(2) : x[k]}</span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía nadie tiene esta estadística.</div>'}</div></div>`;
+  const k = plLiveSt.tab, T = plLiveSt.team, S = m.mov_stats, f1 = (v, d) => v == null ? "–" : d ? Number(v).toFixed(d) : (Math.round(v * 10) / 10).toString().replace(".", ",");
+  const hq = m.home_team.replace(/'/g, "\\'"), aq = m.away_team.replace(/'/g, "\\'");
+  let body = "";
+  if (k === "ev") { plEvLoad(m); const e = plEv[m.id] || {}; body = e.list ? (e.list.length ? e.list.map(x => `<div class="plrow" style="grid-template-columns:46px 26px 1fr;"><span class="muted">${x.min}</span><span>${x.ic}</span><span class="n">${x.tx}<i>${x.tm}</i></span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía no hay eventos.</div>') : e.err ? `<div class="muted" style="text-align:center; padding:16px;">${e.err}</div>` : '<div class="muted" style="text-align:center; padding:16px;">Cargando eventos…</div>'; }
+  else { const list = (S.pl || []).filter(x => T === "all" || x.t === T).slice().sort((a, b) => (b[k] || 0) - (a[k] || 0)).filter(x => (x[k] || 0) > 0), mx = Math.max(1, ...list.map(x => x[k] || 0));
+    body = list.length ? list.map(x => `<div class="plrow"><span class="n">${x.s ? "#" + x.s + " " : ""}${x.n}<i>${x.t === "home" ? m.home_team : m.away_team}</i></span><div class="bar"><b style="width:${(x[k] || 0) / mx * 100}%"></b></div><span class="v">${k === "xg" ? Number(x[k]).toFixed(2) : x[k]}</span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía nadie tiene esta estadística.</div>'; }
+  const bars = PL_TEAMROWS.map(([lab, key, sfx, d]) => { const a = S.h[key], b = S.a[key]; if (a == null || b == null) return ""; const mx = Math.max(a, b, 0.01); return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span>${f1(a, d)}${sfx || ""}</span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span>${f1(b, d)}${sfx || ""}</span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#1A212B; border-radius:3px; display:flex; justify-content:flex-end;"><div style="width:${a / mx * 100}%; background:#3ECF8E; border-radius:3px;"></div></div><div style="flex:1; background:#1A212B; border-radius:3px;"><div style="width:${b / mx * 100}%; background:#6b7f74; border-radius:3px;"></div></div></div></div>`; }).join("");
+  const sc = /(\d+)\s*[-:]\s*(\d+)/.exec(m.mov_score || "");
+  ov.innerHTML = `<div class="plbox" style="max-width:600px; width:100%; max-height:92vh; overflow-y:auto;"><button class="ms-close" onclick="document.getElementById('pl-ov').style.display='none'">✕</button>
+    <div style="display:flex; align-items:center; gap:10px; font-size:12px; padding-right:36px;" class="muted"><span class="chip-live"><i></i>${m.mov_min != null ? m.mov_min + "'" : "En juego"}</span><span>${m.mov_league || ""}</span></div>
+    <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; margin:14px 0 4px; text-align:center;"><b style="font-size:16px;">${m.home_team}</b><b style="font-size:34px; letter-spacing:2px;">${sc ? sc[1] + " - " + sc[2] : m.mov_score || "vs"}</b><b style="font-size:16px;">${m.away_team}</b></div>
+    <div style="text-align:center; margin-bottom:10px;"><button class="small ghost" onclick="document.getElementById('pl-ov').style.display='none'; vsOpenMatch('${hq}','${aq}','${m.commence_time}',this)">Ver partido completo →</button></div>
+    <div class="plt">${PL_TABS2.map(t => `<span class="${t[0] === k ? "on" : ""}" onclick="plLive(null,'${t[0]}')" title="${(PL_TABS.find(z => z[0] === t[0]) || [0, t[1]])[1]}">${t[1]}</span>`).join("")}</div>
+    ${k === "ev" ? "" : `<div class="plt" style="margin-top:6px;"><span class="${T === "all" ? "on" : ""}" onclick="plLive(null,null,'all')">Ambos</span><span class="${T === "home" ? "on" : ""}" onclick="plLive(null,null,'home')">${m.home_team}</span><span class="${T === "away" ? "on" : ""}" onclick="plLive(null,null,'away')">${m.away_team}</span></div>`}
+    <div style="margin-top:10px;">${body}</div>
+    <div style="margin-top:16px; border-top:1px solid #1A212B; padding-top:10px;"><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Estadísticas del partido <span class="muted" style="font-weight:500; font-size:11px;">· Bet365 en directo</span></div>${bars || '<div class="muted">Sin estadísticas de equipo.</div>'}<div class="muted" style="font-size:11px;">${m.home_team} a la izquierda · ${m.away_team} a la derecha. Se actualiza solo.</div></div></div>`;
   ov.style.display = "flex";
 }
+setInterval(async () => { const ov = document.getElementById("pl-ov"); if (ov && ov.style.display === "flex" && plLiveSt.id) { try { await movLoad(true); } catch (e) { } plLive(); } }, 30000);
 
 
 const VS_IMG = id => `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`, VS_LOGO = id => `https://a.espncdn.com/i/teamlogos/soccer/500/${id}.png`;
