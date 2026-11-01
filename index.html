@@ -3913,8 +3913,8 @@ function renderExplore() {
   const N = parseInt(document.getElementById("exSample").value) || 0, sel = document.getElementById("exMarket").value;
   const lname = document.getElementById("exLeague").selectedOptions[0].textContent;
   const byDate = [...(trData || [])].sort((a, b) => b.d.localeCompare(a.d));
-  const teams = [...new Set(((trData && trData.length) ? trData.flatMap(f => [f.h, f.a]) : gs.flatMap(m => [m.h, m.a])))].sort();
-  const fill = (id, keep, def) => { const el = document.getElementById(id); if (el.options.length !== teams.length) { el.innerHTML = teams.map(t => `<option>${t}</option>`).join(""); el.selectedIndex = def; } };
+  const teams = [...new Set(((active && gs.length) || !(trData && trData.length) ? gs.flatMap(m => [m.h, m.a]) : trData.flatMap(f => [f.h, f.a])))].sort();
+  const sig = teams.join("|"), fill = (id, keep, def) => { const el = document.getElementById(id); if (el.dataset.sig !== sig) { el.innerHTML = teams.map(t => `<option>${t}</option>`).join(""); el.selectedIndex = def; el.dataset.sig = sig; } };
   fill("exHome", null, 0); fill("exAway", null, Math.min(1, teams.length - 1));
   let sets, sub = "";
   if (active) {
