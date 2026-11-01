@@ -2495,6 +2495,20 @@ async function loadModel(idx) {
       <div class="muted" style="font-size:11px; margin-top:10px; text-align:center; line-height:1.6;">Modelo tipo Dixon-Coles: ataque y defensa de cada equipo, ventaja de local y más peso a los partidos recientes. Datos: ${md.n} partidos ${src} (${nh} del local, ${na} del visitante). ${Math.min(nh, na) < 8 ? "<b style='color:#F0B429;'>Muestra pequeña: fíate poco.</b> " : ""}El "edge prudente" mezcla 50% modelo y 50% mercado, porque el mercado suele estar mejor calibrado. No tiene en cuenta lesiones ni alineaciones. Es una segunda opinión, no una predicción segura.</div>`;
   } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px; text-align:center;">No se pudo calcular el modelo: ${e.message}</div><div style="text-align:center; margin-top:6px;"><button class="small ghost" onclick="loadModel(${idx})">Reintentar</button></div>`; }
 }
+
+/* ===== Valor en córners: media de córners de BSD + Poisson contra las líneas de Bet365 ===== */
+function poisCdf(k, l) { let p = Math.exp(-l), c = p; for (let i = 1; i <= k; i++) { p *= l / i; c += p; } return Math.min(1, c); }
+async function pvCorners(idx) {
+  const it = pvItems[idx]; if (!it) return; const m = it.m, box = document.getElementById(`${it.cardId}-cor`); box.innerHTML = `<div class="muted">Calculando córners…</div>`;
+  try { movInject(m); if (!m.mov_cor || !m.mov_cor.length) throw new Error("Bet365 no tiene líneas de córners para este partido (pulsa «Cuotas Bet365» arriba).");
+    const b = await vsBsd({ hn: m.home_team, an: m.away_team, date: m.commence_time }); if (!b || !b.ev.home_team_id) throw new Error("BSD no tiene este partido, no puedo sacar la media de córners.");
+    const [h, a] = await Promise.all([vsBsdTeamAvg(b.ev.home_team_id, 8), vsBsdTeamAvg(b.ev.away_team_id, 8)]); if (h.corner_kicks == null || a.corner_kicks == null) throw new Error("BSD no tiene córners de sus últimos partidos.");
+    const lam = h.corner_kicks + a.corner_kicks, lines = {}; m.mov_cor.forEach(([sd, pt, od]) => { (lines[pt] = lines[pt] || {})[sd] = od; });
+    const f2 = v => (Math.round(v * 100) / 100).toString().replace(".", ","), cell = (od, p) => { if (!od) return "<td>–</td><td>–</td>"; const ev = p * od - 1; return `<td><span class="codd ${ev >= VALUE_THRESHOLD ? "v" : ""}">${od.toFixed(2)}</span></td><td>${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%</td>`; };
+    const rows = Object.keys(lines).map(Number).filter(pt => Math.abs(pt - lam) <= 3.5).sort((x, y) => x - y).map(pt => { const pu = poisCdf(Math.floor(pt), lam), po = 1 - pu; return `<tr><td class="mono">${pt}</td>${cell(lines[pt].O, po)}<td>${(po * 100).toFixed(0)}%</td>${cell(lines[pt].U, pu)}<td>${(pu * 100).toFixed(0)}%</td></tr>`; }).join("");
+    box.innerHTML = `<div class="ms-h" style="margin:6px 0 8px;">Córners · Bet365</div><div class="muted" style="font-size:12px; margin-bottom:6px;">Se esperan <b>${f2(lam)}</b> córners (${f2(h.corner_kicks)} ${m.home_team} + ${f2(a.corner_kicks)} ${m.away_team}, medias de sus últimos ${Math.max(h.games, a.games)} partidos)</div>${rows ? `<table class="cptable" style="max-width:640px; margin:0 auto;"><thead><tr><th>Línea</th><th>Over</th><th>Edge</th><th>Prob.</th><th>Under</th><th>Edge</th><th>Prob.</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="muted">Bet365 no tiene líneas cercanas a la media.</div>`}<div class="muted" style="font-size:11px; margin-top:6px;">Estimación sencilla (Poisson sobre la media): úsala como orientación, no como cuota justa.</div>`;
+  } catch (e) { box.innerHTML = `<div class="muted" style="font-size:12px;">${e.message}</div>`; }
+}
 async function loadBet365(idx) {
   const it = pvItems[idx]; if (!it) return;
   const m = it.m, box = document.getElementById(`${it.cardId}-b365`);
@@ -2551,6 +2565,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="pv-actions">
         <button onclick="studyMatch('${cardId}', '${H}', '${A}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar partido</button>
         <button class="small ghost" onclick="pvStats(${idx})">📊 Estadísticas</button>
+        <button class="small ghost" onclick="pvCorners(${idx})">Valor córners</button>
         <button class="small ghost" onclick="vsOpenMatch('${H}','${A}','${m.commence_time}',this)">Ver partido →</button>
         <button class="small ghost" onclick="vsInline('${H}','${A}','${m.commence_time}',this,'${cardId}-bsd')">Árbitro y alineación</button>
         <button class="small ghost" onclick="loadForm('${cardId}', '${H}', '${A}')">Forma</button>
@@ -2565,6 +2580,7 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="mkt-tabs">${tabs.map((t, i) => `<button class="mkt-tab ${i === 0 ? "active" : ""}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t, i) => `<div class="mkt-body ${i === 0 ? "active" : ""}" data-idx="${i}">${t.html}</div>`).join("")}
       <div id="${cardId}-model" style="margin-top:14px; text-align:center;"><button class="small" onclick="loadModel(${idx})" style="font-weight:700;">📐 Probabilidades del modelo</button></div>
+      <div id="${cardId}-cor" style="text-align:center; margin-top:8px;"></div>
       <div id="${cardId}-b365" style="text-align:center; margin-top:12px;"><button class="small ghost" onclick="loadBet365(${idx})">🟢 Cargar cuota Bet365</button></div>
       <div class="acc-grid">
         <details class="analysis-section" id="${cardId}-extra-d"><summary>Más mercados</summary><div id="${cardId}-extra"></div></details>
@@ -3415,7 +3431,7 @@ function movInject(m) {
   try { if ((m.bookmakers || []).some(b => b.key.includes("bet365"))) return m; const c = movGet(); if (!c) return m;
     const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(m.commence_time), h = nm(m.home_team), a = nm(m.away_team);
     const f = c.data.find(x => x.bookmakers && x.bookmakers.length && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000 && near(nm(x.home_team), h) && near(nm(x.away_team), a));
-    if (f) m.bookmakers = [...(m.bookmakers || []), f.bookmakers[0]];
+    if (f) { m.bookmakers = [...(m.bookmakers || []), f.bookmakers[0]]; if (f.mov_cor && !m.mov_cor) m.mov_cor = f.mov_cor; }
   } catch (e) {} return m;
 }
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
