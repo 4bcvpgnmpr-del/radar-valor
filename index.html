@@ -95,7 +95,7 @@
   .pgc:hover { background:#122028; }
   .pgc-top { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#9AA5B1; margin-bottom:6px; align-items:center; }
   .pgc-top .lg { font-weight:700; letter-spacing:.03em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
-  .pgc-top .live { color:#E5484D; font-weight:700; }
+  .pgc-top .live { color:#E5484D; font-weight:700; } .pgc-top .ft { color:#3ECF8E; font-weight:700; }
   .pgc-row { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:1px 0; }
   .pgc-row span.nmt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pgc-vs { text-align:center; color:#E5484D; font-size:10px; line-height:1.2; }
@@ -1570,7 +1570,7 @@
   <div id="view-widgets" class="view">
     <div data-help="widgets"></div>
     <div class="panel">
-      <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga (API-Football)</div>
+      <div style="font-weight:600; margin-bottom:6px;">Estadísticas de liga</div>
       <div class="muted" style="margin-bottom:10px;">Clasificación, máximos goleadores y tarjetas de la temporada — útil para contrastar con lo que dicen las cuotas. <b>API-Football gratis solo llega a 2024</b>; con el token de football-data.org la temporada actual se carga desde allí.</div>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
         <select id="widgetLeague">
@@ -4760,6 +4760,7 @@ function fillLeagueSelects() {
     el.innerHTML = DD_LEAGUES.map(l => `<option value="${l[k]}">${l.fl} ${l.nm}</option>`).join("");
     if (DD_LEAGUES.some(l => l[k] === cur)) el.value = cur;
   });
+  try { prInit(); const w = document.getElementById("widgetLeague"); if (w && !w.querySelector("optgroup")) { const have = new Set(Object.values(FD_ESPN)); w.insertAdjacentHTML("beforeend", `<optgroup label="Más ligas">${[...document.querySelectorAll("#plLeague option")].filter(o => !have.has(o.value)).map(o => `<option value="espn:${o.value}">${o.textContent}</option>`).join("")}</optgroup>`); } } catch (e) { }
 }
 function renderDdChips() {
   const el = document.getElementById("dd-chips"); if (!el) return; fdSchedLoad();
@@ -5415,13 +5416,32 @@ async function liveWatchTick() {
 }
 function alWatchRender() { const el = document.getElementById("alWatch"); if (!el) return; liveWatchWanted(); const n = reqToday(); el.innerHTML = `Vigilancia en vivo: <b style="color:#3ECF8E;">${liveWatchState}</b>${liveWatchLast ? " · última comprobación " + liveWatchLast.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""} · peticiones de alarmas hoy: ${n}${n >= 80 ? ' <b style="color:#F0B429;">(cerca del límite del plan gratuito: 100/día)</b>' : ""}`; }
 setInterval(liveWatchTick, 60000);
+
+/* ===== Resultados de partidos de hoy en Pregame (ESPN) ===== */
+let cpRes = { t: 0, list: [], busy: false };
+function cpResFind(m) {
+  const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(m.home_team), a = nm(m.away_team);
+  return cpRes.list.find(r => near(r.h, h) && near(r.a, a)) || null;
+}
+function cpResBadge(m, hm) {
+  const r = Date.parse(m.commence_time) <= Date.now() ? cpResFind(m) : null; if (!r) return `<span>${hm}</span>`;
+  return r.done ? `<span class="ft">FT ${r.hg}-${r.ag}</span>` : r.live ? `<span class="live">● ${r.hg}-${r.ag}${r.clock ? " " + r.clock : ""}</span>` : `<span>${hm}</span>`;
+}
+async function cpResEnsure() {
+  if (cpRes.busy || Date.now() - cpRes.t < 120000) return; cpRes.busy = true;
+  try { prInit(); const slugs = [...document.querySelectorAll("#plLeague option")].map(o => o.value), d = new Date(), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`, list = [];
+    await prPool(slugs, 8, async sl => { try { const j = await espnGet(`${sl}/scoreboard?dates=${ds}`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"), t = (c.status || e.status || {}).type || {}; if (!hc || !ac || hc.score == null || t.state === "pre") return;
+      const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()); list.push({ h: nm(hc.team.displayName || hc.team.name), a: nm(ac.team.displayName || ac.team.name), hg: hc.score, ag: ac.score, done: !!t.completed, live: t.state === "in", clock: (c.status || e.status || {}).displayClock || "" }); }); } catch (e) { } });
+    const changed = JSON.stringify(list) !== JSON.stringify(cpRes.list); cpRes = { t: Date.now(), list, busy: false }; if (changed) renderCoupon();
+  } catch (e) { cpRes.busy = false; cpRes.t = Date.now(); }
+}
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
   const day0 = new Date(); day0.setHours(0, 0, 0, 0);
   const lbl = cp.dayOff == null ? "Todos los días" : cp.dayOff === 0 ? "Hoy" : cp.dayOff === 1 ? "Mañana" : new Date(day0.getTime() + cp.dayOff * 86400000).toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short" });
   document.getElementById("cpDayLabel").textContent = lbl;
   const now = Date.now(), favs = getFavorites();
-  let base = cpAll().filter(x => Date.parse(x.m.commence_time) >= now - 3 * 3600000);
+  let base = cpAll().filter(x => Date.parse(x.m.commence_time) >= Math.min(now - 3 * 3600000, day0.getTime()));
   if (cp.dayOff != null) { const t0 = day0.getTime() + cp.dayOff * 86400000; base = base.filter(x => { const t = Date.parse(x.m.commence_time); return t >= t0 && t < t0 + 86400000; }); }
   if (cp.q) base = base.filter(x => x.m.home_team.toLowerCase().includes(cp.q) || x.m.away_team.toLowerCase().includes(cp.q));
   { const seen = new Map(); pfLeaguesOrdered().forEach(l => seen.set(l.id, { id: l.id, fl: l.fl, nm: l.nm })); base.forEach(x => { if (!seen.has(x.l.id)) seen.set(x.l.id, { id: x.l.id, fl: x.l.fl, nm: x.l.cty || x.l.nm }); }); cp.leagues.forEach(id => { if (!seen.has(id)) seen.set(id, { id, fl: "🌍", nm: id }); });
@@ -5457,14 +5477,14 @@ function renderCoupon() {
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
     const mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
     const nT = mt ? (hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
-    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${r.m.mov_live ? `<span class="live">● ${r.m.mov_score || "VIVO"}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</span>` : `<span>${hm}</span>`}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
+    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${r.m.mov_live ? `<span class="live">● ${r.m.mov_score || "VIVO"}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</span>` : cpResBadge(r.m, hm)}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
       (!cp.stat.g ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) +
       (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
       `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}<td></td><td></td></tr>`;
   });
-  el.innerHTML = html + "</tbody></table>";
+  el.innerHTML = html + "</tbody></table>"; cpResEnsure();
   document.getElementById("cpPages").innerHTML = pages > 1 ? Array.from({ length: pages }, (_, i) => `<button class="${i === cp.page ? "on" : ""}" onclick="cp.page=${i}; renderCoupon();">${i + 1}</button>`).join("") : "";
 }
 /* ===== Perfiles (ligas, mercados, rachas y casas favoritas) ===== */
@@ -5826,7 +5846,18 @@ async function loadLeagueStatsFd(league, season) {
       <div class="muted" style="font-size:12px;">Tarjetas y fichas de jugador no están en el plan gratuito de football-data.org; para eso hace falta API-Football.</div>`;
   } catch (e) { statusEl.textContent = ""; container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar desde football-data.org: ${e.message}</div>`; }
 }
+async function loadLeagueStatsEspn(slug) {
+  const statusEl = document.getElementById("widgets-status"), container = document.getElementById("widgets-container");
+  statusEl.textContent = "Cargando clasificación…"; container.innerHTML = `<div class="skeleton skeleton-line" style="width:30%;"></div><div class="skeleton skeleton-card"></div>`;
+  try { const r = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${slug}/standings`); if (!r.ok) throw new Error("ESPN " + r.status); const j = await r.json(), groups = (j.children && j.children.length ? j.children : [j]).filter(g => g.standings && (g.standings.entries || []).length);
+    if (!groups.length) throw new Error("ESPN no tiene clasificación para esta competición");
+    const html = groups.map(g => { const rows = g.standings.entries.map(e => { const st = {}; (e.stats || []).forEach(x => st[x.name] = x.value); return { n: e.team.displayName || e.team.name, lg: (e.team.logos || [])[0] && e.team.logos[0].href, pj: st.gamesPlayed, g: st.wins, e: st.ties, p: st.losses, gf: st.pointsFor, gc: st.pointsAgainst, dg: st.pointDifferential, pts: st.points, rk: st.rank }; }).sort((a, b) => (a.rk || 99) - (b.rk || 99));
+      return `${groups.length > 1 ? `<div class="muted" style="margin:14px 0 6px; font-weight:700;">${g.name || ""}</div>` : ""}<table class="cptable"><thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>E</th><th>P</th><th>GF</th><th>GC</th><th>DG</th><th>Pts</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="mono">${r.rk || i + 1}</td><td style="text-align:left;">${r.lg ? `<img src="${r.lg}" style="width:18px;height:18px;object-fit:contain;vertical-align:middle;margin-right:8px;" />` : ""}${r.n}</td><td class="mono">${r.pj ?? ""}</td><td class="mono">${r.g ?? ""}</td><td class="mono">${r.e ?? ""}</td><td class="mono">${r.p ?? ""}</td><td class="mono">${r.gf ?? ""}</td><td class="mono">${r.gc ?? ""}</td><td class="mono">${r.dg ?? ""}</td><td class="mono"><b>${r.pts ?? ""}</b></td></tr>`).join("")}</tbody></table>`; }).join("");
+    statusEl.textContent = ""; container.innerHTML = `<div class="muted" style="margin-bottom:6px;">Clasificación actual · datos de ESPN</div>${html}<div class="muted" style="font-size:12px; margin-top:10px;">Goleadores, asistentes y tarjetas de jugadores: mira la pantalla <b>Jugadores</b>.</div>`;
+  } catch (e) { statusEl.textContent = ""; container.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar: ${e.message}</div>`; }
+}
 async function loadLeagueStats() {
+  { const lg = document.getElementById("widgetLeague").value; if (lg.startsWith("espn:")) return loadLeagueStatsEspn(lg.slice(5)); if (FD_ESPN[lg] && Number(document.getElementById("widgetSeason").value || currentSeason()) >= currentSeason() - 1) return loadLeagueStatsEspn(FD_ESPN[lg]); }
   { const lg = document.getElementById("widgetLeague").value, se = document.getElementById("widgetSeason").value || currentSeason(); if (getFdKey() && Number(se) >= currentSeason() && FD_CODES[String(lg)]) return loadLeagueStatsFd(lg, se); }
   const footballKey = getFootballKey();
   const statusEl = document.getElementById("widgets-status");
