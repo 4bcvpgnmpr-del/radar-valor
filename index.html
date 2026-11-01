@@ -4637,8 +4637,19 @@ async function ofResults(league, season) {
   const j = await res.json();
   return (j.matches || []).filter(m => m.score && m.score.ft && m.score.ft.length === 2).map(m => ({ d: `${m.date}T${m.time || "12:00"}:00Z`, h: m.team1, a: m.team2, hg: m.score.ft[0], ag: m.score.ft[1], hh: m.score.ht ? m.score.ht[0] : null, ha: m.score.ht ? m.score.ht[1] : null }));
 }
+async function espnResults(league, season) {
+  const slug = FD_ESPN[String(league)]; if (!slug) throw new Error("liga no disponible en ESPN");
+  const y = Number(season), pad = n => String(n).padStart(2, "0"), end = Math.min(Date.now(), Date.UTC(y + 1, 5, 30)), months = [];
+  for (let d = new Date(Date.UTC(y, 6, 1)); d.getTime() <= end; d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))) { const e = new Date(Math.min(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0), end)); months.push(`${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}01-${e.getUTCFullYear()}${pad(e.getUTCMonth() + 1)}${pad(e.getUTCDate())}`); }
+  const out = [], seen = new Set();
+  await prPool(months, 4, async rng => { try { const j = await espnGet(`${slug}/scoreboard?dates=${rng}&limit=500`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c || !(c.status || e.status || {}).type || !(c.status || e.status).type.completed || seen.has(e.id)) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac || hc.score == null || ac.score == null) return; seen.add(e.id);
+    const ls = x => (x.linescores || [])[0] ? Number(x.linescores[0].value) : null; out.push({ d: e.date, h: hc.team.displayName || hc.team.name, a: ac.team.displayName || ac.team.name, hg: Number(hc.score), ag: Number(ac.score), hh: ls(hc), ha: ls(ac) }); }); } catch (er) { } });
+  if (!out.length) throw new Error("ESPN no devolvió partidos de esta temporada");
+  return out.sort((a, b) => String(a.d).localeCompare(String(b.d)));
+}
 async function fetchLeagueResults(league, season) {
   const useFd = getFdKey() && Number(season) >= currentSeason(); let err = null;
+  if (FD_ESPN[String(league)] && Number(season) >= currentSeason() - 1) { try { return { f: await espnResults(league, season), src: "ESPN" }; } catch (e) { err = e; console.warn(e.message); } }
   if (useFd) { try { return { f: await fdResults(league, season), src: "football-data.org" }; } catch (e) { err = e; console.warn(e.message); } }
   if (getFootballKey()) {
     try {
@@ -4654,7 +4665,7 @@ function setTrVenue(v) { trVenue = v; document.querySelectorAll("#trVenue .seg-b
 async function loadTrends() {
   const key = getFootballKey(), st = document.getElementById("trStatus");
   const league = document.getElementById("trLeague").value, season = document.getElementById("trSeason").value || 2024;
-  if (!key && !(getFdKey() && Number(season) >= currentSeason()) && !OF_CODES[String(league)]) { st.textContent = "Esta liga necesita tu API-Football key o el token de football-data.org en ⚙️ Configuración."; return; }
+  if (!key && !(getFdKey() && Number(season) >= currentSeason()) && !OF_CODES[String(league)] && !FD_ESPN[String(league)]) { st.textContent = "Esta liga necesita tu API-Football key o el token de football-data.org en ⚙️ Configuración."; return; }
   const ck = `radar-trends-${league}-${season}`;
   try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 3600 * 1000 && (!c.f.length || c.f[0].hh !== undefined)) { trData = c.f; st.textContent = "Datos en caché (menos de 6 h)."; renderTrends(); renderExplore(); return; } } catch (e) {}
   st.textContent = "Cargando partidos de la temporada...";
