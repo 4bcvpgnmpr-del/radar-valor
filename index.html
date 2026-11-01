@@ -447,6 +447,19 @@
   details.help[open] > summary { color:#3ECF8E; border-bottom:1px solid #1A212B; }
   details.help .hp { padding:12px 16px; font-size:13px; line-height:1.65; color:#C5CCD6; text-align:left; }
   details.help .hp b { color:#E6EAF0; } details.help .hp ul { margin:6px 0 0; padding-left:18px; } details.help .hp li { margin:3px 0; }
+
+  .hb-top { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+  .hb-ttl { font-weight:700; font-size:18px; }
+  .hb-tools { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .hbt { background:#141A23; border:1px solid #1E2733; color:#9AA5B1; border-radius:12px; padding:6px 10px; cursor:pointer; font-size:16px; display:inline-flex; align-items:center; gap:6px; }
+  .hbt i { font-style:normal; font-size:11px; }
+  .hbt:hover { border-color:#1EC8A5; color:#E6EBF1; } .hbt.on { background:#12302B; border-color:#1EC8A5; color:#1EC8A5; }
+  .hb-win { position:relative; } .hb-win.off { display:none; }
+  .hbw-h { cursor:move; user-select:none; touch-action:none; }
+  .hbw-x { position:absolute; right:10px; top:10px; width:24px; height:24px; border-radius:50%; background:#232B36; color:#E6EBF1; border:none; cursor:pointer; font-size:11px; padding:0; z-index:2; }
+  .hbw-x:hover { background:#E5484D; }
+  .hb-win.drag { z-index:270; box-shadow:0 18px 50px rgba(0,0,0,.7); }
+  .hb-float { position:fixed; top:170px; left:50%; margin-left:-270px; width:540px; max-width:94vw; max-height:78vh; overflow:auto; z-index:250; background:#10151C; border:1px solid #2A3340; box-shadow:0 20px 60px rgba(0,0,0,.65); }
   .hb-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; margin-top:14px; }
   .hb-col { display:flex; flex-direction:column; gap:14px; min-width:0; }
   .hb-win { background:#10151C; border:1px solid #232B36; border-radius:14px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.35); min-width:0; }
@@ -866,31 +879,23 @@
 
   <div id="view-stats" class="view">
     <div class="panel" id="hb-panel">
-      <div style="font-weight:600; font-size:16px; text-align:center;">Backtest histórico por liga</div>
-      <div class="muted" style="text-align:center; font-size:12px; margin:6px 0 12px; line-height:1.6;">Prueba una estrategia sobre partidos pasados con sus cuotas reales: elige liga, selección (local, empate, visitante, más/menos 2.5), casa y filtros, y mira cuánto habría rendido. Datos: archivos CSV gratuitos de football-data.co.uk (con cuotas Pinnacle, Bet365, máx. y media).</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center;">
-        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;">📂 Importar CSV (varios a la vez)<input type="file" id="hbFile" accept=".csv,text/csv" multiple style="display:none;" onchange="hbImport(event)" /></label>
-        <a class="small ghost" href="https://www.football-data.co.uk/data.php" target="_blank" rel="noopener" style="padding:8px 14px; border:1px solid #2A3340; border-radius:10px; color:inherit; text-decoration:none;">🌐 Dónde descargarlos</a>
-        <button class="small ghost" onclick="exportBackup()" title="Descarga un archivo con tus CSV importados, tus sistemas, alarmas y perfiles">💾 Copia de seguridad</button>
-        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;" title="Restaura una copia descargada antes">📥 Restaurar copia<input type="file" accept="application/json" style="display:none;" onchange="importBackup(event)" /></label>
-        <button class="small ghost" onclick="hbClear()">🗑 Borrar datos</button>
-      </div>
-      <div data-help="hist" style="margin-top:12px;"></div>
+      <div class="hb-top"><div class="hb-ttl">Backtesting</div><div class="hb-tools" id="hbTools">
+        <button class="hbt" data-w="data" onclick="hbwToggle('data')" title="Importar datos y copias de seguridad">📂<i>Datos</i></button>
+        <button class="hbt" data-w="sys" onclick="hbwToggle('sys')" title="Mis sistemas guardados">💾<i>Sistemas</i></button>
+        <button class="hbt" data-w="rep" onclick="hbwToggle('rep')" title="Reporte del sistema">📈<i>Reporte</i></button>
+        <button class="hbt" data-w="res" onclick="hbwToggle('res')" title="Resultados de backtesting">📊<i>Resultados</i></button>
+        <button class="hbt" data-w="pk" onclick="hbwToggle('pk')" title="Picks del sistema">🎯<i>Picks</i></button>
+        <button class="hbt" data-w="desc" onclick="hbwToggle('desc')" title="Descripción del sistema">📝<i>Descripción</i></button>
+        <button class="hbt" data-w="rank" onclick="hbwToggle('rank')" title="Buscar ligas y equipos rentables">🏆<i>Ranking</i></button>
+        <button class="hbt" onclick="hbOpenF()" title="Filtros del sistema">⚙<i>Filtros</i></button>
+      </div></div>
       <div id="hbMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
       <div id="hbBody" style="display:none;">
-        <div class="hb-grid"><div class="hb-col"><div class="hb-win">
+        <div class="hb-grid"><div class="hb-col"><div class="hb-win" id="hbw-rep">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Reporte del sistema</div>
           <button class="small" onclick="hbOpenF()">⚙ Filtros</button>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px;">
-          <select id="hbSys" onchange="hbSysLoad(this.value)" style="min-width:170px; flex:1;"><option value="">Sistemas guardados</option></select>
-          <input id="hbSysName" oninput="hbRender()" type="text" placeholder="Nombre del sistema" style="width:170px; flex:1;" />
-          <input id="hbSysNote" oninput="hbRender()" type="text" placeholder="Comentarios (opcional)" style="width:200px; flex:2;" />
-          <button class="small" onclick="hbSysSave()">💾 Guardar sistema</button>
-          <button class="small ghost" onclick="hbSysDel()" title="Borrar el sistema seleccionado">Borrar sistema</button>
-        </div>
-        <div id="hbSysMsg" class="muted" style="font-size:12px; min-height:16px; margin-bottom:6px;"></div>
         <div class="seg" id="hbPeriod" style="display:flex; flex-wrap:wrap; width:fit-content; max-width:100%; margin:10px 0 12px;">
           <button class="seg-b active" data-p="all" onclick="hbSetPer('all')">Todas las temporadas</button><button class="seg-b" data-p="7" onclick="hbSetPer('7')">Últimos 7 días</button><button class="seg-b" data-p="30" onclick="hbSetPer('30')">Últimos 30 días</button><button class="seg-b" data-p="last" onclick="hbSetPer('last')">Última temporada</button>
         </div>
@@ -903,13 +908,13 @@
         <div id="hbDD" class="muted" style="text-align:center; font-size:12px; margin:-4px 0 8px;"></div>
         <div id="hbChart"></div>
         <div id="hbSeasons" style="margin-top:10px; text-align:center;"></div>
-        </div><div class="hb-win">
+        </div><div class="hb-win" id="hbw-res">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Resultados de backtesting</div>
           <input id="hbQ" type="text" placeholder="Buscar..." oninput="hbRender()" style="width:170px;" />
         </div>
         <div id="hbResults" style="margin-top:8px; overflow-x:auto;"></div>
-        </div></div><div class="hb-col"><div class="hb-win">
+        </div></div><div class="hb-col"><div class="hb-win" id="hbw-pk">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Picks del sistema</div>
           <input id="hbPQ" type="text" placeholder="Buscar..." oninput="hbPicksRender()" style="width:150px;" />
@@ -918,19 +923,40 @@
         </div>
         <div id="movMsg" class="muted" style="font-size:11px; margin-top:4px;"></div>
         <div id="hbPicks" style="margin-top:8px; overflow-x:auto;"></div>
-        </div><div class="hb-win">
+        </div><div class="hb-win" id="hbw-desc">
         <div style="font-weight:600; font-size:15px;">Descripción del sistema</div>
         <div id="hbDesc" style="margin-top:8px;"></div>
-        </div></div></div>
-        <details id="hbRkD" ontoggle="hbRender()" style="margin-top:22px; border:1px solid #1A212B; border-radius:12px; background:#0F141B;">
-          <summary style="cursor:pointer; padding:11px 14px; font-weight:600; font-size:14px;">🔎 Buscar ligas y equipos rentables (ranking)</summary>
-          <div style="padding:6px 14px 14px;">
+        </div><div class="hb-win off" id="hbw-rank">
+        <div style="font-weight:600; font-size:15px;">🔎 Buscar ligas y equipos rentables</div>
+        
             <div class="seg" style="display:flex; width:fit-content; margin:8px auto;"><button class="seg-b active" id="hbGL" onclick="hbGroup('league')">Por liga</button><button class="seg-b" id="hbGT" onclick="hbGroup('team')">Por equipo</button></div>
             <div class="pg-h" id="hbRankT" style="text-align:center;">Ranking</div>
             <input id="hbTeamQ" type="text" placeholder="Buscar equipo..." oninput="hbRender()" style="display:none; width:220px; margin:0 auto 8px;" />
             <div id="hbRank" style="overflow-x:auto;"></div>
-          </div>
-        </details>
+          
+        </div></div></div>
+      </div>
+      <div class="hb-win hb-float off" id="hbw-data"><div class="hbw-h" style="font-weight:600; font-size:15px; margin-bottom:8px;">📂 Datos</div>      <div style="font-weight:600; font-size:16px; text-align:center;">Backtest histórico por liga</div>
+      <div class="muted" style="text-align:center; font-size:12px; margin:6px 0 12px; line-height:1.6;">Prueba una estrategia sobre partidos pasados con sus cuotas reales: elige liga, selección (local, empate, visitante, más/menos 2.5), casa y filtros, y mira cuánto habría rendido. Datos: archivos CSV gratuitos de football-data.co.uk (con cuotas Pinnacle, Bet365, máx. y media).</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; align-items:center;">
+        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;">📂 Importar CSV (varios a la vez)<input type="file" id="hbFile" accept=".csv,text/csv" multiple style="display:none;" onchange="hbImport(event)" /></label>
+        <a class="small ghost" href="https://www.football-data.co.uk/data.php" target="_blank" rel="noopener" style="padding:8px 14px; border:1px solid #2A3340; border-radius:10px; color:inherit; text-decoration:none;">🌐 Dónde descargarlos</a>
+        <button class="small ghost" onclick="exportBackup()" title="Descarga un archivo con tus CSV importados, tus sistemas, alarmas y perfiles">💾 Copia de seguridad</button>
+        <label class="small ghost" style="cursor:pointer; padding:8px 14px; border:1px solid #2A3340; border-radius:10px;" title="Restaura una copia descargada antes">📥 Restaurar copia<input type="file" accept="application/json" style="display:none;" onchange="importBackup(event)" /></label>
+        <button class="small ghost" onclick="hbClear()">🗑 Borrar datos</button>
+      </div>
+      <div data-help="hist" style="margin-top:12px;"></div>
+</div>
+      <div class="hb-win hb-float off" id="hbw-sys"><div class="hbw-h" style="font-weight:600; font-size:15px; margin-bottom:8px;">💾 Mis sistemas</div>
+        <div id="hbSysTbl" style="overflow-x:auto;"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px;">
+          <select id="hbSys" style="display:none;" onchange="hbSysLoad(this.value)" style=""><option value="">Sistemas guardados</option></select>
+          <input id="hbSysName" oninput="hbRender()" type="text" placeholder="Nombre del sistema" style="width:170px; flex:1;" />
+          <input id="hbSysNote" oninput="hbRender()" type="text" placeholder="Comentarios (opcional)" style="width:200px; flex:2;" />
+          <button class="small" onclick="hbSysSave()">💾 Guardar sistema</button>
+          <button class="small ghost" onclick="hbSysDel()" title="Borrar el sistema seleccionado">Borrar sistema</button>
+        </div>
+        <div id="hbSysMsg" class="muted" style="font-size:12px; min-height:16px; margin-bottom:6px;"></div>
       </div>
       <div id="hbModal" style="display:none; position:fixed; inset:0; z-index:300; background:rgba(0,0,0,.7); overflow:auto;" onclick="if(event.target===this)hbCloseF()">
         <div style="max-width:780px; margin:20px auto; background:#10151C; border:1px solid #2A3340; border-radius:16px; padding:18px;">
@@ -999,6 +1025,7 @@
         </div>
       </div>
     </div>
+    <div id="btLegacy" style="display:none;">
     <div class="panel" id="bt-system">
       <div data-help="sistema"></div>
       <div class="seg bt-period" id="btPeriod">
@@ -1058,6 +1085,7 @@
       <div style="font-weight:600; margin-bottom:6px;">Comparar fracciones de Kelly</div>
       <div class="muted" style="margin-bottom:10px;">Cómo te habría ido con el mismo historial de apuestas marcadas, usando 100%, 50% o 25% de Kelly como tamaño de apuesta.</div>
       <div id="kelly-compare"></div>
+    </div>
     </div>
   </div>
 
@@ -2955,8 +2983,9 @@ function hbSelRows(f) {
   return ls.flatMap(l => hbData[l]).sort((a, b) => a[0] - b[0]);
 }
 function hbInit() {
+  try { hbwInit(); } catch (e) {}
   const lgs = Object.keys(hbData).sort(), body = document.getElementById("hbBody"); if (!body) return;
-  if (!lgs.length) { body.style.display = "none"; if (!document.getElementById("hbMsg").textContent) document.getElementById("hbMsg").textContent = "Aún no hay datos. Descarga CSV de football-data.co.uk (por ejemplo NOR.csv de Noruega, o un E0.csv por temporada) e impórtalos aquí."; return; }
+  if (!lgs.length) { const dw = document.getElementById("hbw-data"); if (dw && !(hbwStore().off && "data" in hbwStore().off)) { dw.classList.remove("off"); hbwSync(); } body.style.display = "none"; if (!document.getElementById("hbMsg").textContent) document.getElementById("hbMsg").textContent = "Aún no hay datos. Descarga CSV de football-data.co.uk (por ejemplo NOR.csv de Noruega, o un E0.csv por temporada) e impórtalos aquí."; return; }
   body.style.display = "block";
   lgs.forEach(hbEnrich); hbLastSeas = {}; hbMaxD = 0;
   lgs.forEach(l => { const rs = hbData[l]; hbLastSeas[l] = rs[rs.length - 1][5]; hbMaxD = Math.max(hbMaxD, rs[rs.length - 1][0]); });
@@ -3177,6 +3206,36 @@ function hbPicksRender() {
     out.slice(0, 40).map(x => `<tr style="border-top:1px solid #1A212B;"><td style="padding:6px 5px; white-space:nowrap;">${new Date(x.t).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</td><td>${x.lg.split(" · ").pop()}</td><td>${x.m.home_team}</td><td>${x.m.away_team}</td><td style="text-align:right; font-weight:600;">${x.p.price.toFixed(2)}</td><td style="text-align:right; color:${x.p.ev == null ? "#7C8797" : col(x.p.ev)};">${x.p.ev == null ? "—" : (x.p.ev >= 0 ? "+" : "") + (x.p.ev * 100).toFixed(1) + "%"}</td></tr>`).join("") + `</table>` :
     `<div class="muted" style="text-align:center; padding:10px; font-size:12px; line-height:1.6;">${seen ? "Ningún partido de los próximos 8 días cumple este sistema." : "No hay partidos con cuotas cargadas. Abre una liga en Partidos y valor para cargar sus cuotas."}<br>Solo se miran ligas con cuotas ya cargadas y que existan en tus CSV.</div>`;
 }
+
+/* ===== Ventanas flotantes del Backtesting ===== */
+const HBW_KEY = "radar-hbw", HBW_MAP = { data: "hbw-data", sys: "hbw-sys", rep: "hbw-rep", res: "hbw-res", pk: "hbw-pk", desc: "hbw-desc", rank: "hbw-rank" };
+function hbwStore() { try { return JSON.parse(localStorage.getItem(HBW_KEY) || "{}"); } catch (e) { return {}; } }
+function hbwSave(o) { try { localStorage.setItem(HBW_KEY, JSON.stringify(o)); } catch (e) {} }
+function hbwSync() { const o = hbwStore(); document.querySelectorAll("#hbTools .hbt[data-w]").forEach(b => { const el = document.getElementById(HBW_MAP[b.dataset.w]); b.classList.toggle("on", el && !el.classList.contains("off")); }); }
+function hbwToggle(k) {
+  const el = document.getElementById(HBW_MAP[k]); if (!el) return; const o = hbwStore(); o.off = o.off || {};
+  el.classList.toggle("off"); o.off[k] = el.classList.contains("off"); hbwSave(o); hbwSync();
+  if (!el.classList.contains("off")) { if (k === "sys") hbSysTable(); if (k === "rank") hbRender(); if (k === "data" || k === "sys") { el.style.zIndex = 260; } }
+}
+function hbwInit() {
+  const o = hbwStore(), off = o.off || {}, pos = o.pos || {};
+  Object.keys(HBW_MAP).forEach(k => { const el = document.getElementById(HBW_MAP[k]); if (!el) return; const def = ["data", "sys", "rank"].includes(k); const isOff = k in off ? off[k] : def; el.classList.toggle("off", !!isOff);
+    if (!el.dataset.dr) { el.dataset.dr = "1"; const x = document.createElement("button"); x.className = "hbw-x"; x.textContent = "✕"; x.title = "Cerrar"; x.onclick = ev => { ev.stopPropagation(); hbwToggle(k); }; el.appendChild(x);
+      const h = el.querySelector(".hbw-h") || el.firstElementChild; if (h) h.classList.add("hbw-h");
+      let sx, sy, bx, by, on = false;
+      el.addEventListener("pointerdown", ev => { const hd = ev.target.closest(".hbw-h"); if (!hd || !el.contains(hd) || ev.target.closest("input,button,select,label,a,textarea")) return; on = true; sx = ev.clientX; sy = ev.clientY; const p = (hbwStore().pos || {})[k] || [0, 0]; bx = p[0]; by = p[1]; el.classList.add("drag"); el.setPointerCapture(ev.pointerId); });
+      el.addEventListener("pointermove", ev => { if (!on) return; el.style.transform = `translate(${bx + ev.clientX - sx}px, ${by + ev.clientY - sy}px)`; });
+      const end = ev => { if (!on) return; on = false; el.classList.remove("drag"); const m = /translate\((-?[\d.]+)px, (-?[\d.]+)px\)/.exec(el.style.transform); if (m) { const st = hbwStore(); st.pos = st.pos || {}; st.pos[k] = [parseFloat(m[1]), parseFloat(m[2])]; hbwSave(st); } };
+      el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+      el.addEventListener("dblclick", ev => { if (ev.target.closest(".hbw-h")) { el.style.transform = ""; const st = hbwStore(); if (st.pos) delete st.pos[k]; hbwSave(st); } });
+    }
+    if (pos[k]) el.style.transform = `translate(${pos[k][0]}px, ${pos[k][1]}px)`; });
+  hbwSync();
+}
+function hbSysTable() {
+  const el = document.getElementById("hbSysTbl"); if (!el) return; const o = hbSysAll(), ks = Object.keys(o).sort(), q = n => n.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+  el.innerHTML = ks.length ? `<table style="width:100%; border-collapse:collapse; font-size:12px;"><tr style="color:#7C8797;"><th style="text-align:left; padding:4px;">Nombre</th><th style="text-align:left;">Descripción</th><th></th></tr>${ks.map(n => `<tr style="border-top:1px solid #1A212B;"><td style="padding:6px 4px; font-weight:600;">${n}</td><td class="muted">${o[n].note || "Sin descripción"}</td><td style="white-space:nowrap; text-align:right;"><button class="small" onclick="document.getElementById('hbSys').value='${q(n)}'; hbSysLoad('${q(n)}')">Cargar</button> <button class="small ghost" onclick="document.getElementById('hbSys').value='${q(n)}'; hbSysDel(); hbSysTable()">Borrar</button></td></tr>`).join("")}</table>` : '<div class="muted" style="font-size:12px; padding:6px 0;">Aún no hay sistemas guardados. Ajusta los filtros, ponle un nombre abajo y pulsa «Guardar sistema».</div>';
+}
 const HB_SYS_KEY = "radar-bt-hsystems", HB_SYS_IDS = ["hbSel", "hbBook", "hbWhen", "hbUnit", "hbOMin", "hbOMax", "hbEV", "hbFix", "hbMinN", "hbPhMin", "hbPhMax", "hbPaMin", "hbPaMax", "hbGhMin", "hbGhMax", "hbGaMin", "hbGaMax", "hbWh", "hbWa", "hbUh", "hbUa"];
 function hbSysAll() { try { return JSON.parse(localStorage.getItem(HB_SYS_KEY) || "{}"); } catch (e) { return {}; } }
 function hbSysSet(o) { try { localStorage.setItem(HB_SYS_KEY, JSON.stringify(o)); return true; } catch (e) { return false; } }
@@ -3188,6 +3247,7 @@ function hbSysList() {
   const o = hbSysAll(), el = document.getElementById("hbSys"); if (!el) return; const cur = el.value;
   el.innerHTML = `<option value="">Sistemas guardados${Object.keys(o).length ? " (" + Object.keys(o).length + ")" : ""}</option>` + Object.keys(o).sort().map(k => `<option value="${k.replace(/"/g, "&quot;")}">${k}</option>`).join("");
   if (o[cur]) el.value = cur;
+  try { hbSysTable(); } catch (e) {}
 }
 function hbSysSave() {
   const name = document.getElementById("hbSysName").value.trim(), msg = document.getElementById("hbSysMsg");
@@ -3235,7 +3295,7 @@ function hbRender() {
   const bs = {}; bets.forEach(x => (bs[x.s] = bs[x.s] || []).push(x));
   document.getElementById("hbSeasons").innerHTML = Object.keys(bs).sort().map(k => { const s2 = hbStats(bs[k]); return `<div style="display:inline-block; margin:3px; background:#141A23; border:1px solid #1A212B; border-radius:10px; padding:6px 10px; font-size:12px; text-align:center;"><div class="muted">${k}</div><b style="color:${col(s2.y)}">${s2.y >= 0 ? "+" : ""}${s2.y.toFixed(0)}%</b> <span class="muted">· ${s2.n}</span></div>`; }).join("");
   hbResultsRender(bets, f);
-  if (document.getElementById("hbRkD").open) hbRankRender(sel, bk, f, rows);
+  if (!document.getElementById("hbw-rank").classList.contains("off")) hbRankRender(sel, bk, f, rows);
 }
 function hbResultsRender(bets, f) {
   const el = document.getElementById("hbResults"), q = (document.getElementById("hbQ").value || "").trim().toLowerCase(), col = v => v >= 0 ? "#3ECF8E" : "#E5484D", u = f.unit;
