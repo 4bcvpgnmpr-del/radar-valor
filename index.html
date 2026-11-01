@@ -914,6 +914,7 @@
         <button class="small ghost" onclick="exportClvXlsx()">Exportar Excel</button>
       </div>
       <div class="muted" style="margin-bottom:10px;">CLV compara tu cuota registrada contra la cuota justo antes del partido. Positivo y sostenido en el tiempo = edge real.</div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;"><button class="small" id="syncBtn" onclick="movAutoSync()">Actualizar cierres y resultados (Bet365, gratis)</button><span id="syncMsg" class="muted" style="font-size:12px;"></span></div>
       <div id="clv-chart" style="margin-bottom:14px;"></div>
       <div id="clv-list"></div>
     </div>
@@ -2776,6 +2777,46 @@ async function updateClosing(id) {
   } catch (e) { alert("Error: " + e.message); }
 }
 
+/* ---- Cierres (CLV) y resultados automáticos con MoviOdds (bet365) ---- */
+function movSettle(marketKey, sel, home, away, res) {
+  const sc = /(\d+)\s*-\s*(\d+)/.exec(marketKey === "totals_ht" ? ((res.periods || []).find(p => /1st|first/i.test(p.name)) || {}).score || "" : res.final_score || ""); if (!sc) return null;
+  const hg = +sc[1], ag = +sc[2], tot = hg + ag, nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
+  if (marketKey === "h2h") { const n = nm(sel); if (/^draw$|^empate$|^x$/i.test(String(sel).trim())) return hg === ag ? "ganada" : "perdida"; if (near(n, nm(home))) return hg > ag ? "ganada" : "perdida"; if (near(n, nm(away))) return ag > hg ? "ganada" : "perdida"; return null; }
+  if (marketKey === "totals" || marketKey === "totals_ht") { const m = /^(over|under)\s*\+?(\d+(?:\.\d+)?)/i.exec(String(sel).trim()); if (!m) return null; const ln = +m[2]; if (tot === ln) return null; return (m[1].toLowerCase() === "over") === (tot > ln) ? "ganada" : "perdida"; }
+  if (marketKey === "btts") { const y = hg > 0 && ag > 0; return /^(yes|sí|si)$/i.test(String(sel).trim()) ? (y ? "ganada" : "perdida") : /^no$/i.test(String(sel).trim()) ? (y ? "perdida" : "ganada") : null; }
+  return null;
+}
+function movClosingPick(c, marketKey, sel, home, away) {
+  const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
+  const price = x => { const q = x.pre_close || x.last; return q && q.odds_dec > 1 ? q.odds_dec : null; }, S = c.selections || [];
+  const teamG = g => [home, away].some(t => t && String(g).toLowerCase().includes(String(t).toLowerCase()));
+  if (marketKey === "h2h") { const f = S.filter(x => /^Full ?Time Result$/i.test(x.group_name || "")), lab = /^draw$|^empate$|^x$/i.test(String(sel).trim()) ? "draw" : near(nm(sel), nm(home)) ? "home" : near(nm(sel), nm(away)) ? "away" : null; if (!lab) return null; const x = f.find(y => lab === "draw" ? /^draw$/i.test((y.label || "").trim()) : near(nm(y.label), nm(lab === "home" ? home : away))); return x ? price(x) : null; }
+  if (marketKey === "totals" || marketKey === "totals_ht") { const m = /^(over|under)\s*\+?(\d+(?:\.\d+)?)/i.exec(String(sel).trim()); if (!m) return null; const ht = marketKey === "totals_ht", x = S.find(y => { const g = y.group_name || "", isHT = /(1st|first)\s*half|half\s*time\s*goals|\bHT\b/i.test(g); return !teamG(g) && isHT === ht && (/Goals Over\/Under/i.test(g) || (ht && /goals|total/i.test(g))) && String(y.side || y.label || "").toLowerCase().startsWith(m[1].toLowerCase()) && +(y.line || y.handicap) === +m[2]; }); return x ? price(x) : null; }
+  if (marketKey === "btts") { const x = S.find(y => /Both Teams/i.test(y.group_name || "") && (y.label || "").trim().toLowerCase() === (/^(yes|sí|si)$/i.test(String(sel).trim()) ? "yes" : "no")); return x ? price(x) : null; }
+  return null;
+}
+let movResCache = null;
+async function movAutoSync() {
+  const msg = document.getElementById("syncMsg"), btn = document.getElementById("syncBtn"), say = t => { if (msg) msg.textContent = t; };
+  const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
+  const clv = getClvLog(), vlog = getValueLog(), outs = getOutcomesLog();
+  const needC = clv.filter(e => e.closingOdds == null && /365/i.test(e.bookie || "") && ["h2h", "totals", "totals_ht", "btts"].includes(e.marketKey));
+  const needV = vlog.filter(e => !outs[`${e.matchId}|${e.marketKey}|${e.selection}|${e.day}`] && ["h2h", "totals", "totals_ht", "btts"].includes(e.marketKey));
+  if (!needC.length && !needV.length) { say("No hay nada pendiente (el cierre automático solo vale para apuestas registradas con Bet365)."); return; }
+  if (btn) btn.disabled = true; say("Descargando resultados de Bet365…");
+  try {
+    if (!movResCache || Date.now() - movResCache.t > 600000) { const r = await fetch("https://moviodds.com/results?sport=soccer"); if (!r.ok) throw new Error("HTTP " + r.status); const j = await r.json(); movResCache = { t: Date.now(), list: (j.results || []).filter(x => x.status === "finished" && x.final_score).map(x => ({ x, h: nm(x.home), a: nm(x.away), t: Date.parse(x.finished_at) })) }; }
+    const find = (home, away, since) => { const h = nm(home), a = nm(away); let best = null; movResCache.list.forEach(z => { if (isNaN(z.t) || z.t < since - 6 * 3600000 || z.t > since + 5 * 86400000) return; if (near(z.h, h) && near(z.a, a) && (!best || z.t < best.t)) best = z; }); return best && best.x; };
+    let nc = 0, nr = 0, o2 = getOutcomesLog();
+    for (const e of needV) { const since = Date.parse(e.day + "T00:00:00Z"), r = find(e.home, e.away, since); if (!r) continue; const res = movSettle(e.marketKey, e.selection, e.home, e.away, r); if (res) { o2[`${e.matchId}|${e.marketKey}|${e.selection}|${e.day}`] = res; nr++; } }
+    saveOutcomesLog(o2);
+    for (const e of needC) { const since = +String(e.id).replace(/\D/g, "") || 0, r = find(e.home, e.away, since); if (!r) continue; say("Descargando cierre de " + e.home + "…"); const rc = await fetch("https://moviodds.com/closing?fi=" + encodeURIComponent(r.fixture_id)); if (!rc.ok) continue; const cl = await rc.json(), px = movClosingPick(cl, e.marketKey, e.selection, e.home, e.away); if (px) { e.closingOdds = px; e.closingAt = new Date().toLocaleString("es-ES"); e.clvPct = (e.odds / px - 1) * 100; nc++; } }
+    if (nc) saveClvLog(clv);
+    say(`Listo: ${nc} cierres de CLV y ${nr} resultados marcados${(needC.length - nc) + (needV.length - nr) ? ` · ${(needC.length - nc) + (needV.length - nr)} sin encontrar (partido sin terminar o nombre distinto)` : ""}.`);
+    try { renderHistorial(); } catch (e) {} try { renderStats(); } catch (e) {}
+  } catch (e) { say("No se pudo: " + e.message); }
+  if (btn) btn.disabled = false;
+}
 function deleteClvEntry(id) { saveClvLog(getClvLog().filter(e => e.id !== id)); renderHistorial(); }
 
 const BACKUP_KEYS = ["radar-bt-hsystems", "radar-alarms", "radar-profiles", "radar-profile", "radar-presets", 
