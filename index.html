@@ -5324,6 +5324,10 @@ function alRng() {
   document.getElementById("alMMin").value = a > 0 ? a : ""; document.getElementById("alMMax").value = b < 90 ? b : "";
 }
 function alSetType(t) { alType = t; document.querySelectorAll("#alType .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === t)); document.getElementById("alPre").style.display = t === "pre" ? "block" : "none"; document.getElementById("alLive").style.display = t === "live" ? "block" : "none"; }
+function alLgNorm(x) { return String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+function alLgAll() { const out = DD_LEAGUES.map(l => ({ id: l.id, fl: l.fl, nm: l.nm })), seen = new Set(out.map(l => alLgNorm(l.nm))); try { const c = movGet(); const names = new Set(); (c ? c.data : []).forEach(m => { if (m.mov_league) names.add(m.mov_league); }); alLeaguesSel.forEach(k => { if (String(k).startsWith("n:")) names.add(k.slice(2)); }); [...names].sort().forEach(n => { const k = "n:" + alLgNorm(n); if (!seen.has(alLgNorm(n)) && !out.some(o => o.id === k)) out.push({ id: k, fl: "⚽", nm: n }); }); } catch (e) {} return out; }
+function alLgOK(a, id, nameStr) { if (!a.leagues || !a.leagues.length) return true; const nn = alLgNorm(nameStr); return a.leagues.some(l => l === id || (String(l).startsWith("n:") && nn && (nn.includes(l.slice(2)) || l.slice(2).includes(nn)))); }
+function renderAlarmsLg() { renderAlarms(); }
 function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) alLeaguesSel.splice(i, 1); else alLeaguesSel.push(id); renderAlarms(); }
 function alSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
@@ -5363,8 +5367,10 @@ function alClearLog() { try { localStorage.removeItem("radar-alarm-log"); } catc
 function renderAlarms() {
   const el = document.getElementById("alList"); if (!el) return;
   try { alWatchRender(); } catch (e) {}
-  document.getElementById("alLeagues").innerHTML = DD_LEAGUES.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" onclick="alToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
-  try { const nm = alLeaguesSel.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).filter(Boolean); document.getElementById("alLgN").textContent = nm.length ? "(" + nm.length + ")" : "(todas)"; document.getElementById("alLgSel").innerHTML = nm.length ? nm.map(n => "• " + n).join("<br>") : "Ninguna elegida: la alarma vale para todas las ligas."; alRng(); } catch (e) {}
+  { const q = ((document.getElementById("alLgQ") || {}).value || "").toLowerCase(), all = alLgAll(), vis = all.filter(l => !q || l.nm.toLowerCase().includes(q) || alLeaguesSel.includes(l.id));
+    document.getElementById("alLeagues").innerHTML = `<input id="alLgQ" placeholder="Buscar liga o país..." value="${q.replace(/"/g, "")}" oninput="renderAlarmsLg()" style="width:100%; margin-bottom:6px;">` + vis.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" data-k="${encodeURIComponent(l.id)}" onclick="alToggleLeague(decodeURIComponent(this.dataset.k))"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
+    const qe = document.getElementById("alLgQ"); if (qe && q && document.activeElement !== qe && document.getElementById("alDdL").classList.contains("open")) { qe.focus(); qe.setSelectionRange(q.length, q.length); } }
+  try { const _al = alLgAll(), nm = alLeaguesSel.map(id => (_al.find(l => l.id === id) || {}).nm).filter(Boolean); document.getElementById("alLgN").textContent = nm.length ? "(" + nm.length + ")" : "(todas)"; document.getElementById("alLgSel").innerHTML = nm.length ? nm.map(n => "• " + n).join("<br>") : "Ninguna elegida: la alarma vale para todas las ligas."; alRng(); } catch (e) {}
   const all = getAlarms();
   el.innerHTML = all.length ? all.map(a => `<div class="al-item"><div><div class="t">${a.name}</div><div class="d">${alDescribe(a)}</div></div><div style="display:flex; gap:8px; align-items:center;"><button class="small ${a.active ? "" : "ghost"}" onclick="alToggle('${a.id}')">${a.active ? "Activa" : "Pausada"}</button><button class="small ghost" onclick="alDelete('${a.id}')" title="Borrar">🗑</button></div></div>`).join("") : `<div class="muted" style="text-align:center; padding:10px;">Aún no tienes alarmas.</div>`;
   const log = getAlLog();
@@ -5499,7 +5505,7 @@ function runLiveAlarms(fixtures) {
   fixtures.forEach(f => {
     const min = f.fixture.status.elapsed, gh = f.goals.home ?? 0, ga = f.goals.away ?? 0;
     alarms.forEach(a => {
-      if (a.leagues.length && !a.leagues.includes(String(f.league.id))) return;
+      if (!alLgOK(a, String(f.league.id), (f.league.country || "") + " " + (f.league.name || ""))) return;
       if (!alMatchOK(a, f.teams.home.name, f.teams.away.name)) return;
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
@@ -5544,7 +5550,7 @@ function runMovAlarms() {
   c.data.filter(m => m.mov_live).forEach(m => {
     const mm = /(\d+)\s*[-:]\s*(\d+)/.exec(m.mov_score || ""), gh = mm ? +mm[1] : 0, ga = mm ? +mm[2] : 0, min = m.mov_min, it = all.find(x => x.m.id === m.id), lid = it ? it.l.id : null;
     alarms.forEach(a => {
-      if (a.leagues.length && (!lid || !a.leagues.includes(lid))) return;
+      if (!alLgOK(a, lid, m.mov_league)) return;
       if (!alMatchOK(a, m.home_team, m.away_team)) return;
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
