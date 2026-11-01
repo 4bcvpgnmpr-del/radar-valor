@@ -95,7 +95,11 @@
   .pgc:hover { background:#122028; }
   .pgc-top { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#9AA5B1; margin-bottom:6px; align-items:center; }
   .pgc-top .lg { font-weight:700; letter-spacing:.03em; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
-  .pgc-top .live { color:#E5484D; font-weight:700; } .pgc-top .ft { color:#3ECF8E; font-weight:700; }
+  .pgc-top .live { color:#E5484D; font-weight:700; }
+  .chip-live { display:inline-flex; align-items:center; gap:5px; background:rgba(229,72,77,.14); color:#F26B6B; font-weight:700; font-size:11px; padding:2px 8px; border-radius:999px; white-space:nowrap; } .chip-live i { width:6px; height:6px; border-radius:50%; background:#E5484D; animation:cpPulse 1.4s infinite; }
+  .chip-ft { background:rgba(62,207,142,.14); color:#3ECF8E; font-weight:700; font-size:10.5px; letter-spacing:.05em; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .gsc { margin-left:auto; min-width:22px; text-align:center; font-size:15px; font-weight:800; padding:0 6px; border-radius:6px; background:#1A212B; color:#E6EAF0; font-variant-numeric:tabular-nums; } .gsc.live { color:#F26B6B; background:rgba(229,72,77,.12); } .gsc.ft { color:#3ECF8E; background:rgba(62,207,142,.12); }
+  @keyframes cpPulse { 50% { opacity:.3; } }
   .pgc-row { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; font-weight:600; padding:1px 0; }
   .pgc-row span.nmt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pgc-vs { text-align:center; color:#E5484D; font-size:10px; line-height:1.2; }
@@ -5423,9 +5427,12 @@ function cpResFind(m) {
   const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(m.home_team), a = nm(m.away_team);
   return cpRes.list.find(r => near(r.h, h) && near(r.a, a)) || null;
 }
-function cpResBadge(m, hm) {
-  const r = Date.parse(m.commence_time) <= Date.now() ? cpResFind(m) : null; if (!r) return `<span>${hm}</span>`;
-  return r.done ? `<span class="ft">FT ${r.hg}-${r.ag}</span>` : r.live ? `<span class="live">● ${r.hg}-${r.ag}${r.clock ? " " + r.clock : ""}</span>` : `<span>${hm}</span>`;
+function cpState(m, hm) {
+  if (m.mov_live) { const sc = /(\d+)\s*[-:]\s*(\d+)/.exec(m.mov_score || ""); return { st: "live", chip: `<span class="chip-live"><i></i>${m.mov_min != null ? m.mov_min + "'" : "VIVO"}</span>`, hg: sc ? sc[1] : null, ag: sc ? sc[2] : null }; }
+  const r = Date.parse(m.commence_time) <= Date.now() ? cpResFind(m) : null;
+  if (r && r.done) return { st: "ft", chip: `<span class="chip-ft">FINAL</span>`, hg: r.hg, ag: r.ag };
+  if (r && r.live) return { st: "live", chip: `<span class="chip-live"><i></i>${r.clock || "VIVO"}</span>`, hg: r.hg, ag: r.ag };
+  return { st: "", chip: `<span>${hm}</span>`, hg: null, ag: null };
 }
 async function cpResEnsure() {
   if (cpRes.busy || Date.now() - cpRes.t < 120000) return; cpRes.busy = true;
@@ -5475,9 +5482,9 @@ function renderCoupon() {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
     if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0)}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
-    const mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
+    const cs = cpState(r.m, hm), mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
     const nT = mt ? (hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
-    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${r.m.mov_live ? `<span class="live">● ${r.m.mov_score || "VIVO"}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</span>` : cpResBadge(r.m, hm)}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
+    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${cs.chip}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${cs.hg != null ? `<b class="gsc ${cs.st}">${cs.hg}</b>` : ""}${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${cs.ag != null ? `<b class="gsc ${cs.st}">${cs.ag}</b>` : ""}${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
       (!cp.stat.g ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) +
