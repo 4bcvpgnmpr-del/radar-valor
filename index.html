@@ -2498,6 +2498,14 @@ async function loadModel(idx) {
 
 /* ===== Valor en córners: media de córners de BSD + Poisson contra las líneas de Bet365 ===== */
 function poisCdf(k, l) { let p = Math.exp(-l), c = p; for (let i = 1; i <= k; i++) { p *= l / i; c += p; } return Math.min(1, c); }
+
+async function lvAvg(btn) {
+  const out = btn.parentNode.querySelector(".lvavg"), h = btn.dataset.h, a = btn.dataset.a; out.textContent = "Cargando medias…";
+  try { const b = await vsBsd({ hn: h, an: a, date: new Date().toISOString() }); if (!b || !b.ev.home_team_id) throw new Error("BSD no tiene este partido.");
+    const [x, y] = await Promise.all([vsBsdTeamAvg(b.ev.home_team_id, 8), vsBsdTeamAvg(b.ev.away_team_id, 8)]), f = v => v == null ? "–" : (Math.round(v * 10) / 10).toString().replace(".", ","), sum = k => x[k] != null && y[k] != null ? f(x[k] + y[k]) : "–";
+    out.innerHTML = `Por partido (últimos ${Math.max(x.games, y.games)}): córners <b>${sum("corner_kicks")}</b> (${f(x.corner_kicks)} + ${f(y.corner_kicks)}) · amarillas <b>${sum("yellow_cards")}</b> · faltas <b>${sum("fouls")}</b> · tiros <b>${sum("total_shots")}</b>`;
+  } catch (e) { out.textContent = e.message; }
+}
 async function pvCorners(idx) {
   const it = pvItems[idx]; if (!it) return; const m = it.m, box = document.getElementById(`${it.cardId}-cor`); box.innerHTML = `<div class="muted">Calculando córners…</div>`;
   try { movInject(m); if (!m.mov_cor || !m.mov_cor.length) throw new Error("Bet365 no tiene líneas de córners para este partido (pulsa «Cuotas Bet365» arriba).");
@@ -4553,7 +4561,7 @@ function renderLive() {
     const hit = r.hit, hq = r.home.replace(/'/g, "\\'"), aq = r.away.replace(/'/g, "\\'"), lq = String(r.lname).replace(/'/g, "\\'");
     const cells = lv.cols.map(c => { const d = CP_COLS.find(x => x[2] === c); if (!hit) return '<div class="lvo muted">–</div>'; const key = d[1] === "home" ? hit.m.home_team : d[1] === "away" ? hit.m.away_team : d[1]; const p = cpPick(hit.m.bookmakers, d[0], key); if (!p) return '<div class="lvo muted">–</div>'; const fo = p.fair ? 1 / p.fair : null; return `<div class="lvo">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb ${p.ev != null && p.ev >= 0.02 ? "v" : ""}"><i class="ic b3">365</i>${p.price.toFixed(2)}</div></div>`; }).join("");
     return `<div class="lvr" style="${grid}" onclick="${r.kind === "af" ? `openMatchSheet('${hq}', '${aq}', '${r.id}', '${lq}')` : ""}"><div class="lvl"><span class="lvlive">${["FT", "AET", "PEN"].includes(r.st) ? "FIN" : "LIVE"}</span><span class="lvfl">${r.flag}</span><span class="lvcode">${r.code}</span></div>
-      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div><div><button class="small ghost" onclick="event.stopPropagation();vsOpenMatch(this.dataset.h,this.dataset.a,'',this)" data-h="${String(r.home).replace(/"/g,'&quot;')}" data-a="${String(r.away).replace(/"/g,'&quot;')}">Ver partido →</button></div>${r.kind === "af" ? lvTimeline(r) : ""}${lvStats(r)}</div>${cells}</div>`;
+      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div><div><button class="small ghost" onclick="event.stopPropagation();vsOpenMatch(this.dataset.h,this.dataset.a,'',this)" data-h="${String(r.home).replace(/"/g,'&quot;')}" data-a="${String(r.away).replace(/"/g,'&quot;')}">Ver partido →</button> <button class="small ghost" onclick="event.stopPropagation();lvAvg(this)" data-h="${String(r.home).replace(/"/g,'&quot;')}" data-a="${String(r.away).replace(/"/g,'&quot;')}">Medias BSD</button><div class="lvavg muted" style="font-size:11px; margin-top:4px;"></div></div>${r.kind === "af" ? lvTimeline(r) : ""}${lvStats(r)}</div>${cells}</div>`;
   }).join("") || '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>';
 }
 function lvPop(kind) {
