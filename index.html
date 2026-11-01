@@ -3384,7 +3384,9 @@ const MOV_KEY = "radar-valor-mov-cache";
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
 const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
 function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; const pl = (st.players || []).map(x => ({ n: x.name, t: x.team, s: x.shirt, g: x.goals || 0, sh: x.shots || 0, sot: x.shots_on_target || 0, xg: x.xg || 0, yc: x.yellow_cards || 0, rc: x.red_cards || 0, f: x.fouls || 0, fd: x.fouls_drawn || 0, tk: x.tackles || 0, as: x.assists || 0, sv: x.saves || 0 })).filter(x => x.g || x.sh || x.sot || x.xg || x.yc || x.rc || x.f || x.fd || x.tk || x.as || x.sv); return { h: f(st.home), a: f(st.away), t: st.updated_at || null, pl }; }
+const MOV_PP = {};
 function movConvert(d) {
+  Object.keys(MOV_PP).forEach(k => delete MOV_PP[k]);
   const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0 };
   (d.matches || []).forEach(x => {
     if (!x.home || !x.away) return;
@@ -3402,8 +3404,10 @@ function movConvert(d) {
     const bt = qs.filter(q => /Both Teams/i.test(q.group_name || "") && /^(yes|no)$/i.test((q.label || "").trim())).map(q => ({ name: /^yes$/i.test(q.label.trim()) ? "Yes" : "No", price: q.odds_dec }));
     if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
     if (!mk.length && !live) return;
+    const cor = []; qs.filter(q => q.group_name === "Corners 2-Way" && /^(over|under)$/i.test(q.side || "")).forEach(q => { const pt = parseFloat(q.line || q.handicap); if (!isNaN(pt)) cor.push([/^over$/i.test(q.side) ? "O" : "U", pt, q.odds_dec]); });
+    if (!live) { const rows = [], SM = { "Shots": "totalShots", "Shots On Target": "shotsOnTarget", "Fouls Committed": "foulsCommitted", "To Be Fouled": "foulsSuffered" }; qs.forEach(q => { const k = SM[q.group_name]; if (!k) return; const m = /^(\d+)\+$/.exec(q.side || ""); if (!m || !q.line) return; rows.push([k, q.n2 || "", q.line, +m[1], q.odds_dec]); }); if (rows.length) MOV_PP["mov" + x.id] = { h: x.home, a: x.away, t, rows }; }
     st.n++; if (live) st.live++;
-    out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", mov_live: live, mov_score: x.score || "", mov_min: x.clock && x.clock.min != null ? x.clock.min : null, mov_stats: movStatsCompact(x.stats), bookmakers: mk.length ? [{ key: "bet365", title: "Bet365", markets: mk }] : [] });
+    out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", mov_cor: cor.length ? cor : undefined, mov_live: live, mov_score: x.score || "", mov_min: x.clock && x.clock.min != null ? x.clock.min : null, mov_stats: movStatsCompact(x.stats), bookmakers: mk.length ? [{ key: "bet365", title: "Bet365", markets: mk }] : [] });
   });
   return { out, st };
 }
@@ -3922,6 +3926,8 @@ function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel
 
 
 /* ===== Radar de la jornada ===== */
+function jrCorners(hn, an, date) { const c = movGet(); if (!c) return null; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(date), m = c.data.find(x => x.mov_cor && near(nm(x.home_team), nm(hn)) && near(nm(x.away_team), nm(an)) && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000); if (!m) return null;
+  const by = {}; m.mov_cor.forEach(([sd, pt, o]) => { (by[pt] = by[pt] || { pt })[sd === "O" ? "o" : "u"] = o; }); const lines = Object.values(by).filter(x => x.o && x.u); return lines.length ? { lines } : null; }
 function jrOdds(hn, an, date) { const c = movGet(); if (!c || !c.data.length) return null; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(hn), a = nm(an), t = Date.parse(date);
   const m = c.data.find(x => near(nm(x.home_team), h) && near(nm(x.away_team), a) && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000); if (!m) return null; const bk = (m.bookmakers || [])[0]; if (!bk) return null;
   const to = ((bk.markets.find(k => k.key === "totals") || {}).outcomes || []).find(o => o.name === "Over" && o.point === 2.5), bt = ((bk.markets.find(k => k.key === "btts") || {}).outcomes || []).find(o => o.name === "Yes"); return (to || bt) ? { o25: to && to.price, bt: bt && bt.price } : null; }
@@ -3943,16 +3949,16 @@ async function jrSearch() {
     const avgT = (tid, isH) => { let ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(m => m && m.v === 2 && m.c && m.c.length === 2);
       if (jrV === "venue") ms = ms.filter(m => { const x = m.c.find(y => y.id === tid); return x && !!x.h === !!isH; }); ms = ms.slice(0, N); if (!ms.length) return null;
       const g = f => ms.reduce((a, m) => a + f(m), 0) / ms.length, me = m => m.c.find(y => y.id === tid), op = m => m.c.find(y => y.id !== tid), ts = (m, id, k) => (m.ts[id] || {})[k] || 0;
-      return { n: ms.length, gf: g(m => me(m).s), gc: g(m => op(m).s), co: g(m => ts(m, tid, "wonCorners")), coA: g(m => ts(m, op(m).id, "wonCorners")), ta: g(m => ts(m, tid, "yellowCards") + ts(m, tid, "redCards")), taA: g(m => ts(m, op(m).id, "yellowCards") + ts(m, op(m).id, "redCards")), sh: g(m => ts(m, tid, "totalShots")), sot: g(m => ts(m, tid, "shotsOnTarget")), fo: g(m => ts(m, tid, "foulsCommitted")), o25: g(m => (m.c[0].s + m.c[1].s) > 2.5 ? 100 : 0), btts: g(m => (m.c[0].s > 0 && m.c[1].s > 0) ? 100 : 0) }; };
+      const cT = ms.map(m => ts(m, m.c[0].id, "wonCorners") + ts(m, m.c[1].id, "wonCorners")); return { cT, n: ms.length, gf: g(m => me(m).s), gc: g(m => op(m).s), co: g(m => ts(m, tid, "wonCorners")), coA: g(m => ts(m, op(m).id, "wonCorners")), ta: g(m => ts(m, tid, "yellowCards") + ts(m, tid, "redCards")), taA: g(m => ts(m, op(m).id, "yellowCards") + ts(m, op(m).id, "redCards")), sh: g(m => ts(m, tid, "totalShots")), sot: g(m => ts(m, tid, "shotsOnTarget")), fo: g(m => ts(m, tid, "foulsCommitted")), o25: g(m => (m.c[0].s + m.c[1].s) > 2.5 ? 100 : 0), btts: g(m => (m.c[0].s > 0 && m.c[1].s > 0) ? 100 : 0) }; };
     const f1 = v => (Math.round(v * 10) / 10).toString().replace(".", ","), lg = (sb.leagues && sb.leagues[0] && sb.leagues[0].name) || slug;
     $("jrGrid").innerHTML = evs.sort((a, b) => String(a.date).localeCompare(String(b.date))).map(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return "";
       const hid = String(hc.team.id), aid = String(ac.team.id), H = avgT(hid, 1), A = avgT(aid, 0); if (!H || !A) return "";
-      const od = jrOdds(hc.team.displayName || hc.team.name, ac.team.displayName || ac.team.name, e.date), ev = (o, pc) => o ? ((pc / 100) * o - 1) * 100 : null, p25 = (H.o25 + A.o25) / 2, pbt = (H.btts + A.btts) / 2, e25 = od && ev(od.o25, p25), ebt = od && ev(od.bt, pbt);
+      const cr = jrCorners(hc.team.displayName || hc.team.name, ac.team.displayName || ac.team.name, e.date), crHtml = (() => { if (!cr) return ""; const exp = (H.co + H.coA + A.co + A.coA) / 2, ln = cr.lines.reduce((b, x) => Math.abs(x.pt - exp) < Math.abs(b.pt - exp) ? x : b), arr = [...H.cT, ...A.cT], po = arr.filter(v => v > ln.pt).length / arr.length * 100, eo = ln.o ? (po / 100 * ln.o - 1) * 100 : null, eu = ln.u ? ((100 - po) / 100 * ln.u - 1) * 100 : null, c2 = (t, o, pc, ed) => o ? `<span class="jr-od ${ed > 5 ? "pos" : ed < -5 ? "neg" : ""}">${t} <b>${o.toFixed(2)}</b> · hist. ${Math.round(pc)}% · <b>${ed > 0 ? "+" : ""}${ed.toFixed(0)}%</b></span>` : ""; return c2(`Córners +${String(ln.pt).replace(".", ",")}`, ln.o, po, eo) + c2(`Córners -${String(ln.pt).replace(".", ",")}`, ln.u, 100 - po, eu); })(), od = jrOdds(hc.team.displayName || hc.team.name, ac.team.displayName || ac.team.name, e.date), ev = (o, pc) => o ? ((pc / 100) * o - 1) * 100 : null, p25 = (H.o25 + A.o25) / 2, pbt = (H.btts + A.btts) / 2, e25 = od && ev(od.o25, p25), ebt = od && ev(od.bt, pbt);
       const chip = (t, o, pc, ed) => o ? `<span class="jr-od ${ed > 5 ? "pos" : ed < -5 ? "neg" : ""}">${t} <b>${o.toFixed(2)}</b> · hist. ${Math.round(pc)}% · <b>${ed > 0 ? "+" : ""}${ed.toFixed(0)}%</b></span>` : "";
       const row = (lab, h, a, tot, fmt) => `<tr><td>${fmt(h)}</td><td class="mid">${lab}${tot != null ? `<div class="tt">Σ ${fmt(tot)}</div>` : ""}</td><td>${fmt(a)}</td></tr>`, fp = v => Math.round(v) + "%";
       return `<div class="plc"><div class="h"><span>${lg} · ${H.n}/${A.n} partidos</span><b>${new Date(e.date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</b></div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin:6px 0 4px;"><a class="vs-a" style="display:flex; gap:6px; align-items:center; font-weight:800;" onclick="vsTeam('${slug}','${hid}')">${vsLg(hid, "vs-lg big")}${hc.team.displayName || hc.team.name}</a><i class="muted">vs</i><a class="vs-a" style="display:flex; gap:6px; align-items:center; font-weight:800;" onclick="vsTeam('${slug}','${aid}')">${ac.team.displayName || ac.team.name}${vsLg(aid, "vs-lg big")}</a></div>
-        ${od ? `<div class="jr-odds">${chip("+2,5 goles", od.o25, p25, e25)}${chip("Ambos marcan", od.bt, pbt, ebt)}<div class="muted" style="font-size:10.5px; margin-top:3px;">Cuota Bet365 · valor = % histórico × cuota − 1 (orientativo)</div></div>` : ""}<table class="jr-t">${row("Goles a favor", H.gf, A.gf, H.gf + A.gf, f1)}${row("Goles en contra", H.gc, A.gc, null, f1)}${row("Córners", H.co, A.co, H.co + A.co, f1)}${row("Tarjetas", H.ta, A.ta, H.ta + A.ta, f1)}${row("Tiros", H.sh, A.sh, H.sh + A.sh, f1)}${row("Tiros a puerta", H.sot, A.sot, H.sot + A.sot, f1)}${row("Faltas", H.fo, A.fo, H.fo + A.fo, f1)}${row("+2,5 goles", H.o25, A.o25, null, fp)}${row("Ambos marcan", H.btts, A.btts, null, fp)}</table></div>`; }).join("");
+        ${od || crHtml ? `<div class="jr-odds">${od ? chip("+2,5 goles", od.o25, p25, e25) + chip("Ambos marcan", od.bt, pbt, ebt) : ""}${crHtml}<div class="muted" style="font-size:10.5px; margin-top:3px;">Cuota Bet365 · valor = % histórico × cuota − 1 (orientativo)</div></div>` : ""}<table class="jr-t">${row("Goles a favor", H.gf, A.gf, H.gf + A.gf, f1)}${row("Goles en contra", H.gc, A.gc, null, f1)}${row("Córners", H.co, A.co, H.co + A.co, f1)}${row("Tarjetas", H.ta, A.ta, H.ta + A.ta, f1)}${row("Tiros", H.sh, A.sh, H.sh + A.sh, f1)}${row("Tiros a puerta", H.sot, A.sot, H.sot + A.sot, f1)}${row("Faltas", H.fo, A.fo, H.fo + A.fo, f1)}${row("+2,5 goles", H.o25, A.o25, null, fp)}${row("Ambos marcan", H.btts, A.btts, null, fp)}</table></div>`; }).join("");
     msg.textContent = $("jrGrid").innerHTML ? "" : "No hay suficientes datos de estos equipos.";
   } catch (e) { msg.textContent = "Error: " + e.message; }
   finally { jrBusy = false; btn.disabled = false; }
@@ -4248,6 +4254,15 @@ async function prSearch() {
   } catch (e) { msg.textContent = "Error: " + e.message; }
   finally { prBusy = false; btn.disabled = false; }
 }
+
+/* ===== Cuotas bet365 de props de jugador ===== */
+function ppNm(x) { return String(x || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(w => w.length > 1); }
+function ppNear(a, b) { const x = typeof msNorm === "function" ? msNorm(a) : String(a).toLowerCase(), y = typeof msNorm === "function" ? msNorm(b) : String(b).toLowerCase(); return x && y && (x === y || x.includes(y) || y.includes(x)); }
+function ppFind(hn, an, date) { const t = Date.parse(date); return Object.values(MOV_PP).find(e => ppNear(e.h, hn) && ppNear(e.a, an) && Math.abs(e.t - t) < 6 * 3600000) || null; }
+function ppOdds(r, stat, thr) { const e = ppFind(r.ht[0], r.ht[1], r.time); if (!e) return null; const w = ppNm(r.name);
+  const c = e.rows.filter(x => x[0] === stat && x[3] === thr && ppNear(x[1], r.team)).filter(x => { const v = ppNm(x[2]); if (!v.length || !w.length) return false; const [sh, lo] = v.length <= w.length ? [v, w] : [w, v]; return sh.every(t => lo.includes(t)) || (v[v.length - 1] === w[w.length - 1] && v[0][0] === w[0][0]); });
+  return c.length ? c[0][4] : null; }
+function ppChip(r) { const stat = PL_MK[prMeta.mk || "shots"][1], thr = Math.floor(prMeta.line) + 1, o = ppOdds(r, stat, thr); if (!o) return ""; const ed = (r.pct / 100 * o - 1) * 100; return `<div class="jr-odds"><span class="jr-od ${ed > 5 ? "pos" : ed < -5 ? "neg" : ""}">bet365 ${thr}+ <b>${o.toFixed(2)}</b> · hist. ${Math.round(r.pct)}% · valor <b>${ed > 0 ? "+" : ""}${ed.toFixed(0)}%</b></span></div>`; }
 function prRender() {
   const q = (document.getElementById("plQ").value || "").trim().toLowerCase(), list = prRes.filter(r => !q || r.name.toLowerCase().includes(q) || r.team.toLowerCase().includes(q)), mk = PL_MK[prMeta.mk || "shots"], ln = String(prMeta.line).replace(".", ",");
   document.getElementById("plCount").innerHTML = prRes.length ? `<small class="vs-k">${mk[0].toUpperCase()} · L${prMeta.L}</small><br>Candidatos encontrados <span class="vs-pill">${list.length}</span>` : "";
@@ -4255,6 +4270,7 @@ function prRender() {
     ${vsWho(r)}<div class="vs-badges">${r.lastStart ? '<span class="vs-b ok">Titular</span>' : '<span class="vs-b">No titular último</span>'}</div>
     <div class="vs">${vsLg(r.ht[0] === r.team ? r.tid : "0")}${r.ht[0]} <i>vs</i> ${r.ht[1]} · ${r.home ? "en casa" : "fuera"}</div>
     <div class="hit"><span>Más de ${ln} ${mk[0].toLowerCase()}</span><div class="bar"><i style="width:${r.pct}%"></i></div><b class="p">${Math.round(r.pct)}%</b><span>${r.hits}/${r.n}</span></div>
+    ${ppChip(r)}
     <div class="mini"><div><b>${r.avg.toFixed(2)}</b>media</div><div><b>${r.l5[0]}/${r.l5[1]}</b>últ. 5</div><div><b>${r.hr[1] ? r.hr[0] + "/" + r.hr[1] : "–"}</b>en casa</div><div><b>${r.ar[1] ? r.ar[0] + "/" + r.ar[1] : "–"}</b>fuera</div></div>
     <div class="vs-k" style="margin:2px 0 4px;">ÚLTIMOS RESULTADOS · el más reciente primero</div><div class="res">${r.vals.map(v => `<span class="${v > prMeta.line ? "y" : ""}">${v}</span>`).join("")}</div>
     <div class="vs-ft"><a class="vs-a" onclick="vsPlayer('${r.slug}','${r.tid}','${r.pid}')">Ver jugador →</a><a class="vs-a" onclick="vsTeam('${r.slug}','${r.tid}')">Ver equipo</a></div></div>`).join("") || (prRes.length ? '<div class="muted" style="grid-column:1/-1; text-align:center; padding:16px;">Ninguno coincide con la búsqueda.</div>' : "");
