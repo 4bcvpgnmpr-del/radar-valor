@@ -3863,8 +3863,23 @@ function plLive(id, tab, team) {
 
 const VS_IMG = id => `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`, VS_LOGO = id => `https://a.espncdn.com/i/teamlogos/soccer/500/${id}.png`;
 const VS_HEAD = {}, VS_NM = {};
-function vsPh(id, cls) { return `<img class="${cls || "vs-ph"}" src="${VS_HEAD[id] || VS_IMG(id)}" loading="lazy" referrerpolicy="no-referrer" onerror="vsPhErr(this,'${id}')" />`; }
-function vsPhErr(el, id) { if (el.dataset.f !== "1" && !VS_HEAD[id]) { el.dataset.f = "1"; el.src = `https://a.espncdn.com/combiner/i?img=/i/headshots/soccer/players/full/${id}.png&w=96&h=96`; return; } const n = (VS_NM[id] || "?").split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase(), d = document.createElement("span"); d.className = el.className; d.textContent = n; d.style.cssText = "display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#1f6b4a;font-size:" + (/big/.test(el.className) ? 28 : 15) + "px"; el.replaceWith(d); }
+function vsPh(id, cls) { return `<img class="${cls || "vs-ph"}" src="${VS_HEAD[id] || vsPCget()[id] || VS_IMG(id)}" loading="lazy" referrerpolicy="no-referrer" onerror="vsPhErr(this,'${id}')" />`; }
+let vsPC = null, vsQ = [], vsQB = false;
+function vsPCget() { if (!vsPC) { try { vsPC = JSON.parse(localStorage.getItem("radar-photo-cache") || "{}"); } catch (e) { vsPC = {}; } } return vsPC; }
+function vsPhErr(el, id) {
+  const c = vsPCget(), cls = el.className, n = (VS_NM[id] || "?").split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase(), d = document.createElement("span");
+  d.className = cls; d.dataset.pid = id; d.textContent = n; d.style.cssText = "display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#1f6b4a;font-size:" + (/big/.test(cls) ? 28 : 15) + "px"; el.replaceWith(d);
+  if (c[id]) return vsPhSwap(id, c[id]); if (c[id] === "" || !VS_NM[id]) return; if (!vsQ.includes(id)) vsQ.push(id); vsPhRun();
+}
+function vsPhSwap(id, url) { document.querySelectorAll(`[data-pid="${id}"]`).forEach(sp => { const im = document.createElement("img"); im.className = sp.className; im.src = url; im.referrerPolicy = "no-referrer"; im.onerror = () => { }; sp.replaceWith(im); }); }
+async function vsPhRun() {
+  if (vsQB) return; vsQB = true; const c = vsPCget();
+  while (vsQ.length) { const id = vsQ.shift(); if (id in c) continue;
+    try { const r = await fetch("https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=" + encodeURIComponent(VS_NM[id])), j = await r.json(), pl = (j.player || []).find(x => x.strSport === "Soccer") || (j.player || [])[0]; c[id] = (pl && (pl.strCutout || pl.strThumb)) || ""; }
+    catch (e) { break; }
+    try { localStorage.setItem("radar-photo-cache", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 2200)); }
+  vsQB = false;
+}
 function vsLg(id, cls) { return `<img class="${cls || "vs-lg"}" src="${VS_LOGO(id)}" loading="lazy" onerror="this.style.visibility='hidden'" />`; }
 function vsWho(r) { return `<div class="vs-who">${vsPh(r.pid)}<div style="min-width:0;"><a class="nm vs-a" onclick="vsPlayer('${r.slug}','${r.tid}','${r.pid}')">${r.name}</a><div class="tm">${vsLg(r.tid)}<a class="vs-a" onclick="vsTeam('${r.slug}','${r.tid}')">${r.team}</a>${r.pos ? `<span class="vs-tag">${r.pos}</span>` : ""}</div></div></div>`; }
 function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel || sel.dataset.t) return; sel.dataset.t = 1; const bar = document.createElement("div"); bar.className = "vs-days"; const draw = () => { bar.innerHTML = [...sel.options].map(o => `<button class="${o.value === sel.value ? "on" : ""}" data-v="${o.value}"><b>${o.text.split(" · ")[0]}</b><span>${o.text.split(" · ")[1] || ""}</span></button>`).join(""); bar.querySelectorAll("button").forEach(b => b.onclick = () => { sel.value = b.dataset.v; draw(); }); }; draw(); const lab = sel.closest("label"); lab.style.display = "none"; lab.closest(".pl-filters").before(bar); }
