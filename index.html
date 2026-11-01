@@ -622,6 +622,10 @@
   .plc .mini { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; text-align:center; font-size:10px; color:#7C8797; margin:10px 0 6px; } .plc .mini b { display:block; font-size:13px; color:#E6EAF0; }
   .plc .res { display:flex; flex-wrap:wrap; gap:3px; } .plc .res span { min-width:24px; text-align:center; font-size:11px; padding:3px 4px; border-radius:6px; background:#1A212B; color:#7C8797; } .plc .res span.y { background:#12382A; color:#3ECF8E; font-weight:700; }
   :root { --v-bg:#0D1117; --v-bg2:#0D1117; --v-line:#1A212B; --v-g:#3ECF8E; --v-mut:#7C8797; --v-text:#E6EAF0; --v-gsoft:#0F2A1F; --v-card:#141A23; }
+
+  /* Tema claro: se invierte la paleta oscura y se devuelven a su color las imágenes */
+  html.theme-light { filter: invert(1) hue-rotate(180deg); background:#0D1117; }
+  html.theme-light img, html.theme-light video, html.theme-light canvas, html.theme-light .vs-head .big, html.theme-light .radar-logo, html.theme-light .pl-ph, html.theme-light svg image { filter: invert(1) hue-rotate(180deg); }
   .vs-view { }
   .view.vs-view.active { background:transparent; color:var(--v-text); padding:0 0 28px; }
   .vs-view .pl-wrap { max-width:1500px; }
@@ -765,6 +769,7 @@
     <div style="width:40px;"></div>
     <h2 id="view-title">Partidos y valor</h2>
     <div style="display:flex; gap:8px; align-items:center; width:40px; justify-content:flex-end;">
+      <button class="ghost" id="themeBtn" onclick="themeToggle()" title="Cambiar entre tema claro y oscuro">☀️</button>
       <button class="ghost" onclick="toggleSettingsModal(true)" title="Configuración">⚙️</button>
     </div>
   </header>
@@ -3435,6 +3440,10 @@ function hbNowMetrics(l, home, away) {
 
 /* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
 const MOV_KEY = "radar-valor-mov-cache";
+
+function themeApply(t) { document.documentElement.classList.toggle("theme-light", t === "light"); const b = document.getElementById("themeBtn"); if (b) b.textContent = t === "light" ? "🌙" : "☀️"; }
+function themeToggle() { let t = "dark"; try { t = localStorage.getItem("radar-theme") === "light" ? "dark" : "light"; localStorage.setItem("radar-theme", t); } catch (e) { t = document.documentElement.classList.contains("theme-light") ? "dark" : "light"; } themeApply(t); }
+try { themeApply(localStorage.getItem("radar-theme") || "dark"); } catch (e) { }
 function movInject(m) {
   try { if ((m.bookmakers || []).some(b => b.key.includes("bet365"))) return m; const c = movGet(); if (!c) return m;
     const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(m.commence_time), h = nm(m.home_team), a = nm(m.away_team);
