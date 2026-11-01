@@ -340,6 +340,27 @@
   .rg:hover { color:#1EC8A5; }
   .rg.on { background:#12302B; color:#1EC8A5; border-radius:999px; padding:2px 10px; font-size:12px; font-weight:700; }
   .cp-rp { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:#0B0F15; border:1px solid #1EC8A5; border-radius:14px; padding:22px 18px 14px; width:min(360px,92%); box-shadow:0 10px 40px rgba(0,0,0,.6); }
+
+  /* --- Pregame: sin scroll lateral y más aire --- */
+  .pg-layout { grid-template-columns:196px minmax(0,1fr); gap:16px; }
+  #view-coupon .pg-main { overflow-x:visible; padding:10px 14px 18px; }
+  #view-coupon .cptable { table-layout:fixed; width:100%; border-spacing:0 14px; }
+  #view-coupon .cptable th.c-m { width:23%; }
+  #view-coupon .cptable thead th { padding:8px 6px; text-align:center; overflow:hidden; text-overflow:ellipsis; }
+  #view-coupon .cptable th.c-m { text-align:left; padding-left:14px; }
+  #view-coupon .cptable td { padding:10px 6px; }
+  #view-coupon .cptable td.cm { padding:0 10px 0 0; }
+  #view-coupon .pgc { min-width:0; max-width:none; padding:12px 14px; }
+  #view-coupon .pgc-top .lg { max-width:75%; }
+  #view-coupon .pgc-row { padding:3px 0; }
+  #view-coupon .pgc-act { margin-top:10px; }
+  #view-coupon .cod2 { align-items:center; min-width:0; gap:5px; }
+  #view-coupon .cod2 .cb { flex-wrap:wrap; justify-content:center; row-gap:1px; }
+  #view-coupon .cst { grid-template-columns:12px auto; gap:4px 6px; font-size:11px; }
+  #view-coupon .cst b { font-size:12px; white-space:nowrap; }
+  .thp { gap:5px; max-width:100%; }
+  .wrap:has(#view-coupon.active) { max-width:1480px; }
+  @media (max-width:1100px) { #view-coupon .pg-main { overflow-x:auto; } #view-coupon .cptable { min-width:900px; } }
   .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
   .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
   .pm-item:last-child { border-bottom:none; }
@@ -3601,7 +3622,8 @@ function pickDdLeague(id) {
   trData = null; renderDdChips(); loadTrends();
 }
 const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"],["btts","Yes","BTTS+"],["btts","No","BTTS-"]];
-const CP_LAB = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visit.)", "+2.5": "Más de 2.5", "-2.5": "Menos de 2.5", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No" };
+const CP_LAB = { "1": "1", X: "X", "2": "2", "+2.5": "Más 2.5", "-2.5": "Menos 2.5", "BTTS+": "Ambos Sí", "BTTS-": "Ambos No" };
+const CP_LABF = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visitante)", "+2.5": "Más de 2.5 goles", "-2.5": "Menos de 2.5 goles", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No" };
 const CP_CODES = { "39": "ENG-PRE", "140": "ESP-PRE", "135": "ITA-SRA", "78": "GER-BUN", "61": "FRA-LG1", "2": "UEFA-CL", "88": "NED-ERE", "94": "POR-PRI", "40": "ENG-CHA", "71": "BRA-SRA", "1": "WORLD", "4": "EURO" };
 function cpCode(l) { if (CP_CODES[l.id]) return CP_CODES[l.id]; const c = (l.cty || "").slice(0, 3).toUpperCase(), rest = String(l.nm).replace(l.cty || "", "").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 3).toUpperCase(); return c ? c + "-" + (rest || "") : String(l.nm).slice(0, 7).toUpperCase(); }
 const CP_PAGE = 15;
@@ -3697,7 +3719,7 @@ function cpPop(kind) {
     const lst = Object.values(cnt).sort((a, b) => b.n - a.n);
     h = `<div class="pm-chips"><span class="pf-chip ${cp.leagues.length ? "" : "on"}" onclick="cpSet('leagues', []); cpPop('lg')">Todas</span>${lst.map(o => `<span class="pf-chip ${cp.leagues.includes(o.l.id) ? "on" : ""}" onclick="cpToggleLeague('${o.l.id}'); cpPop('lg')">${o.l.fl} ${o.l.nm} · ${o.n}</span>`).join("")}</div>`;
   } else if (kind === "mk") {
-    h = CP_COLS.map(c => ck(cp.cols.includes(c[2]), `cpTogCol('${c[2]}')`, CP_LAB[c[2]])).join("");
+    h = CP_COLS.map(c => ck(cp.cols.includes(c[2]), `cpTogCol('${c[2]}')`, CP_LABF[c[2]])).join("");
   } else if (kind === "st") {
     h = ck(cp.stat.g, "cp.stat.g=this.checked; renderCoupon()", "Goles promedio (L / V / T)") + ck(cp.stat.r, "cp.stat.r=this.checked; renderCoupon()", "Rachas (G / I)") + ck(cp.stat.p, "cp.stat.p=this.checked; renderCoupon()", "Posición en la liga (al lado del equipo)");
   } else if (kind === "rc") {
@@ -4107,7 +4129,7 @@ function renderCoupon() {
   document.getElementById("cpCount").innerHTML = `Mostrando <b>${rows.length}</b> partidos en <b>${leaguesN}</b> ligas<br><span style="font-size:11px;">(de un total de ${base.length} partidos · <b style="color:#1EC8A5;">B</b> = cuota justa estimada, debajo la cuota de la casa y su % de valor)</span>`;
   if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>'; document.getElementById("cpPages").innerHTML = ""; return; }
   const vis = rows.slice(cp.page * CP_PAGE, (cp.page + 1) * CP_PAGE), nc = vis[0].cells.length;
-  let day = "", html = `<table class="cptable"><thead><tr><th>Liga · Hora · Partido</th>${vis[0].cells.map(c => `<th><span class="thp">${CP_LAB[c.lab] || c.lab}<i onclick="cpColOff('${c.lab}')" title="Quitar columna">✕</i></span></th>`).join("")}${cp.stat.g ? `<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)"><span class="thp">Goles prom.<i onclick="cpStatOff('g')">✕</i></span></th>` : ""}${cp.stat.r ? `<th title="G = partidos ganados seguidos, I = partidos sin perder seguidos"><span class="thp">Rachas<i onclick="cpStatOff('r')">✕</i></span></th>` : ""}</tr></thead><tbody>`;
+  let day = "", html = `<table class="cptable"><thead><tr><th class="c-m">Liga · Hora · Partido</th>${vis[0].cells.map(c => `<th title="${CP_LABF[c.lab] || c.lab}"><span class="thp">${CP_LAB[c.lab] || c.lab}<i onclick="cpColOff('${c.lab}')" title="Quitar columna">✕</i></span></th>`).join("")}${cp.stat.g ? `<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)"><span class="thp">Goles prom.<i onclick="cpStatOff('g')">✕</i></span></th>` : ""}${cp.stat.r ? `<th title="G = partidos ganados seguidos, I = partidos sin perder seguidos"><span class="thp">Rachas<i onclick="cpStatOff('r')">✕</i></span></th>` : ""}</tr></thead><tbody>`;
   vis.forEach(r => {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
     if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0)}">${dk}</td></tr>`; }
