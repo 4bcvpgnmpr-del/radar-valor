@@ -331,6 +331,25 @@
   .pg-pages { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:16px; }
   .pg-pages button { width:32px; height:32px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#9AA5B1; cursor:pointer; padding:0; font-size:12px; }
   .pg-pages button.on { background:#3ECF8E; color:#06231A; border-color:#3ECF8E; font-weight:700; }
+
+  .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
+  .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
+  .pm-item:last-child { border-bottom:none; }
+  .pm-item::after { content:"›"; color:#4A525E; font-size:18px; }
+  .pm-item:hover { background:#141C26; color:#1EC8A5; }
+  .pm-btn { width:100%; background:#151C26; border:1px solid #1E2733; color:#E6EBF1; border-radius:999px; padding:10px 14px; font-size:13px; cursor:pointer; text-align:center; }
+  .pm-btn:hover { border-color:#1EC8A5; color:#1EC8A5; }
+  .pm-note { font-size:11px; color:#7C8797; text-align:center; margin:-4px 0 4px; }
+  .thp { display:inline-flex; align-items:center; gap:6px; }
+  .thp i { font-style:normal; cursor:pointer; opacity:.6; font-size:11px; }
+  .thp i:hover { opacity:1; }
+  .cp-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:300; align-items:center; justify-content:center; padding:16px; }
+  .cp-modal.on { display:flex; }
+  .cp-mbox { background:#10151C; border:1px solid #1E2733; border-radius:16px; padding:18px; width:min(440px,100%); max-height:80vh; overflow:auto; }
+  .cp-mh { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:16px; }
+  .pm-chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .pm-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:6px 0; font-size:13px; }
+  .pm-row input { width:90px; }
   @media (max-width:900px) { .pg-layout { grid-template-columns:1fr; } .pg-side { position:static; } }
   /* ---- Explorar ---- */
   .ex-sel { display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
@@ -983,33 +1002,47 @@
     <div class="pg-count" id="cpCount"></div>
     <div class="pg-layout">
       <aside class="pg-side">
-        <div class="pg-box"><div class="pg-h">Buscar</div><input id="cpSearch" type="text" placeholder="Equipo..." style="width:100%;" oninput="cpRead()" /></div>
-        <div class="pg-box"><div class="pg-h">Mercados (columnas)</div>
-          <label class="pg-ck"><input type="checkbox" class="cpcol" value="1" checked onchange="cpRead()" /> 1 (local)</label>
-          <label class="pg-ck"><input type="checkbox" class="cpcol" value="X" checked onchange="cpRead()" /> X (empate)</label>
-          <label class="pg-ck"><input type="checkbox" class="cpcol" value="2" checked onchange="cpRead()" /> 2 (visitante)</label>
-          <label class="pg-ck"><input type="checkbox" class="cpcol" value="+2.5" checked onchange="cpRead()" /> Más de 2.5</label>
-          <label class="pg-ck"><input type="checkbox" class="cpcol" value="-2.5" checked onchange="cpRead()" /> Menos de 2.5</label>
+        <div class="pm-menu">
+          <div class="pm-item" onclick="cpPop('lg')">Ligas</div>
+          <div class="pm-item" onclick="cpPop('mk')">Mercados</div>
+          <div class="pm-item" onclick="cpPop('st')">Estadísticas</div>
+          <div class="pm-item" onclick="cpPop('rc')">Rachas</div>
+          <div class="pm-item" onclick="cpPop('bk')">Casas de Apuestas</div>
         </div>
-        <div class="pg-box"><div class="pg-h">Ordenar</div>
-          <select id="cpSort" style="width:100%;" onchange="cpRead()"><option value="time">Por hora</option><option value="ev">Mayor valor (EV)</option><option value="name">Por equipo</option></select>
+        <button class="pm-btn" onclick="cpPop('sort')">Ordenar</button>
+        <button class="pm-btn" onclick="switchView('alarms')">Alarmas múltiples</button>
+        <button class="pm-btn" style="margin-top:10px;" onclick="cpPop('preset')">Añadir un preset</button>
+        <div class="pm-note" id="cpPresetNote">No has cargado un preset</div>
+        <button class="pm-btn" onclick="cpPop('flt')">Añadir filtros</button>
+        <div class="pm-note" id="cpFilterNote">No has añadido ningún filtro</div>
+        <button class="pm-btn" style="margin-top:10px;" onclick="enableReminders()">⏰ Recordatorios de favoritos</button>
+        <div id="cpLegacy" style="display:none;">
+          <div id="cpFltBox">
+            <div class="pg-h">Buscar equipo</div><input id="cpSearch" type="text" placeholder="Equipo..." style="width:100%;" oninput="cpRead()" />
+            <div class="pg-h" style="margin-top:12px;">Filtros</div>
+            <label class="pg-ck"><input type="checkbox" id="cpValue" onchange="cpRead()" /> Solo con valor</label>
+            <label class="pg-ck"><input type="checkbox" id="cpFavs" onchange="cpRead()" /> Solo favoritos ⭐</label>
+            <div style="display:flex; gap:6px; margin-top:8px;"><input id="cpMin" type="number" step="0.05" placeholder="Cuota mín." style="width:50%;" oninput="cpRead()" /><input id="cpMax" type="number" step="0.05" placeholder="Cuota máx." style="width:50%;" oninput="cpRead()" /></div>
+          </div>
+          <div id="cpColsBox">
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="1" checked onchange="cpRead()" /> 1 (local gana)</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="X" checked onchange="cpRead()" /> X (empate)</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="2" checked onchange="cpRead()" /> 2 (visitante gana)</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="+2.5" checked onchange="cpRead()" /> Más de 2.5 goles</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="-2.5" checked onchange="cpRead()" /> Menos de 2.5 goles</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="BTTS+" onchange="cpRead()" /> Ambos marcan: Sí</label>
+            <label class="pg-ck"><input type="checkbox" class="cpcol" value="BTTS-" onchange="cpRead()" /> Ambos marcan: No</label>
+          </div>
+          <div id="cpSortBox"><select id="cpSort" style="width:100%;" onchange="cpRead()"><option value="time">Por hora</option><option value="ev">Mayor valor (EV)</option><option value="name">Por equipo</option></select></div>
+          <select id="cpPreset" onchange="cpLoadPreset(this.value)"><option value="">Sin preset cargado</option></select>
         </div>
-        <div class="pg-box"><div class="pg-h">Filtros</div>
-          <label class="pg-ck"><input type="checkbox" id="cpValue" onchange="cpRead()" /> Solo con valor</label>
-          <label class="pg-ck"><input type="checkbox" id="cpFavs" onchange="cpRead()" /> Solo favoritos ⭐</label>
-          <div style="display:flex; gap:6px; margin-top:8px;"><input id="cpMin" type="number" step="0.05" placeholder="Mín." style="width:50%;" oninput="cpRead()" /><input id="cpMax" type="number" step="0.05" placeholder="Máx." style="width:50%;" oninput="cpRead()" /></div>
-        </div>
-        <div class="pg-box"><div class="pg-h">Presets</div>
-          <select id="cpPreset" style="width:100%;" onchange="cpLoadPreset(this.value)"><option value="">Sin preset cargado</option></select>
-          <div style="display:flex; gap:6px; margin-top:8px;"><button class="small ghost" style="flex:1;" onclick="cpSavePreset()">Guardar actual</button><button class="small ghost" onclick="cpDeletePreset()" title="Borrar preset">🗑</button></div>
-        </div>
-        <div class="pg-box"><button class="small ghost" style="width:100%;" onclick="enableReminders()">⏰ Recordatorios de favoritos</button></div>
       </aside>
       <div class="pg-main">
         <div id="coupon-content"></div>
         <div class="pg-pages" id="cpPages"></div>
       </div>
     </div>
+    <div id="cp-modal" class="cp-modal" onclick="if (event.target === this) cpPopClose()"><div class="cp-mbox"><div class="cp-mh"><b id="cpMT"></b><button class="pg-nav" onclick="cpPopClose()" style="width:30px; height:30px; font-size:14px;">✕</button></div><div id="cpMB"></div><div style="margin-top:14px; text-align:right;"><button class="small" onclick="cpPopClose()">Listo</button></div></div></div>
   </div>
 
   <div id="view-explore" class="view">
@@ -3559,9 +3592,12 @@ function pickDdLeague(id) {
   document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
   trData = null; renderDdChips(); loadTrends();
 }
-const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"]];
+const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"],["btts","Yes","BTTS+"],["btts","No","BTTS-"]];
+const CP_LAB = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visit.)", "+2.5": "Más de 2.5", "-2.5": "Menos de 2.5", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No" };
+const CP_CODES = { "39": "ENG-PRE", "140": "ESP-PRE", "135": "ITA-SRA", "78": "GER-BUN", "61": "FRA-LG1", "2": "UEFA-CL", "88": "NED-ERE", "94": "POR-PRI", "40": "ENG-CHA", "71": "BRA-SRA", "1": "WORLD", "4": "EURO" };
+function cpCode(l) { if (CP_CODES[l.id]) return CP_CODES[l.id]; const c = (l.cty || "").slice(0, 3).toUpperCase(), rest = String(l.nm).replace(l.cty || "", "").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 3).toUpperCase(); return c ? c + "-" + (rest || "") : String(l.nm).slice(0, 7).toUpperCase(); }
 const CP_PAGE = 15;
-let cp = { dayOff: null, leagues: [], sort: "time", onlyValue: false, onlyFavs: false, minO: "", maxO: "", cols: ["1","X","2","+2.5","-2.5"], q: "", page: 0 };
+let cp = { dayOff: null, leagues: [], sort: "time", onlyValue: false, onlyFavs: false, minO: "", maxO: "", cols: ["1","X","2","+2.5","-2.5"], q: "", page: 0, stat: { g: true, r: true, p: true }, rw: 0, ru: 0, book: "auto" };
 function cpAll() {
   const out = [];
   DD_LEAGUES.forEach(l => {
@@ -3588,7 +3624,9 @@ function cpPick(bks, mk, key) {
   const fairs = [];
   rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
   let shown = null;
-  for (const fb of (pfActive().books || [])) { shown = rows.find(r => r.b === fb); if (shown) break; }
+  if (cp.book === "best") { let bp = 0; rows.forEach(r => { const x = r.o.find(y => outcomeKey(y) === key); if (x && x.price > bp) { bp = x.price; shown = r; } }); }
+  else if (cp.book && cp.book !== "auto") shown = rows.find(r => r.b.includes(cp.book)) || null;
+  if (!shown) for (const fb of (pfActive().books || [])) { shown = rows.find(r => r.b === fb); if (shown) break; }
   shown = shown || rows.find(r => r.b.includes("bet365")) || rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b)) || rows.find(r => r.b.includes("bet365")) || rows[0];
   if (!shown) return null;
   const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
@@ -3627,8 +3665,51 @@ function cpSavePreset() {
   try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {}
   cpFillPresets(n); showToast(`Preset "${n}" guardado`);
 }
-function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...p, page: 0 }; cpWriteDom(); renderCoupon(); }
+let cpPresetName = "";
+function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...p, page: 0 }; cpPresetName = n; cpWriteDom(); renderCoupon(); }
 function cpDeletePreset() { const n = document.getElementById("cpPreset").value; if (!n) return; const p = cpGetPresets(); delete p[n]; try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {} cpFillPresets(""); }
+
+function cpSet(k, v) { cp[k] = v; cp.page = 0; try { cpWriteDom(); } catch (e) {} renderCoupon(); }
+function cpColOff(c) { cp.cols = cp.cols.filter(x => x !== c); cp.page = 0; cpWriteDom(); renderCoupon(); }
+function cpStatOff(k) { cp.stat[k] = false; renderCoupon(); }
+function cpTogCol(c) { const i = cp.cols.indexOf(c); if (i >= 0) cp.cols.splice(i, 1); else cp.cols.push(c); cp.cols = CP_COLS.map(x => x[2]).filter(x => cp.cols.includes(x)); cpWriteDom(); renderCoupon(); cpPop("mk"); }
+function cpNotes() {
+  const a = document.getElementById("cpPresetNote"), b = document.getElementById("cpFilterNote"); if (!a || !b) return;
+  a.textContent = cpPresetName ? "Preset: " + cpPresetName : "No has cargado un preset";
+  const f = []; if (cp.q) f.push("Equipo: " + cp.q); if (cp.onlyValue) f.push("Solo valor"); if (cp.onlyFavs) f.push("Solo favoritos"); if (cp.minO) f.push("Cuota ≥ " + cp.minO); if (cp.maxO) f.push("Cuota ≤ " + cp.maxO); if (cp.rw > 0) f.push("Racha G ≥ " + cp.rw); if (cp.ru > 0) f.push("Racha I ≥ " + cp.ru); if (cp.leagues.length) f.push(cp.leagues.length + " liga(s)"); if (cp.book && cp.book !== "auto") f.push("Casa: " + cp.book);
+  b.textContent = f.length ? f.join(" · ") : "No has añadido ningún filtro";
+}
+function cpPop(kind) {
+  const T = { lg: "Ligas", mk: "Mercados", st: "Estadísticas", rc: "Rachas", bk: "Casas de Apuestas", sort: "Ordenar", preset: "Presets", flt: "Filtros" }[kind];
+  document.getElementById("cpMT").textContent = T;
+  const ck = (on, fn, lab) => `<label class="pg-ck"><input type="checkbox" ${on ? "checked" : ""} onchange="${fn}" /> ${lab}</label>`;
+  let h = "";
+  if (kind === "lg") {
+    const cnt = {}; cpAll().forEach(x => { const k = x.l.id; (cnt[k] = cnt[k] || { l: x.l, n: 0 }).n++; });
+    const lst = Object.values(cnt).sort((a, b) => b.n - a.n);
+    h = `<div class="pm-chips"><span class="pf-chip ${cp.leagues.length ? "" : "on"}" onclick="cpSet('leagues', []); cpPop('lg')">Todas</span>${lst.map(o => `<span class="pf-chip ${cp.leagues.includes(o.l.id) ? "on" : ""}" onclick="cpToggleLeague('${o.l.id}'); cpPop('lg')">${o.l.fl} ${o.l.nm} · ${o.n}</span>`).join("")}</div>`;
+  } else if (kind === "mk") {
+    h = CP_COLS.map(c => ck(cp.cols.includes(c[2]), `cpTogCol('${c[2]}')`, CP_LAB[c[2]])).join("");
+  } else if (kind === "st") {
+    h = ck(cp.stat.g, "cp.stat.g=this.checked; renderCoupon()", "Goles promedio (L / V / T)") + ck(cp.stat.r, "cp.stat.r=this.checked; renderCoupon()", "Rachas (G / I)") + ck(cp.stat.p, "cp.stat.p=this.checked; renderCoupon()", "Posición en la liga (al lado del equipo)");
+  } else if (kind === "rc") {
+    h = `<div class="muted" style="font-size:12px; margin-bottom:8px;">Muestra solo partidos donde algún equipo lleve al menos esta racha (0 = sin filtro). Necesita historial cargado.</div><div class="pm-row"><span>Ganados seguidos ≥</span><input type="number" min="0" max="20" value="${cp.rw}" oninput="cpSet('rw', parseInt(this.value) || 0)" /></div><div class="pm-row"><span>Sin perder seguidos ≥</span><input type="number" min="0" max="30" value="${cp.ru}" oninput="cpSet('ru', parseInt(this.value) || 0)" /></div>`;
+  } else if (kind === "bk") {
+    const bs = new Set(); cpAll().forEach(x => x.m.bookmakers.forEach(b => bs.add(b.key)));
+    const opts = [["auto", "Automática (perfil / bet365)"], ["best", "La mejor cuota de todas"], ...[...bs].sort().map(b => [b, b.replace(/_/g, " ")])];
+    h = opts.map(([v, l]) => `<label class="pg-ck"><input type="radio" name="cpbk" ${cp.book === v ? "checked" : ""} onchange="cpSet('book','${v}')" /> ${l}</label>`).join("");
+  } else if (kind === "sort") {
+    h = [["time", "Por hora"], ["ev", "Mayor valor (EV)"], ["name", "Por equipo"]].map(([v, l]) => `<label class="pg-ck"><input type="radio" name="cpso" ${cp.sort === v ? "checked" : ""} onchange="cpSet('sort','${v}')" /> ${l}</label>`).join("");
+  } else if (kind === "preset") {
+    const p = Object.keys(cpGetPresets());
+    h = (p.length ? p.map(n => `<div class="pm-row"><span style="cursor:pointer; color:#1EC8A5;" onclick="cpLoadPreset(this.dataset.n); cpPopClose()" data-n="${n.replace(/"/g, "&quot;")}">${n}</span><button class="small ghost" data-n="${n.replace(/"/g, "&quot;")}" onclick="document.getElementById('cpPreset').value=this.dataset.n; cpDeletePreset(); cpPop('preset')">Borrar</button></div>`).join("") : '<div class="muted" style="font-size:12px;">Aún no tienes presets.</div>') + `<button class="small" style="margin-top:12px;" onclick="cpSavePreset(); cpPop('preset'); cpNotes()">+ Guardar filtros actuales como preset</button>`;
+  } else if (kind === "flt") {
+    h = `<input type="text" placeholder="Buscar equipo..." value="${cp.q.replace(/"/g, "&quot;")}" style="width:100%; margin-bottom:8px;" oninput="cpSet('q', this.value.toLowerCase().trim())" />` + ck(cp.onlyValue, "cpSet('onlyValue', this.checked)", "Solo con valor") + ck(cp.onlyFavs, "cpSet('onlyFavs', this.checked)", "Solo favoritos ⭐") + `<div class="pm-row"><span>Cuota mín.</span><input type="number" step="0.05" value="${cp.minO}" oninput="cpSet('minO', this.value)" /></div><div class="pm-row"><span>Cuota máx.</span><input type="number" step="0.05" value="${cp.maxO}" oninput="cpSet('maxO', this.value)" /></div><button class="small ghost" style="margin-top:10px;" onclick="cp.q=''; cp.onlyValue=false; cp.onlyFavs=false; cp.minO=''; cp.maxO=''; cp.rw=0; cp.ru=0; cp.leagues=[]; cp.book='auto'; cpWriteDom(); renderCoupon(); cpPop('flt')">Quitar todos los filtros</button>`;
+  }
+  document.getElementById("cpMB").innerHTML = h;
+  document.getElementById("cp-modal").classList.add("on");
+}
+function cpPopClose() { document.getElementById("cp-modal").classList.remove("on"); cpNotes(); }
 let exMode = "league";
 function setExMode(m) { exMode = m; document.querySelectorAll("#exModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
 function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
@@ -3969,26 +4050,29 @@ function renderCoupon() {
   });
   if (cp.onlyValue) rows = rows.filter(r => r.maxEv >= 0.02);
   if (cp.onlyFavs) rows = rows.filter(r => favs.has(r.m.home_team) || favs.has(r.m.away_team));
+  if (cp.rw > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hw, t.aw) >= cp.rw; });
+  if (cp.ru > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hu, t.au) >= cp.ru; });
   const mn = parseFloat(cp.minO), mx = parseFloat(cp.maxO);
   if (!isNaN(mn) || !isNaN(mx)) rows = rows.filter(r => r.cells.some(c => c.r && (isNaN(mn) || c.r.price >= mn) && (isNaN(mx) || c.r.price <= mx)));
   rows.sort((a, b) => cp.sort === "ev" ? b.maxEv - a.maxEv : cp.sort === "name" ? a.m.home_team.localeCompare(b.m.home_team) : a.m.commence_time.localeCompare(b.m.commence_time));
+  cpNotes();
   const leaguesN = new Set(rows.map(r => r.l.id)).size, pages = Math.max(1, Math.ceil(rows.length / CP_PAGE));
   if (cp.page >= pages) cp.page = 0;
   document.getElementById("cpCount").innerHTML = `Mostrando <b>${rows.length}</b> partidos en <b>${leaguesN}</b> ligas<br><span style="font-size:11px;">(de un total de ${base.length} partidos · <b style="color:#1EC8A5;">B</b> = cuota justa estimada, debajo la cuota de la casa y su % de valor)</span>`;
   if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>'; document.getElementById("cpPages").innerHTML = ""; return; }
   const vis = rows.slice(cp.page * CP_PAGE, (cp.page + 1) * CP_PAGE), nc = vis[0].cells.length;
-  let day = "", html = `<table class="cptable"><thead><tr><th>Partido</th>${vis[0].cells.map(c => `<th>${({ "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visit.)", "+2.5": "Más de 2.5", "-2.5": "Menos de 2.5" })[c.lab] || c.lab}</th>`).join("")}<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)">Goles prom.</th><th title="G = partidos ganados seguidos, I = partidos sin perder seguidos">Rachas</th></tr></thead><tbody>`;
+  let day = "", html = `<table class="cptable"><thead><tr><th>Liga · Hora · Partido</th>${vis[0].cells.map(c => `<th><span class="thp">${CP_LAB[c.lab] || c.lab}<i onclick="cpColOff('${c.lab}')" title="Quitar columna">✕</i></span></th>`).join("")}${cp.stat.g ? `<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)"><span class="thp">Goles prom.<i onclick="cpStatOff('g')">✕</i></span></th>` : ""}${cp.stat.r ? `<th title="G = partidos ganados seguidos, I = partidos sin perder seguidos"><span class="thp">Rachas<i onclick="cpStatOff('r')">✕</i></span></th>` : ""}</tr></thead><tbody>`;
   vis.forEach(r => {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-    if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 3}">${dk}</td></tr>`; }
+    if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0)}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
     const mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
     const nT = mt ? (hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
-    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${r.m.mov_live ? `<span class="live">● ${r.m.mov_score || "VIVO"}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</span>` : `<span>${hm}</span>`}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${mt ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${mt ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
+    html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${r.m.mov_live ? `<span class="live">● ${r.m.mov_score || "VIVO"}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</span>` : `<span>${hm}</span>`}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
-      `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>` +
-      `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td></tr>` +
+      (!cp.stat.g ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) +
+      (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
       `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}<td></td><td></td></tr>`;
   });
   el.innerHTML = html + "</tbody></table>";
