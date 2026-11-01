@@ -660,6 +660,7 @@
   .vs-t th img { width:26px; height:26px; object-fit:contain; display:block; margin:4px auto; } .vs-t th .d { font-size:10.5px; color:var(--v-mut); font-weight:700; } .vs-t th .sc { display:inline-block; font-size:11px; border-radius:5px; padding:1px 6px; font-weight:700; margin-top:2px; }
   .vs-t .w { background:#e0f2e7; color:#17613f; border:1px solid #bfe0cc; } .vs-t .dr { background:#e3ecfa; color:#2457a6; border:1px solid #c5d7f3; } .vs-t .lo { background:#fbe5e5; color:#b3261e; border:1px solid #f1c4c4; } .vs-t td.g { background:#e6f4ec; font-weight:700; } .vs-t td.z { color:#9bb0a5; }
   .vs-sum { display:flex; gap:18px; flex-wrap:wrap; margin:0 22px 14px; padding:12px 16px; background:#fff; border:1px solid var(--v-line); border-radius:12px; font-size:12px; color:var(--v-mut); } .vs-sum b { color:var(--v-text); font-size:15px; margin-left:4px; }
+  .jr-t { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; } .jr-t td { padding:6px 4px; text-align:center; border-top:1px solid #edf2ef; font-weight:700; width:30%; } .jr-t td.mid { width:40%; font-weight:500; color:var(--v-mut); font-size:12px; } .jr-t .tt { font-size:10.5px; color:var(--v-g); font-weight:700; } .vs-lg.big { width:24px; height:24px; }
   .al-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
   .al-grid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
   .al-grid input, .al-grid select { width:100%; }
@@ -695,6 +696,7 @@
       <div class="sidebar-section">Jugadores y tarjetas</div>
       <button class="side-btn" data-v="players" onclick="switchView('players')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg> Jugadores (props)</button>
 
+      <button class="side-btn" data-v="jorn" onclick="switchView('jorn')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Radar de la jornada</button>
       <button class="side-btn" data-v="ligas" onclick="switchView('ligas')"><svg class="icon" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg> Ligas</button>
       <button class="side-btn" data-v="tteam" onclick="switchView('tteam')"><svg class="icon" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg> Rachas de equipos</button>
       <button class="side-btn" data-v="pstreak" onclick="switchView('pstreak')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h7v7"/></svg> Tendencias de jugadores</button>
@@ -1435,6 +1437,21 @@
     </div>
   </div>
 
+  <div id="view-jorn" class="view vs-view">
+    <div class="pl-wrap">
+      <div class="pl-hero"><div class="pl-k">JORNADA</div><h2>Radar de la jornada</h2><div class="muted">Cada partido del día con las medias de los dos equipos en sus últimos partidos: goles, córners, tarjetas y tiros. La suma sirve de referencia para los mercados de totales. Datos de ESPN.</div></div>
+      <div class="pl-filters">
+        <label>Liga<select id="jrLeague"></select></label>
+        <label>Día<select id="jrDay"></select></label>
+        <label><span>Últimos partidos: <b id="jrNL">8</b></span><input id="jrN" type="range" min="4" max="15" value="8" oninput="document.getElementById('jrNL').textContent=this.value" /></label>
+        <label>Localía<div class="seg" id="jrVSeg"><button class="seg-b active" data-c="all" onclick="jrSetV('all')">Todos</button><button class="seg-b" data-c="venue" onclick="jrSetV('venue')">Mismo campo</button></div></label>
+        <button id="jrBtn" onclick="jrSearch()">Ver jornada</button>
+      </div>
+      <div id="jrMsg" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+      <div id="jrGrid" class="prg-grid" style="grid-template-columns:repeat(auto-fill,minmax(420px,1fr));"></div>
+    </div>
+  </div>
+
   <div id="view-ligas" class="view vs-view">
     <div class="pl-wrap">
       <div class="pl-hero"><div class="pl-k">LIGAS</div><h2>Ligas y equipos</h2><div class="muted">Elige una liga para ver su clasificación y entrar en la ficha de cada equipo. Datos de ESPN.</div></div>
@@ -1593,7 +1610,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1609,6 +1626,7 @@ function switchView(v) {
   if (v === "pstreak") tpInit();
   if (v === "tteam") ttInit();
   if (v === "ligas") lgInit();
+  if (v === "jorn") jrInit();
   if (v === "profile") pfRender();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
@@ -3901,6 +3919,38 @@ function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel
 
 
 
+
+/* ===== Radar de la jornada ===== */
+let jrBusy = false, jrV = "all";
+function jrInit() { prInit(); ["jrLeague", "jrDay"].forEach(id => { const el = document.getElementById(id); if (el && !el.dataset.x) { el.dataset.x = 1; el.innerHTML = document.getElementById(id === "jrLeague" ? "plLeague" : "plDay").innerHTML; } }); vsDayTabs("jrDay"); }
+function jrSetV(c) { jrV = c; document.querySelectorAll("#jrVSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.c === c)); }
+async function jrSearch() {
+  if (jrBusy) return; prCacheLoad(); jrBusy = true;
+  const $ = id => document.getElementById(id), msg = $("jrMsg"), btn = $("jrBtn"), slug = $("jrLeague").value, dayOff = +$("jrDay").value, N = +$("jrN").value;
+  btn.disabled = true; $("jrGrid").innerHTML = "";
+  try {
+    const d = new Date(Date.now() + dayOff * 864e5), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    msg.textContent = "Buscando partidos…"; const sb = await espnGet(`${slug}/scoreboard?dates=${ds}`), evs = (sb.events || []).filter(e => !vsDone(e));
+    if (!evs.length) { msg.textContent = "No hay partidos pendientes ese día en esta liga."; return; }
+    const teams = new Set(); evs.forEach(e => (((e.competitions || [])[0] || {}).competitors || []).forEach(c => teams.add(String(c.team.id))));
+    const sched = {}; let n = 0;
+    await prPool([...teams], 5, async id => { try { const sc = await espnGet(`${slug}/teams/${id}/schedule`); sched[id] = (sc.events || []).filter(vsDone).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, jrV === "venue" ? N * 2 + 4 : N).map(e => String(e.id)); } catch (e) { sched[id] = []; } msg.textContent = `Calendarios ${++n}/${teams.size}`; });
+    await vsEnsure(slug, [...new Set(Object.values(sched).flat())], msg, true);
+    const avgT = (tid, isH) => { let ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(m => m && m.v === 2 && m.c && m.c.length === 2);
+      if (jrV === "venue") ms = ms.filter(m => { const x = m.c.find(y => y.id === tid); return x && !!x.h === !!isH; }); ms = ms.slice(0, N); if (!ms.length) return null;
+      const g = f => ms.reduce((a, m) => a + f(m), 0) / ms.length, me = m => m.c.find(y => y.id === tid), op = m => m.c.find(y => y.id !== tid), ts = (m, id, k) => (m.ts[id] || {})[k] || 0;
+      return { n: ms.length, gf: g(m => me(m).s), gc: g(m => op(m).s), co: g(m => ts(m, tid, "wonCorners")), coA: g(m => ts(m, op(m).id, "wonCorners")), ta: g(m => ts(m, tid, "yellowCards") + ts(m, tid, "redCards")), taA: g(m => ts(m, op(m).id, "yellowCards") + ts(m, op(m).id, "redCards")), sh: g(m => ts(m, tid, "totalShots")), sot: g(m => ts(m, tid, "shotsOnTarget")), fo: g(m => ts(m, tid, "foulsCommitted")), o25: g(m => (m.c[0].s + m.c[1].s) > 2.5 ? 100 : 0), btts: g(m => (m.c[0].s > 0 && m.c[1].s > 0) ? 100 : 0) }; };
+    const f1 = v => (Math.round(v * 10) / 10).toString().replace(".", ","), lg = (sb.leagues && sb.leagues[0] && sb.leagues[0].name) || slug;
+    $("jrGrid").innerHTML = evs.sort((a, b) => String(a.date).localeCompare(String(b.date))).map(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return "";
+      const hid = String(hc.team.id), aid = String(ac.team.id), H = avgT(hid, 1), A = avgT(aid, 0); if (!H || !A) return "";
+      const row = (lab, h, a, tot, fmt) => `<tr><td>${fmt(h)}</td><td class="mid">${lab}${tot != null ? `<div class="tt">Σ ${fmt(tot)}</div>` : ""}</td><td>${fmt(a)}</td></tr>`, fp = v => Math.round(v) + "%";
+      return `<div class="plc"><div class="h"><span>${lg} · ${H.n}/${A.n} partidos</span><b>${new Date(e.date).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</b></div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:6px 0 4px;"><a class="vs-a" style="display:flex; gap:6px; align-items:center; font-weight:800;" onclick="vsTeam('${slug}','${hid}')">${vsLg(hid, "vs-lg big")}${hc.team.displayName || hc.team.name}</a><i class="muted">vs</i><a class="vs-a" style="display:flex; gap:6px; align-items:center; font-weight:800;" onclick="vsTeam('${slug}','${aid}')">${ac.team.displayName || ac.team.name}${vsLg(aid, "vs-lg big")}</a></div>
+        <table class="jr-t">${row("Goles a favor", H.gf, A.gf, H.gf + A.gf, f1)}${row("Goles en contra", H.gc, A.gc, null, f1)}${row("Córners", H.co, A.co, H.co + A.co, f1)}${row("Tarjetas", H.ta, A.ta, H.ta + A.ta, f1)}${row("Tiros", H.sh, A.sh, H.sh + A.sh, f1)}${row("Tiros a puerta", H.sot, A.sot, H.sot + A.sot, f1)}${row("Faltas", H.fo, A.fo, H.fo + A.fo, f1)}${row("+2,5 goles", H.o25, A.o25, null, fp)}${row("Ambos marcan", H.btts, A.btts, null, fp)}</table></div>`; }).join("");
+    msg.textContent = $("jrGrid").innerHTML ? "" : "No hay suficientes datos de estos equipos.";
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  finally { jrBusy = false; btn.disabled = false; }
+}
 /* ===== Ligas ===== */
 let lgBusy = false;
 function lgInit() { prInit(); const el = document.getElementById("lgSel"); if (el && !el.dataset.x) { el.dataset.x = 1; el.innerHTML = document.getElementById("plLeague").innerHTML; lgLoad(); } }
