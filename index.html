@@ -361,6 +361,48 @@
   .thp { gap:5px; max-width:100%; }
   .wrap:has(#view-coupon.active) { max-width:1480px; }
   @media (max-width:1100px) { #view-coupon .pg-main { overflow-x:auto; } #view-coupon .cptable { min-width:900px; } }
+
+  /* --- Explorador estilo BetPractice --- */
+  .ex-mode { display:flex; align-items:center; gap:12px; font-size:14px; }
+  .sw { position:relative; width:44px; height:24px; display:inline-block; }
+  .sw input { opacity:0; width:0; height:0; }
+  .sw i { position:absolute; inset:0; background:#E6EBF1; border-radius:999px; transition:.2s; cursor:pointer; }
+  .sw i::before { content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#0B0F15; border-radius:50%; transition:.2s; }
+  .sw input:checked + i { background:#1EC8A5; } .sw input:checked + i::before { transform:translateX(20px); background:#fff; }
+  .ex-sel select { background:#151C26; border:1px solid #1E2733; border-radius:999px; padding:6px 14px; font-size:13px; color:#E6EBF1; }
+  .ex-hero { max-width:760px; height:200px; padding:0 18px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:#fff;
+    background:linear-gradient(180deg, rgba(8,12,18,.75) 0%, rgba(8,12,18,.15) 45%, rgba(0,0,0,0) 55%), radial-gradient(ellipse at 20% 0%, rgba(255,255,255,.18), transparent 40%), radial-gradient(ellipse at 80% 0%, rgba(255,255,255,.14), transparent 40%), linear-gradient(180deg, #1B2634 0%, #26364A 42%, #1F5A33 43%, #1B4D2D 100%);
+    border:none; position:relative; overflow:hidden; }
+  .ex-hero::after { content:""; position:absolute; left:0; right:0; bottom:0; height:57%; background:repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 60px, rgba(0,0,0,.05) 60px 120px); pointer-events:none; }
+  .ex-hero > * { position:relative; z-index:1; }
+  .ex-hero .t { font-size:26px; font-weight:800; text-shadow:0 2px 8px rgba(0,0,0,.5); }
+  .ex-hero .s { color:#E6EBF1; font-size:15px; opacity:.9; }
+  .ex-hero .s2 { color:#B8C3CF; font-size:12px; margin-top:6px; background:rgba(0,0,0,.35); padding:3px 12px; border-radius:999px; }
+  .ex-hero .vsrow { display:flex; align-items:center; gap:18px; flex-wrap:wrap; justify-content:center; }
+  .ex-hero .vs { font-weight:800; color:#1EC8A5; font-size:20px; }
+  .ex-pmh { text-align:center; font-weight:800; font-size:17px; margin:22px 0 10px; }
+  .ex-pills { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:16px; max-width:820px; margin-left:auto; margin-right:auto; }
+  .ex-card { max-width:920px; margin:0 auto 16px; background:#131A23; border-radius:16px; padding:12px 18px 14px; }
+  .ex-ch { display:flex; justify-content:center; align-items:center; position:relative; font-weight:800; font-size:16px; padding:4px 0 10px; }
+  .ex-ch i { position:absolute; right:0; font-style:normal; cursor:pointer; opacity:.7; } .ex-ch i:hover { opacity:1; }
+  .ex-card .extable { width:100%; border-collapse:collapse; }
+  .ex-card .extable thead th { border-bottom:2px solid #1EC8A5; padding:10px 8px; font-size:12px; font-weight:600; color:#E6EBF1; text-transform:none; text-align:center; }
+  .ex-card .extable td { padding:12px 8px; text-align:center; border-top:1px solid #1A212B; font-size:13px; }
+  .ex-card .extable tbody tr:first-child td { border-top:none; }
+  .ex-card .exm { text-align:left; font-weight:700; }
+  .ex-card .rl { color:#1EC8A5; font-weight:700; font-size:14px; } .ex-card .rp { font-size:11px; color:#9AA5B1; }
+  .ex-card .sm { color:#1EC8A5; font-weight:600; font-size:12px; }
+  .bpi { display:inline-block; background:#2F6BFF; color:#fff; border-radius:4px; padding:0 5px; font-size:11px; margin-right:4px; }
+  .bmi { background:#3ECF8E; color:#06231A; font-size:8px; font-weight:800; border-radius:3px; padding:1px 3px; }
+  .bmi + * , .ex-card .pos { } .ex-card .pos { color:#3ECF8E; font-size:11px; font-weight:700; } .ex-card .neg { color:#E85D75; font-size:11px; font-weight:700; }
+
+  .ex-hero { min-height:200px; height:auto; padding:14px 18px 12px; justify-content:flex-start; }
+  #exHeroTxt { display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:6px; }
+  .ex-ctl { position:relative; z-index:1; width:100%; display:flex; flex-direction:column; align-items:center; gap:10px; margin-top:12px; }
+  .ex-goals { display:flex; gap:22px; } .ex-goals label { font-size:11px; font-weight:700; text-align:center; } .ex-goals input { display:block; width:64px; margin:3px auto 0; text-align:center; background:#fff; color:#0B0F15; border:none; border-radius:999px; padding:3px 6px; font-weight:700; }
+  .ex-rng { display:flex; gap:24px; width:100%; justify-content:center; flex-wrap:wrap; } .ex-rng > div { display:flex; flex-direction:column; align-items:center; width:42%; min-width:200px; font-size:11px; font-weight:700; } .ex-rng b { font-size:18px; } .ex-rng input { width:100%; accent-color:#1EC8A5; }
+  .ex-btns { display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; } .ex-btns select { background:rgba(0,0,0,.35); border:none; color:#1EC8A5; border-radius:999px; padding:5px 12px; font-size:13px; }
+  .ex-gm { font-size:11px; color:#B8C3CF; text-align:center; min-height:14px; }
   .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
   .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
   .pm-item:last-child { border-bottom:none; }
@@ -1077,7 +1119,7 @@
   <div id="view-explore" class="view">
     <div data-help="explore"></div>
     <div style="display:flex; justify-content:center; margin-bottom:14px;">
-      <div class="seg" id="exModeSeg"><button class="seg-b active" data-m="league" onclick="setExMode('league')">Modo liga</button><button class="seg-b" data-m="game" onclick="setExMode('game')">Modo partido</button></div>
+      <div class="ex-mode"><b id="exLblL">Modo Liga</b><label class="sw"><input type="checkbox" id="exSw" onchange="setExMode(this.checked ? 'game' : 'league')" /><i></i></label><span id="exLblG">Modo Partido</span></div>
     </div>
     <div class="ex-sel">
       <select id="exLeague" onchange="exPickLeague(this.value)">
@@ -1089,7 +1131,13 @@
     <div class="ex-sel" id="exGameSel" style="display:none;">
       <select id="exHome" onchange="renderExplore()"></select><span class="muted">vs</span><select id="exAway" onchange="renderExplore()"></select>
     </div>
-    <div class="ex-hero" id="exHero"></div>
+    <div class="ex-hero" id="exHero"><div id="exHeroTxt"></div>
+      <div class="ex-ctl">
+        <div class="ex-goals"><label>Local<br>Goles<input type="number" id="exL" min="0" max="9" value="0" oninput="renderExplore()" /></label><label>Visitante<br>Goles<input type="number" id="exV" min="0" max="9" value="0" oninput="renderExplore()" /></label></div>
+        <div class="ex-rng"><div><span>Inicio del intervalo</span><b id="exSl">0'</b><input type="range" id="exS" min="0" max="90" value="0" oninput="exRng('s')" /></div><div><span>Fin del intervalo</span><b id="exEl">90'</b><input type="range" id="exE" min="0" max="90" value="90" oninput="exRng('e')" /></div></div>
+        <div class="ex-btns"><select id="exView" onchange="renderExplore()"><option value="market">Market Analysis</option><option value="next">Next Goal</option></select><button class="small" onclick="exLoadGoals()">⬇ Cargar minutos de goles</button></div>
+        <div id="exGoalMsg" class="ex-gm"></div>
+      </div></div>
     <div id="ex-status" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
     <div id="ex-out"></div>
   </div>
@@ -3774,8 +3822,69 @@ function cpRpSave() {
   cpRpClose(true);
 }
 function cpRpClose(apply) { cpRp = null; if (apply) { cp.page = 0; renderCoupon(); cpFlt(cpFltTab); } else { const e = document.getElementById("cpRp"); if (e) e.style.display = "none"; } }
+
+/* ===== Minutos de goles (ESPN) ===== */
+const ESPN_SLUG = { "39": "eng.1", "140": "esp.1", "135": "ita.1", "78": "ger.1", "61": "fra.1", "2": "uefa.champions", "88": "ned.1", "94": "por.1", "40": "eng.2", "71": "bra.1", "1": "fifa.world", "4": "uefa.euro" };
+const exGoalMem = {};
+function exGoalKey() { const lg = document.getElementById("trLeague").value, y = document.getElementById("trSeason").value || 2024; return { slug: ESPN_SLUG[lg], y, k: `radar-espn-goals-${ESPN_SLUG[lg]}-${y}` }; }
+function exGoalSet() { try { const g = exGoalKey(); if (!g.slug) return []; if (exGoalMem[g.k]) return exGoalMem[g.k]; const c = JSON.parse(localStorage.getItem(g.k) || "null"); if (c && c.m) return (exGoalMem[g.k] = c.m.map(x => ({ d: x[0], h: x[1], a: x[2], hg: x[3], ag: x[4], g: x[5] }))); } catch (e) {} return []; }
+function exRng(w) { const s = document.getElementById("exS"), e = document.getElementById("exE"); if (+s.value > +e.value) { if (w === "s") e.value = s.value; else s.value = e.value; } document.getElementById("exSl").textContent = s.value + "'"; document.getElementById("exEl").textContent = e.value + "'"; renderExplore(); }
+async function espnGet(path) {
+  const url = "https://site.api.espn.com/apis/site/v2/sports/soccer/" + path;
+  try { const r = await fetch(url); if (!r.ok) throw new Error("ESPN " + r.status); return await r.json(); }
+  catch (e) { const px = getFdProxy(); if (!px) throw new Error("ESPN no se puede llamar desde el navegador (" + e.message + "). Añade tu Worker en ⚙️ y actualiza worker.js (ruta /espn)."); const r = await fetch(px + "/espn/" + path); if (!r.ok) throw new Error("ESPN vía Worker " + r.status); return await r.json(); }
+}
+function exParseGoals(details, homeId, hg, ag) {
+  const g = (details || []).filter(x => x.scoringPlay).map(x => [parseInt((x.clock && x.clock.displayValue) || "0") || 0, String(x.team && x.team.id) === String(homeId) ? 0 : 1]).sort((a, b) => a[0] - b[0]);
+  const c = (side) => g.filter(x => x[1] === side).length;
+  if (c(0) === hg && c(1) === ag) return g;
+  if (c(1) === hg && c(0) === ag) return g.map(x => [x[0], 1 - x[1]]);
+  return null;
+}
+let exLoading = false;
+async function exLoadGoals() {
+  const msg = document.getElementById("exGoalMsg"), g = exGoalKey(); if (exLoading) return;
+  if (!g.slug) { msg.textContent = "Esta liga no está en ESPN."; return; }
+  exLoading = true;
+  try {
+    msg.textContent = "Leyendo calendario...";
+    const c0 = await espnGet(`${g.slug}/scoreboard?dates=${g.y}1015`);
+    let days = ((c0.leagues && c0.leagues[0] && c0.leagues[0].calendar) || []).map(x => String(x).slice(0, 10).replace(/-/g, "")).filter(x => x <= new Date().toISOString().slice(0, 10).replace(/-/g, ""));
+    days = [...new Set(days)];
+    if (!days.length) { msg.textContent = "ESPN no devolvió calendario para esa temporada."; exLoading = false; return; }
+    const out = [], need = []; let done = 0, i = 0;
+    const work = async () => { while (i < days.length) { const d = days[i++]; try { const j = await espnGet(`${g.slug}/scoreboard?dates=${d}`); (j.events || []).forEach(e => { const c = e.competitions && e.competitions[0]; if (!c || !(c.status && c.status.type && c.status.type.completed)) return; const hm = c.competitors.find(x => x.homeAway === "home"), aw = c.competitors.find(x => x.homeAway === "away"); if (!hm || !aw) return; const hg = parseInt(hm.score), ag = parseInt(aw.score); if (isNaN(hg) || isNaN(ag)) return; const row = [String(e.date).slice(0, 10), hm.team.displayName, aw.team.displayName, hg, ag, null]; if (Array.isArray(c.details)) row[5] = exParseGoals(c.details, hm.team.id, hg, ag); else if (hg + ag === 0) row[5] = []; else need.push({ row, id: e.id, hid: hm.team.id }); out.push(row); }); } catch (e) { if (done === 0 && !out.length) throw e; } done++; if (done % 5 === 0) msg.textContent = `Calendario ${done}/${days.length} días · ${out.length} partidos`; } };
+    await Promise.all([work(), work(), work(), work()]);
+    let k = 0;
+    if (need.length) { msg.textContent = `Pidiendo detalle de ${need.length} partidos...`; let j2 = 0; const w2 = async () => { while (j2 < need.length) { const n = need[j2++]; try { const sm = await espnGet(`${g.slug}/summary?event=${n.id}`); const cc = sm.header && sm.header.competitions && sm.header.competitions[0]; n.row[5] = exParseGoals(cc && cc.details, n.hid, n.row[3], n.row[4]); } catch (e) {} k++; if (k % 10 === 0) msg.textContent = `Detalle ${k}/${need.length}`; } }; await Promise.all([w2(), w2(), w2(), w2()]); }
+    const ok = out.filter(r => r[5]).length;
+    try { localStorage.setItem(g.k, JSON.stringify({ t: Date.now(), m: out })); } catch (e) { msg.textContent = "No cabe en el almacenamiento del navegador."; }
+    delete exGoalMem[g.k];
+    msg.textContent = `✓ ${out.length} partidos, ${ok} con minutos de gol (${g.slug} ${g.y}).`;
+    renderExplore();
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  exLoading = false;
+}
+function exNextGoal(sets, S, E, active, total) {
+  const cols = sets.length > 1 ? sets.map(x => x.label) : ["Frecuencia"];
+  const calc = x => { const n = x.pairs.length, r = { n, h: 0, a: 0, none: 0, bins: [] }; const step = 15, lo = S, hi = E >= 90 ? 120 : E; const nb = Math.max(1, Math.ceil((Math.min(E, 90) - S) / step)); for (let i = 0; i < nb; i++) r.bins.push(0); x.pairs.forEach(p => { const f = p.g.find(z => z[0] > S && z[0] <= hi); if (!f) { r.none++; return; } f[1] ? r.a++ : r.h++; r.bins[Math.min(nb - 1, Math.floor((f[0] - S - 1) / step))]++; }); r.nb = nb; return r; };
+  const R = sets.map(calc), pc = (v, n) => n ? v / n : null;
+  const cell = (v, n) => v == null ? '<span class="sm">Sin muestra</span>' : (v * 100).toFixed(1) + "%";
+  const avg = vals => { const v = vals.filter(z => z != null); return v.length ? v.reduce((a, c) => a + c, 0) / v.length : null; };
+  const row = (lab, vals) => { const p = sets.length > 1 ? avg(vals) : vals[0]; return `<tr><td class="exm">${lab}</td><td><div class="rl">${p ? (1 / p).toFixed(2) : '<span class="sm">Sin muestra</span>'}</div>${p ? `<div class="rp">(${(p * 100).toFixed(2)}%)</div>` : ""}</td>${vals.map(v => `<td>${cell(v)}</td>`).join("")}${sets.length > 1 ? `<td><b>${p == null ? "–" : (p * 100).toFixed(1) + "%"}</b></td>` : ""}<td><input class="exin" type="number" step="0.01" placeholder="1.90" data-p="${p || 0}" oninput="exEdge(this)" /></td><td class="exedge muted">–</td></tr>`; };
+  const head = `<thead><tr><th></th><th><b class="bpi">b</b> Cuota real</th>${cols.map(c => `<th>${c}</th>`).join("")}${sets.length > 1 ? "<th>Media</th>" : ""}<th>Cuota personalizada</th><th>Edge</th></tr></thead>`;
+  let html = `<div class="ex-pmh">⚽ NextGoal</div>`;
+  html += `<div class="ex-card"><div class="ex-ch"><span>🥅 Próximo gol tras el ${S}'</span></div><table class="extable">${head}<tbody>${row("Local", R.map(r => pc(r.h, r.n)))}${row("Visitante", R.map(r => pc(r.a, r.n)))}${row("Ninguno más" + (E < 90 ? " (hasta el " + E + "')" : ""), R.map(r => pc(r.none, r.n)))}</tbody></table></div>`;
+  const nb = R[0].nb, lab = i => { const a = S + i * 15 + 1, b = Math.min(E, S + (i + 1) * 15); return `${a}' – ${i === nb - 1 && E >= 90 ? "90'+" : b + "'"}`; };
+  html += `<div class="ex-card"><div class="ex-ch"><span>⏱ Franja en la que cae el próximo gol</span></div><table class="extable">${head}<tbody>${Array.from({ length: nb }, (_, i) => row(lab(i), R.map(r => pc(r.bins[i], r.n)))).join("")}</tbody></table></div>`;
+  html += `<div class="muted" style="text-align:center; font-size:11px;">Muestra: ${R.map(r => r.n).join(" / ")} partidos con el marcador ${document.getElementById("exL").value || 0}-${document.getElementById("exV").value || 0} al minuto ${S}'. Minutos de gol de ESPN.${active ? "" : " Sin filtros: todos los partidos desde el minuto 0."}</div>`;
+  if (!total) html = `<div class="muted" style="text-align:center; padding:24px;">Pulsa «⬇ Cargar minutos de goles» para usar Next Goal.</div>`;
+  return html;
+}
 let exMode = "league";
-function setExMode(m) { exMode = m; document.querySelectorAll("#exModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
+let exHidden = {};
+function exHide(k, on) { if (k === "all") exHidden = {}; else exHidden[k] = on; renderExplore(); }
+function setExMode(m) { exMode = m; { const sw = document.getElementById("exSw"); if (sw) sw.checked = m === "game"; const a = document.getElementById("exLblL"), b = document.getElementById("exLblG"); if (a) a.style.fontWeight = m === "game" ? 400 : 700; if (b) b.style.fontWeight = m === "game" ? 700 : 400; } document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
 function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
 function exMarkets() {
   const mk = (l, f, ht) => ({ l, f, ht });
@@ -3796,45 +3905,66 @@ function exMarkets() {
 }
 function renderExplore() {
   const out = document.getElementById("ex-out"); if (!out) return;
-  const hero = document.getElementById("exHero"), st = document.getElementById("ex-status");
+  const hero = document.getElementById("exHeroTxt"), st = document.getElementById("ex-status");
+  const gs = exGoalSet(), eL = parseInt(document.getElementById("exL").value) || 0, eV = parseInt(document.getElementById("exV").value) || 0, eS = parseInt(document.getElementById("exS").value) || 0, eE = parseInt(document.getElementById("exE").value); const E90 = isNaN(eE) ? 90 : eE;
+  const active = eL > 0 || eV > 0 || eS > 0 || E90 < 90 || document.getElementById("exView").value === "next";
   document.getElementById("exLeague").value = document.getElementById("trLeague").value;
-  if (!trData || !trData.length) { hero.innerHTML = `<div class="t">Explorar mercados</div><div class="s">Cargando datos de la liga...</div>`; out.innerHTML = ""; st.textContent = document.getElementById("trStatus").textContent; return; }
+  if ((!trData || !trData.length) && !(active && gs.length)) { hero.innerHTML = `<div class="t">Explorar mercados</div><div class="s">Cargando datos de la liga...</div>`; out.innerHTML = ""; st.textContent = document.getElementById("trStatus").textContent; return; }
   const N = parseInt(document.getElementById("exSample").value) || 0, sel = document.getElementById("exMarket").value;
   const lname = document.getElementById("exLeague").selectedOptions[0].textContent;
-  const byDate = [...trData].sort((a, b) => b.d.localeCompare(a.d));
-  const teams = [...new Set(trData.flatMap(f => [f.h, f.a]))].sort();
+  const byDate = [...(trData || [])].sort((a, b) => b.d.localeCompare(a.d));
+  const teams = [...new Set(((trData && trData.length) ? trData.flatMap(f => [f.h, f.a]) : gs.flatMap(m => [m.h, m.a])))].sort();
   const fill = (id, keep, def) => { const el = document.getElementById(id); if (el.options.length !== teams.length) { el.innerHTML = teams.map(t => `<option>${t}</option>`).join(""); el.selectedIndex = def; } };
   fill("exHome", null, 0); fill("exAway", null, Math.min(1, teams.length - 1));
-  let sets; // cada set: { label, pairs:[{h,a}] }
-  if (exMode === "league") {
+  let sets, sub = "";
+  if (active) {
+    const same = (x, y) => { const p = msNorm(x), q = msNorm(y); return p && q && (p === q || p.includes(q) || q.includes(p)); };
+    const sc = (g, min) => { let h = 0, a = 0; if (min > 0) g.forEach(x => { if (x[0] <= min) x[1] ? a++ : h++; }); return [h, a]; };
+    const mk = m => { const st0 = sc(m.g, eS), fin = E90 >= 90 ? [m.hg, m.ag] : sc(m.g, E90); return { h: fin[0], a: fin[1], hh: null, ha: null, g: m.g, s0: st0 }; };
+    const pick = list => { let r = list.filter(m => m.g && sc(m.g, eS)[0] === eL && sc(m.g, eS)[1] === eV).sort((a, b) => b.d.localeCompare(a.d)); if (N) r = r.slice(0, N); return r; };
+    if (!gs.length) { hero.innerHTML = `<div class="t">${lname}</div><div class="s">Faltan los minutos de goles</div><div class="s2">Pulsa «Cargar minutos de goles»</div>`; out.innerHTML = '<div class="muted" style="text-align:center; padding:24px;">Para filtrar por minuto y marcador necesito los goles de cada partido con su minuto. Pulsa «⬇ Cargar minutos de goles» (ESPN, gratis) en el banner.</div>'; st.textContent = ""; return; }
+    if (exMode === "league") { const r = pick(gs); sets = [{ label: "Liga", pairs: r.map(mk), n: r.length }]; }
+    else { const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value; const hr = pick(gs.filter(m => same(m.h, H))), ar = pick(gs.filter(m => same(m.a, A))); sets = [{ label: `${H} (en casa)`, pairs: hr.map(mk), n: hr.length }, { label: `${A} (fuera)`, pairs: ar.map(mk), n: ar.length }]; }
+    sub = `Marcador ${eL}-${eV} al minuto ${eS}' · mercados medidos al ${E90}' · ${sets.map(x => x.n).join(" / ")} partidos`;
+  } else if (exMode === "league") {
     const rows = N ? byDate.slice(0, N) : byDate;
     sets = [{ label: "Liga", pairs: rows.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }];
-    hero.innerHTML = `<div class="t">${lname}</div><div class="s">Análisis de liga · ${rows.length} partidos${N ? " (últimos " + N + ")" : " de la temporada"}</div>`;
+    sub = `${rows.length} partidos${N ? " (últimos " + N + ")" : " de la temporada"}`;
   } else {
     const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value;
     let hr = byDate.filter(f => f.h === H), ar = byDate.filter(f => f.a === A);
     if (N) { hr = hr.slice(0, N); ar = ar.slice(0, N); }
     sets = [{ label: `${H} (en casa)`, pairs: hr.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }, { label: `${A} (fuera)`, pairs: ar.map(f => ({ h: f.hg, a: f.ag, hh: f.hh, ha: f.ha })) }];
-    hero.innerHTML = `<div class="t">${H} vs ${A}</div><div class="s">${lname} · ${hr.length} partidos del local en casa · ${ar.length} del visitante fuera</div>`;
+    sub = `${hr.length} partidos del local en casa · ${ar.length} del visitante fuera`;
   }
+  if (exMode === "league") hero.innerHTML = `<div class="t">${lname}</div><div class="s">League Analysis</div><div class="s2">${sub}</div>`;
+  else { const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value; hero.innerHTML = `<div class="s">${lname}</div><div class="vsrow"><span class="t">${H}</span><span class="vs">VS</span><span class="t">${A}</span></div><div class="s2">${sub}</div>`; }
+  if (document.getElementById("exView").value === "next") { out.innerHTML = exNextGoal(sets, eS, E90, active, gs.length); st.textContent = ""; return; }
   st.textContent = "Cuota justa = 1 / frecuencia. Escribe tu cuota para ver el edge (cuota × frecuencia − 1).";
   const freq = (pairs, f, ht) => { const ps = ht ? pairs.filter(p => p.hh != null && p.ha != null) : pairs; return ps.length ? ps.filter(p => f(p.h, p.a, p.hh, p.ha)).length / ps.length : null; };
   const defs = exMarkets(); let html = "";
-  Object.keys(defs).filter(k => sel === "all" || sel === k).forEach(k => {
-    const [title, list] = defs[k];
+  const keys = Object.keys(defs);
+  html += `<div class="ex-pmh">⎍ Pregame Market Analysis${exMode === "league" ? " Modo Liga" : ""}</div><div class="ex-pills"><span class="pf-chip ${sel === "all" && !Object.values(exHidden).some(Boolean) ? "on" : ""}" onclick="document.getElementById('exMarket').value='all'; exHide('all')">Todos</span>${keys.map(k => `<span class="pf-chip ${(sel === k || sel === "all") && !exHidden[k] ? "on" : ""}" onclick="document.getElementById('exMarket').value='${k}'; exHide('${k}', false)">${defs[k][0].replace(/ \(.*/, "")}</span>`).join("")}</div>`;
+  // cuotas bet365 del partido (modo partido)
+  let bks = null;
+  if (exMode === "game") { try { const H = document.getElementById("exHome").value, A = document.getElementById("exAway").value, same = (x, y) => { const p = msNorm(x), q = msNorm(y); return p && q && (p === q || p.includes(q) || q.includes(p)); }; const f = cpAll().find(x => same(x.m.home_team, H) && same(x.m.away_team, A)); if (f) bks = f.m; } catch (e) {} }
+  const BM = { "1 (local gana)": ["h2h", "home"], "X (empate)": ["h2h", "Draw"], "2 (visitante gana)": ["h2h", "away"], "Más de 2.5": ["totals", "Over +2.5"], "Menos de 2.5": ["totals", "Under +2.5"], "Sí": ["btts", "Yes"], "No": ["btts", "No"] };
+  const bmCell = (m, p, k) => { if (k !== "1x2" && k !== "goals" && k !== "btts") return null; const d = BM[m.l]; if (!d || !bks) return `<td class="muted">(-)</td>`; const key = d[1] === "home" ? bks.home_team : d[1] === "away" ? bks.away_team : d[1]; const r = cpPick(bks.bookmakers, d[0], key); if (!r) return `<td class="muted">(-)</td>`; const df = p ? (r.price * p - 1) * 100 : null; return `<td><span class="bmi">${/bet365/.test(r.shown || "") ? "365" : (r.shown || "·").slice(0, 3).toUpperCase()}</span> ${r.price.toFixed(2)} ${df != null ? `<span class="${df >= 0 ? "pos" : "neg"}">${df >= 0 ? "+" : ""}${df.toFixed(2)}%</span>` : ""}</td>`; };
+  keys.filter(k => (sel === "all" || sel === k) && !exHidden[k] && !(active && ["ht", "half2", "htft"].includes(k))).forEach(k => {
+    const [title, list] = defs[k], hasBm = !!bks && (k === "1x2" || k === "goals" || k === "btts");
     const head = sets.length > 1 ? `<th>${sets[0].label}</th><th>${sets[1].label}</th><th>Media</th>` : `<th>Frecuencia</th>`;
-    html += `<div class="ex-block"><h3>${title}</h3><table class="extable"><thead><tr><th>Mercado</th>${head}<th>Cuota justa</th><th>Tu cuota</th><th>Edge</th></tr></thead><tbody>` +
+    html += `<div class="ex-card"><div class="ex-ch"><span>📊 ${title}</span><i onclick="exHide('${k}', true)" title="Ocultar">✕</i></div><table class="extable"><thead><tr><th></th><th><b class="bpi">b</b> Cuota real</th>${hasBm ? "<th>Casa de Apuestas</th>" : ""}${head}<th>Cuota personalizada</th><th>Edge</th></tr></thead><tbody>` +
       list.map(m => {
         const fs = sets.map(x => freq(x.pairs, m.f, m.ht)), valid = fs.filter(v => v != null), p = valid.length ? valid.reduce((a, c) => a + c, 0) / valid.length : null;
-        const cells = fs.map(v => `<td>${v == null ? "–" : (v * 100).toFixed(1) + "%"}</td>`).join("") + (sets.length > 1 ? `<td><b>${p == null ? "–" : (p * 100).toFixed(1) + "%"}</b></td>` : "");
-        return `<tr><td class="exm">${m.l}</td>${cells}<td><span class="codd">${p ? (1 / p).toFixed(2) : "–"}</span></td><td><input class="exin" type="number" step="0.01" placeholder="1.90" data-p="${p || 0}" oninput="exEdge(this)" /></td><td class="exedge muted">–</td></tr>`;
+        const cells = fs.map(v => `<td>${v == null ? '<span class="sm">Sin muestra</span>' : (v * 100).toFixed(1) + "%"}</td>`).join("") + (sets.length > 1 ? `<td><b>${p == null ? "–" : (p * 100).toFixed(1) + "%"}</b></td>` : "");
+        return `<tr><td class="exm">${m.l}</td><td><div class="rl">${p ? (1 / p).toFixed(2) : '<span class="sm">Sin muestra</span>'}</div>${p ? `<div class="rp">(${(p * 100).toFixed(2)}%)</div>` : ""}</td>${hasBm ? (bmCell(m, p, k) || "<td></td>") : ""}${cells}<td><input class="exin" type="number" step="0.01" placeholder="1.90" data-p="${p || 0}" oninput="exEdge(this)" /></td><td class="exedge muted">–</td></tr>`;
       }).join("") + `</tbody></table></div>`;
   });
   if (sel === "all" || sel === "scores") {
     const pooled = sets.flatMap(x => x.pairs), cnt = {};
     pooled.forEach(p => { const k = `${p.h}-${p.a}`; cnt[k] = (cnt[k] || 0) + 1; });
     const top = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 8), mx = top.length ? top[0][1] : 1;
-    html += `<div class="ex-block"><h3>Marcadores más frecuentes</h3><table class="extable"><thead><tr><th>Marcador</th><th>Veces</th><th>Frecuencia</th><th style="width:40%;"></th></tr></thead><tbody>` +
+    html += `<div class="ex-card"><div class="ex-ch"><span>⚽ Marcadores más frecuentes</span></div><table class="extable"><thead><tr><th>Marcador</th><th>Veces</th><th>Frecuencia</th><th style="width:40%;"></th></tr></thead><tbody>` +
       top.map(([k, n]) => `<tr><td class="exm">${k}</td><td>${n}</td><td>${(100 * n / pooled.length).toFixed(1)}%</td><td><div class="exbar"><i style="width:${100 * n / mx}%"></i></div></td></tr>`).join("") + `</tbody></table></div>`;
   }
   html += `<div class="muted" style="max-width:820px; margin:14px auto 0; font-size:11px; text-align:center;">El análisis por minuto de gol (Next Goal) no está incluido: requiere los eventos de cada partido, que agotarían la cuota diaria del plan gratuito de API-Football.</div>`;
