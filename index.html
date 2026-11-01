@@ -780,6 +780,7 @@
         <div><div class="muted" style="margin-bottom:4px;">API-Football key <span class="tooltip" title="api-football.com — necesaria para forma, lesiones, formaciones y estadísticas.">ⓘ</span></div><input id="footballKey" type="password" placeholder="api-football.com" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">football-data.org token <span class="tooltip" title="football-data.org — gratis. Da resultados de la temporada ACTUAL de 12 ligas para Tendencias, Explorar y la ficha del partido.">ⓘ</span></div><input id="fdKey" type="password" placeholder="football-data.org (gratis)" style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">Proxy football-data (URL de tu Worker) <span class="tooltip" title="football-data.org no permite llamadas desde GitHub Pages. Un Worker gratuito de Cloudflare hace de intermediario. Pega aquí su URL, por ejemplo https://radar-fd.tuusuario.workers.dev">ⓘ</span></div><input id="fdProxy" type="text" placeholder="https://radar-fd.xxxx.workers.dev" style="width:100%;" /></div>
+        <div><div class="muted" style="margin-bottom:4px;">Clave de Bzzoiro Sports Data (alineaciones, estadísticas de partido, árbitros) <span class="tooltip" title="Se guarda solo en este navegador. Si tu Worker tiene la variable BSD_KEY puedes dejarla vacía.">ⓘ</span></div><input id="bsdKey" type="password" placeholder="Token de sports.bzzoiro.com" style="width:100%;" autocomplete="off" /></div>
         <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
@@ -1667,7 +1668,8 @@ function saveKeys() {
   const k2 = document.getElementById("footballKey").value.trim();
   const k3 = document.getElementById("anthropicKey").value.trim();
   const k5 = document.getElementById("isportsKey").value.trim();
-  const k6 = document.getElementById("fdKey").value.trim(), k7 = document.getElementById("fdProxy").value.trim();
+  const k6 = document.getElementById("fdKey").value.trim(), k7 = document.getElementById("fdProxy").value.trim(), kb = document.getElementById("bsdKey").value.trim();
+  if (kb) { try { localStorage.setItem("radar-bsd-key", kb); } catch (e) {} }
   const br = document.getElementById("bankroll").value.trim();
   const kf = document.getElementById("kellyFraction").value;
   if (k1) localStorage.setItem(ODDS_KEY_STORAGE, k1);
@@ -1826,6 +1828,7 @@ async function loadOdds(forceRefresh) {
   document.getElementById("isportsKey").value = getIsportsKey();
   document.getElementById("fdKey").value = localStorage.getItem(FD_KEY_STORAGE) || "";
   document.getElementById("fdProxy").value = getFdProxy();
+  try { const b = document.getElementById("bsdKey"); b.value = ""; b.placeholder = localStorage.getItem("radar-bsd-key") ? "•••••• guardada (escribe para cambiarla)" : "Token de sports.bzzoiro.com"; } catch (e) { }
   document.getElementById("bankroll").value = getBankroll();
   document.getElementById("kellyFraction").value = getKellyFraction();
   if (!key) {
@@ -3962,6 +3965,24 @@ function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel
 
 
 
+
+/* ===== Bzzoiro Sports Data (BSD): alineaciones, estadísticas, árbitros ===== */
+async function bsdGet(path) {
+  let k = ""; try { k = localStorage.getItem("radar-bsd-key") || ""; } catch (e) { }
+  const px = getFdProxy(); if (!k && !px) throw new Error("Falta la clave de BSD en ⚙️");
+  if (k) { try { const r = await fetch("https://sports.bzzoiro.com/api/v2/" + path, { headers: { Authorization: "Token " + k } }); if (r.ok) return await r.json(); if (r.status === 404) throw new Error("404"); } catch (e) { if (e.message === "404") throw e; } }
+  if (!px) throw new Error("BSD no responde desde el navegador; añade tu Worker en ⚙️");
+  const r = await fetch(px + "/bsd/" + path, { headers: k ? { "X-BSD-Key": k } : {} }); if (!r.ok) throw new Error("BSD " + r.status); return await r.json();
+}
+async function vsBsd(ev) {
+  const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), day = new Date(ev.date).toISOString().slice(0, 10);
+  let url = `events/?date_from=${day}&date_to=${day}&limit=200`, found = null;
+  for (let i = 0; i < 4 && url && !found; i++) { const j = await bsdGet(url); found = (j.results || []).find(e => near(nm(e.home_team), nm(ev.hn)) && near(nm(e.away_team), nm(ev.an))); url = j.next ? j.next.replace(/^.*\/api\/v2\//, "") : null; }
+  if (!found) return null;
+  const out = { ev: found, lin: null, ref: null, st: null };
+  await Promise.all([bsdGet(`events/${found.id}/lineups/`).then(j => { out.lin = j; }).catch(() => { }), found.referee_id ? bsdGet(`referees/${found.referee_id}/`).then(j => { out.ref = j; }).catch(() => { }) : null, found.status === "finished" ? bsdGet(`events/${found.id}/stats/`).then(j => { out.st = j; }).catch(() => { }) : null]);
+  return out;
+}
 /* ===== Página de partido (Previa · Alineaciones · Árbitro · Clasificación) ===== */
 let vsM = null;
 const VS_MROWS = [["Córners", "wonCorners"], ["Faltas", "foulsCommitted"], ["Tarjetas amarillas", "yellowCards"], ["Tarjetas rojas", "redCards"], ["Fueras de juego", "offsides"], ["Paradas", "saves"], ["Tiros", "totalShots"], ["Tiros a puerta", "shotsOnTarget"], ["Posesión (%)", "possessionPct"]];
@@ -3977,6 +3998,7 @@ async function vsMatch(key) {
     vsM.h2h = (evs[ev.hid] || []).filter(vsDone).filter(e => (((e.competitions || [])[0] || {}).competitors || []).some(c => String(c.team.id) === ev.aid)).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 6).map(e => { const cs = e.competitions[0].competitors, h = cs.find(c => c.homeAway === "home"), a = cs.find(c => c.homeAway === "away"); return { d: e.date, hn: h.team.displayName || h.team.name, an: a.team.displayName || a.team.name, hs: sc(h), as: sc(a), hid: String(h.team.id) }; });
     try { const j = await (await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${slug}/standings`)).json(), en = (((j.children || [])[0] || j).standings || {}).entries || [];
       vsM.stand = en.map(e => { const st = {}; (e.stats || []).forEach(x => st[x.name] = x.value); return { id: String(e.team.id), n: e.team.displayName || e.team.name, pj: st.gamesPlayed, g: st.wins, e: st.ties, p: st.losses, gf: st.pointsFor, gc: st.pointsAgainst, dg: st.pointDifferential, pts: st.points, rk: st.rank }; }).sort((a, b) => (a.rk || 99) - (b.rk || 99)); } catch (e) { }
+    try { vsM.bsd = await vsBsd(ev); } catch (e) { vsM.bsd = null; vsM.bsdErr = e.message; }
     try { vsM.ref = await vsRefFetch(ev); } catch (e) { vsM.ref = null; }
     try { if (!Object.keys(hbData).length) await hbLoad(); } catch (e) { }
     vsMatchDraw();
@@ -4003,7 +4025,7 @@ function vsMPrev() {
   const bar = (lab, k) => { const x = av(H, k), y = av(A, k), mx = Math.max(x, y, 0.01); return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span>${f1(x)}</span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span>${f1(y)}</span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#e3ebe6; border-radius:3px; display:flex; justify-content:flex-end;"><i style="width:${x / mx * 100}%; background:var(--v-g); border-radius:3px;"></i></div><div style="flex:1; background:#e3ebe6; border-radius:3px;"><i style="display:block; width:${y / mx * 100}%; height:100%; background:#2b8f6a; border-radius:3px;"></i></div></div></div>`; };
   const pct = ([lab, fn]) => { const h = H.filter(m => fn(m)).length, a = A.filter(m => fn(m)).length, ph = H.length ? h / H.length * 100 : 0, pa = A.length ? a / A.length * 100 : 0; return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span style="color:var(--v-g);">${Math.round(ph)}% <small class="muted" style="font-weight:500;">(${h}/${H.length})</small></span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span style="color:var(--v-g);">${Math.round(pa)}% <small class="muted" style="font-weight:500;">(${a}/${A.length})</small></span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#e3ebe6; border-radius:3px; display:flex; justify-content:flex-end;"><i style="width:${ph}%; background:var(--v-g); border-radius:3px;"></i></div><div style="flex:1; background:#e3ebe6; border-radius:3px;"><i style="display:block; width:${pa}%; height:100%; background:#2b8f6a; border-radius:3px;"></i></div></div></div>`; };
   const trend = (arr, tid, name) => { const out = []; Object.keys(TT_DEF).forEach(cat => TT_DEF[cat].forEach(([label, fn, ths]) => { let best = null; ths.forEach(t => { const th = t + (t % 1 ? .5 : 0); let k = 0; while (k < arr.length && fn(arr[k].m, tid) >= th) k++; if (k >= 4 && (!best || t > best.t)) best = { t, k }; }); if (best) out.push(`${label} +${String(best.t % 1 ? best.t : best.t - .5).replace(".", ",")} · racha de ${best.k}`); })); return `<div class="vs-card2"><b style="display:flex; align-items:center; gap:8px;">${vsLg(tid)}${name}</b>${out.length ? "<ul style='margin:8px 0 0; padding-left:18px; font-size:12.5px; line-height:1.7;'>" + out.map(x => `<li>${x}</li>`).join("") + "</ul>" : '<div class="muted" style="margin-top:6px; font-size:12px;">Sin rachas de 4 o más.</div>'}</div>`; };
-  const mo = vsMOdds(M.hn, M.an, M.date), h2h = M.h2h, hw = h2h.filter(x => (x.hid === M.hid ? x.hs > x.as : x.as > x.hs)).length, aw = h2h.filter(x => (x.hid === M.hid ? x.hs < x.as : x.as < x.hs)).length;
+  const bh = M.bsd && M.bsd.ev && M.bsd.ev.head_to_head, mo = vsMOdds(M.hn, M.an, M.date), h2h = bh && (bh.recent_matches || []).length ? bh.recent_matches.slice(0, 8).map(x => ({ d: x.date, hn: x.home, an: x.away, hs: x.home_score, as: x.away_score, hid: String(x.home_team_id) === String(M.bsd.ev.home_team_id) ? M.hid : M.aid })) : M.h2h, hw = h2h.filter(x => (x.hid === M.hid ? x.hs > x.as : x.as > x.hs)).length, aw = h2h.filter(x => (x.hid === M.hid ? x.hs < x.as : x.as < x.hs)).length;
   return `<div class="vs-g2"><div class="vs-card2"><b>Últimos partidos · ${M.hn}</b>${last(H, M.hid)}</div><div class="vs-card2"><b>Últimos partidos · ${M.an}</b>${last(A, M.aid)}</div></div>
     <div class="vs-g2" style="margin-top:14px;"><div class="vs-card2"><b>Medias (últimos ${Math.max(H.length, A.length)})</b>${VS_MROWS.map(([l, k]) => bar(l, k)).join("")}</div><div class="vs-card2"><b>Frecuencias (últimos ${Math.max(H.length, A.length)})</b>${VS_MPCT.map(pct).join("")}</div></div>
     <div class="vs-g2" style="margin-top:14px;">${trend(H, M.hid, M.hn)}${trend(A, M.aid, M.an)}</div>
@@ -4011,7 +4033,17 @@ function vsMPrev() {
     ${mo ? `<div class="vs-card2" style="margin-top:14px;"><b>Mejores cuotas · resultado final (Bet365)</b><div style="display:flex; gap:10px; margin-top:8px;">${[["1", M.hn, mo.h], ["X", "Empate", mo.d], ["2", M.an, mo.a]].map(([a, n, o]) => `<div style="flex:1; text-align:center; background:#f1f5f2; border-radius:10px; padding:10px;"><div class="muted" style="font-size:11px;">${a} · ${n}</div><div style="font-size:22px; font-weight:800;">${o ? o.toFixed(2) : "–"}</div></div>`).join("")}</div></div>` : ""}`;
 }
 function vsMOdds(hn, an, date) { const c = movGet(); if (!c) return null; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(date), m = c.data.find(x => near(nm(x.home_team), nm(hn)) && near(nm(x.away_team), nm(an)) && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000), bk = m && (m.bookmakers || [])[0], mk = bk && bk.markets.find(k => k.key === "h2h"); if (!mk) return null; const g = n => (mk.outcomes.find(o => o.name === n) || {}).price; return { h: g(m.home_team), d: g("Draw"), a: g(m.away_team) }; }
+function vsMLinB() {
+  const M = vsM, L = M.bsd.lin, lx = L && L.lineups, f = v => (Math.round(v * 10) / 10).toString().replace(".", ","), rank = p => ({ G: 0, D: 1, M: 2, F: 3 }[String(p || "").charAt(0)] ?? 4);
+  if (!lx || !lx.home || !(lx.home.players || []).length) return null;
+  const es = tid => { const m = new Map(); (M.ms[tid] || []).forEach(x => x.m.pl.filter(p => p.t === tid).forEach(p => { if (!m.has(p.i)) m.set(p.i, { n: p.n, rows: [] }); m.get(p.i).rows.push(p); })); return m; };
+  const find = (map, name) => { const w = ppNm(name); if (!w.length) return null; for (const [id, o] of map) { const v = ppNm(o.n); if (!v.length) continue; const [sh, lo] = v.length <= w.length ? [v, w] : [w, v]; if (sh.every(t => lo.includes(t)) || (v[v.length - 1] === w[w.length - 1] && v[0][0] === w[0][0])) return { id, o }; } return null; };
+  const side = (lado, tid, nameT) => { const T = lx[lado]; if (!T) return ""; const map = es(tid), pl = (T.players || []).slice().sort((a, b) => rank(a.position) - rank(b.position));
+    return `<div class="vs-card2"><b style="display:flex; align-items:center; gap:8px;">${vsLg(tid)}${nameT} <small class="muted">· ${T.formation || "?"} · ${L.lineup_status === "confirmed" ? "confirmada" : "probable"}</small></b><div class="vs-tw" style="margin:8px 0 0; border:0;"><table class="vs-t"><tr><th class="l">JUGADOR</th><th>#</th><th>POS</th><th>PJ</th><th>TIROS</th><th>A PUERTA</th><th>F.COM</th><th>F.REC</th><th>AMAR</th></tr>${pl.map(p => { const e = find(map, p.name), n = e ? e.o.rows.length : 0, sum = k => e ? e.o.rows.reduce((a, r) => a + (r.k[k] || 0), 0) : 0; return `<tr><td class="l">${e ? `<a class="vs-a" style="display:inline-flex; align-items:center; gap:8px;" onclick="vsPlayer('${M.slug}','${tid}','${e.id}')">${vsPh(e.id, "vs-ph")}${p.name}</a>` : p.name}${p.captain ? " ©" : ""}</td><td>${p.jersey_number ?? ""}</td><td>${p.position || "–"}</td><td>${n || "–"}</td><td>${n ? f(sum("totalShots") / n) : "–"}</td><td>${n ? f(sum("shotsOnTarget") / n) : "–"}</td><td>${n ? f(sum("foulsCommitted") / n) : "–"}</td><td>${n ? f(sum("foulsSuffered") / n) : "–"}</td><td>${n ? sum("yellowCards") : "–"}</td></tr>`; }).join("")}</table></div></div>`; };
+  return side("home", M.hid, M.hn) + '<div style="height:14px;"></div>' + side("away", M.aid, M.an) + '<div class="muted" style="font-size:11px; margin-top:8px;">Alineación de Bzzoiro Sports Data. Las medias salen de los partidos de ESPN descargados; si un jugador no se reconoce por el nombre, aparece "–".</div>';
+}
 function vsMLin() {
+  if (vsM.bsd && vsM.bsd.lin) { const h = vsMLinB(); if (h) return h; }
   const M = vsM, rank = p => /^G/.test(p) ? 0 : /^(D|C[BD]|[RL]B|SW|WB)/.test(p) ? 1 : /^(M|[DCAL R]M|[LR]M)/.test(p) ? 2 : 3, f = v => (Math.round(v * 10) / 10).toString().replace(".", ",");
   const tbl = (tid, name) => { const arr = M.ms[tid] || [], lastM = arr[0]; if (!lastM) return `<div class="vs-card2"><b>${name}</b><div class="muted">Sin datos.</div></div>`;
     const st0 = lastM.m.pl.filter(x => x.t === tid && x.s), st = (st0.length ? st0 : lastM.m.pl.filter(x => x.t === tid).slice(0, 11)).sort((a, b) => rank(a.p) - rank(b.p)), agg = id => { const rows = arr.map(m => m.m.pl.find(x => x.i === id && x.t === tid)).filter(Boolean), n = rows.length || 1, sum = k => rows.reduce((a, r) => a + (r.k[k] || 0), 0); return { n: rows.length, sh: sum("totalShots") / n, sot: sum("shotsOnTarget") / n, fc: sum("foulsCommitted") / n, fs: sum("foulsSuffered") / n, y: sum("yellowCards"), g: sum("totalGoals") }; };
@@ -4020,7 +4052,8 @@ function vsMLin() {
 }
 function vsRefKey(n) { const t = String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean); return t.length > 1 ? { ini: t[0][0], sur: t.slice(1).join(" ") } : { ini: "", sur: t[0] || "" }; }
 function vsMArb() {
-  const M = vsM, rf = M.ref;
+  const M = vsM, rf = M.ref, bf = M.bsd && M.bsd.ref;
+  if (bf) { const f2 = x => (Math.round(x * 100) / 100).toString().replace(".", ","); return `<div class="vs-card2"><div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;"><div><div style="font-size:22px; font-weight:800;">${bf.name}</div><div class="muted">${bf.country || ""} · ${bf.matches ?? "?"} partidos arbitrados · ${bf.career_games ?? "?"} en su carrera</div></div><div style="margin-left:auto; display:flex; gap:22px; text-align:center;"><div><b style="font-size:22px; color:#b07d00;">${f2(bf.avg_yellow_per_match)}</b><div class="muted" style="font-size:11px;">Amarillas/partido</div></div><div><b style="font-size:22px; color:#b3261e;">${f2(bf.avg_red_per_match)}</b><div class="muted" style="font-size:11px;">Rojas/partido</div></div><div><b style="font-size:22px;">${f2(bf.avg_fouls_per_match)}</b><div class="muted" style="font-size:11px;">Faltas/partido</div></div><div><b style="font-size:22px;">${f2(bf.avg_goals_per_match)}</b><div class="muted" style="font-size:11px;">Goles/partido</div></div></div></div></div><div class="muted" style="font-size:11px; margin-top:8px;">Medias de Bzzoiro Sports Data. Los partidos concretos y las medias de córners salen de tus CSV si los importaste.</div>`; }
   if (!rf) return `<div class="vs-card2" style="text-align:center; padding:26px;"><b>Árbitro</b><div class="muted" style="margin:10px auto; max-width:540px; font-size:13px; line-height:1.6;">${getFdKey() ? "football-data.org no devuelve el árbitro de este partido (o la liga no entra en su plan gratuito)." : "Para ver el árbitro hace falta configurar tu Worker de football-data.org en ⚙️."} Puedes mirar las medias de todos los árbitros en la pantalla de Árbitros.</div><button onclick="switchView('refs')">Ir a Árbitros</button></div>`;
   if (!rf.name) return `<div class="vs-card2" style="text-align:center; padding:26px;"><b>Árbitro</b><div class="muted" style="margin-top:10px;">Todavía no hay árbitro designado para este partido.</div></div>`;
   const k = vsRefKey(rf.name), rows = []; Object.keys(hbData).forEach(lg => hbData[lg].forEach(r => { if (!r[8]) return; const q = vsRefKey(r[8][0]); if (q.sur === k.sur && (!q.ini || !k.ini || q.ini === k.ini)) rows.push({ lg, r }); }));
