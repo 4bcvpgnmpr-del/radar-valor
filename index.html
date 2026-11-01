@@ -1609,7 +1609,7 @@ const VALUE_THRESHOLD = 0.02;
 const ERROR_THRESHOLD = 0.15;
 const ODDS_CACHE_PREFIX = "radar-valor-odds-cache-";
 const ODDS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
-const DISPLAY_BOOKMAKER_MATCH = ["williamhill"];
+const DISPLAY_BOOKMAKER_MATCH = ["bet365"];
 const REFERENCE_BOOKMAKERS = ["pinnacle", "unibet_eu"];
 const FEATURED_MARKETS = "h2h,spreads,totals";
 const ADDITIONAL_MARKETS = "btts,double_chance,draw_no_bet";
@@ -2497,22 +2497,13 @@ async function loadModel(idx) {
 }
 async function loadBet365(idx) {
   const it = pvItems[idx]; if (!it) return;
-  const m = it.m, box = document.getElementById(`${it.cardId}-b365`), key = getFootballKey();
-  if (!key) { box.innerHTML = `<div class="muted">Añade tu API-Football key en ⚙️ Configuración.</div>`; return; }
-  box.innerHTML = `<div class="muted">Buscando el partido y la cuota de Bet365...</div>`;
+  const m = it.m, box = document.getElementById(`${it.cardId}-b365`);
+  box.innerHTML = `<div class="muted">Buscando la cuota de Bet365...</div>`;
   try {
-    const lg = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0], day = m.commence_time.slice(0, 10), ck = `radar-b365-${m.id}`;
-    let od = null;
-    try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 30 * 60000) od = c.d; } catch (e) {}
-    if (!od) {
-      const fx = await apiFootball(`/fixtures?league=${lg.id}&season=${currentSeason()}&date=${day}`, key);
-      const hn = msFind(m.home_team, fx.map(x => x.teams.home.name)), f = fx.find(x => x.teams.home.name === hn);
-      if (!f) throw new Error("no encuentro este partido en API-Football (¿temporada no incluida en tu plan?)");
-      const r = await apiFootball(`/odds?fixture=${f.fixture.id}&bookmaker=8`, key);
-      od = r[0] && r[0].bookmakers && r[0].bookmakers[0] ? r[0].bookmakers[0].bets : null;
-      if (!od) throw new Error("Bet365 todavía no tiene cuotas publicadas para este partido");
-      try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), d: od })); } catch (e) {}
-    }
+    movInject(m); const bk = (m.bookmakers || []).find(b => b.key.includes("bet365"));
+    if (!bk) throw new Error("Bet365 no tiene este partido en MoviOdds todavía (pulsa «Cuotas Bet365» arriba para actualizar)");
+    const g = (k, n, pt) => { const mk = bk.markets.find(x => x.key === k); const o = mk && mk.outcomes.find(x => x.name === n && (pt == null || x.point === pt)); return o ? String(o.price) : null; };
+    const od = [{ name: "Match Winner", values: [{ value: "Home", odd: g("h2h", m.home_team) }, { value: "Draw", odd: g("h2h", "Draw") }, { value: "Away", odd: g("h2h", m.away_team) }].filter(x => x.odd) }, { name: "Goals Over/Under", values: [{ value: "Over 2.5", odd: g("totals", "Over", 2.5) }, { value: "Under 2.5", odd: g("totals", "Under", 2.5) }].filter(x => x.odd) }];
     const mw = od.find(b => b.name === "Match Winner"), ou = od.find(b => b.name === "Goals Over/Under");
     const val = (b, v) => { const x = b && b.values.find(y => y.value === v); return x ? parseFloat(x.odd) : null; };
     const lines = [["h2h", m.home_team, "1 · " + m.home_team, val(mw, "Home")], ["h2h", "Draw", "X · Empate", val(mw, "Draw")], ["h2h", m.away_team, "2 · " + m.away_team, val(mw, "Away")], ["totals", "Over +2.5", "Más de 2.5 goles", val(ou, "Over 2.5")], ["totals", "Under +2.5", "Menos de 2.5 goles", val(ou, "Under 2.5")]].filter(l => l[3] != null);
@@ -2540,7 +2531,7 @@ function renderMatches(matches, sport, isFiltered) {
   const q = n => n.replace(/'/g, "\\'");
   let items = matches.map((m, idx) => {
     const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, sport, eventId: m.id };
-    let byMarket = extractFeaturedMarkets(m);
+    movInject(m); let byMarket = extractFeaturedMarkets(m);
     lastFullMarketsByMatch[m.id] = { matchMeta, byMarket };
     if (marketFilter !== "all" && byMarket[marketFilter]) byMarket = { [marketFilter]: byMarket[marketFilter] };
     else if (marketFilter !== "all") byMarket = {};
@@ -3420,6 +3411,13 @@ function hbNowMetrics(l, home, away) {
 
 /* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
 const MOV_KEY = "radar-valor-mov-cache";
+function movInject(m) {
+  try { if ((m.bookmakers || []).some(b => b.key.includes("bet365"))) return m; const c = movGet(); if (!c) return m;
+    const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(m.commence_time), h = nm(m.home_team), a = nm(m.away_team);
+    const f = c.data.find(x => x.bookmakers && x.bookmakers.length && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000 && near(nm(x.home_team), h) && near(nm(x.away_team), a));
+    if (f) m.bookmakers = [...(m.bookmakers || []), f.bookmakers[0]];
+  } catch (e) {} return m;
+}
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
 const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
 function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; const pl = (st.players || []).map(x => ({ n: x.name, t: x.team, s: x.shirt, g: x.goals || 0, sh: x.shots || 0, sot: x.shots_on_target || 0, xg: x.xg || 0, yc: x.yellow_cards || 0, rc: x.red_cards || 0, f: x.fouls || 0, fd: x.fouls_drawn || 0, tk: x.tackles || 0, as: x.assists || 0, sv: x.saves || 0 })).filter(x => x.g || x.sh || x.sot || x.xg || x.yc || x.rc || x.f || x.fd || x.tk || x.as || x.sv); return { h: f(st.home), a: f(st.away), t: st.updated_at || null, pl }; }
