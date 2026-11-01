@@ -332,6 +332,14 @@
   .pg-pages button { width:32px; height:32px; border-radius:50%; background:#141A23; border:1px solid #1A212B; color:#9AA5B1; cursor:pointer; padding:0; font-size:12px; }
   .pg-pages button.on { background:#3ECF8E; color:#06231A; border-color:#3ECF8E; font-weight:700; }
 
+  .cp-mbox.wide { width:min(620px,100%); position:relative; }
+  .rgt { width:100%; border-collapse:collapse; font-size:13px; }
+  .rgt th { font-size:12px; padding:6px 8px; text-align:center; font-weight:700; }
+  .rgt td { padding:12px 8px; text-align:center; border-top:1px solid #1A212B; }
+  .rg { display:inline-block; min-width:28px; cursor:pointer; color:#9AA5B1; font-size:17px; }
+  .rg:hover { color:#1EC8A5; }
+  .rg.on { background:#12302B; color:#1EC8A5; border-radius:999px; padding:2px 10px; font-size:12px; font-weight:700; }
+  .cp-rp { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:#0B0F15; border:1px solid #1EC8A5; border-radius:14px; padding:22px 18px 14px; width:min(360px,92%); box-shadow:0 10px 40px rgba(0,0,0,.6); }
   .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
   .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
   .pm-item:last-child { border-bottom:none; }
@@ -3597,7 +3605,7 @@ const CP_LAB = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (v
 const CP_CODES = { "39": "ENG-PRE", "140": "ESP-PRE", "135": "ITA-SRA", "78": "GER-BUN", "61": "FRA-LG1", "2": "UEFA-CL", "88": "NED-ERE", "94": "POR-PRI", "40": "ENG-CHA", "71": "BRA-SRA", "1": "WORLD", "4": "EURO" };
 function cpCode(l) { if (CP_CODES[l.id]) return CP_CODES[l.id]; const c = (l.cty || "").slice(0, 3).toUpperCase(), rest = String(l.nm).replace(l.cty || "", "").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 3).toUpperCase(); return c ? c + "-" + (rest || "") : String(l.nm).slice(0, 7).toUpperCase(); }
 const CP_PAGE = 15;
-let cp = { dayOff: null, leagues: [], sort: "time", onlyValue: false, onlyFavs: false, minO: "", maxO: "", cols: ["1","X","2","+2.5","-2.5"], q: "", page: 0, stat: { g: true, r: true, p: true }, rw: 0, ru: 0, book: "auto" };
+let cp = { dayOff: null, leagues: [], sort: "time", onlyValue: false, onlyFavs: false, minO: "", maxO: "", cols: ["1","X","2","+2.5","-2.5"], q: "", page: 0, stat: { g: true, r: true, p: true }, rw: 0, ru: 0, book: "auto", rng: {}, srng: {} };
 function cpAll() {
   const out = [];
   DD_LEAGUES.forEach(l => {
@@ -3676,7 +3684,7 @@ function cpTogCol(c) { const i = cp.cols.indexOf(c); if (i >= 0) cp.cols.splice(
 function cpNotes() {
   const a = document.getElementById("cpPresetNote"), b = document.getElementById("cpFilterNote"); if (!a || !b) return;
   a.textContent = cpPresetName ? "Preset: " + cpPresetName : "No has cargado un preset";
-  const f = []; if (cp.q) f.push("Equipo: " + cp.q); if (cp.onlyValue) f.push("Solo valor"); if (cp.onlyFavs) f.push("Solo favoritos"); if (cp.minO) f.push("Cuota ≥ " + cp.minO); if (cp.maxO) f.push("Cuota ≤ " + cp.maxO); if (cp.rw > 0) f.push("Racha G ≥ " + cp.rw); if (cp.ru > 0) f.push("Racha I ≥ " + cp.ru); if (cp.leagues.length) f.push(cp.leagues.length + " liga(s)"); if (cp.book && cp.book !== "auto") f.push("Casa: " + cp.book);
+  const f = []; if (cp.q) f.push("Equipo: " + cp.q); if (cp.onlyValue) f.push("Solo valor"); if (cp.onlyFavs) f.push("Solo favoritos"); if (cp.minO) f.push("Cuota ≥ " + cp.minO); if (cp.maxO) f.push("Cuota ≤ " + cp.maxO); { const n = Object.keys(cp.rng || {}).length + Object.keys(cp.srng || {}).length; if (n) f.push(n + " rango(s)"); } if (cp.rw > 0) f.push("Racha G ≥ " + cp.rw); if (cp.ru > 0) f.push("Racha I ≥ " + cp.ru); if (cp.leagues.length) f.push(cp.leagues.length + " liga(s)"); if (cp.book && cp.book !== "auto") f.push("Casa: " + cp.book);
   b.textContent = f.length ? f.join(" · ") : "No has añadido ningún filtro";
 }
 function cpPop(kind) {
@@ -3703,13 +3711,47 @@ function cpPop(kind) {
   } else if (kind === "preset") {
     const p = Object.keys(cpGetPresets());
     h = (p.length ? p.map(n => `<div class="pm-row"><span style="cursor:pointer; color:#1EC8A5;" onclick="cpLoadPreset(this.dataset.n); cpPopClose()" data-n="${n.replace(/"/g, "&quot;")}">${n}</span><button class="small ghost" data-n="${n.replace(/"/g, "&quot;")}" onclick="document.getElementById('cpPreset').value=this.dataset.n; cpDeletePreset(); cpPop('preset')">Borrar</button></div>`).join("") : '<div class="muted" style="font-size:12px;">Aún no tienes presets.</div>') + `<button class="small" style="margin-top:12px;" onclick="cpSavePreset(); cpPop('preset'); cpNotes()">+ Guardar filtros actuales como preset</button>`;
-  } else if (kind === "flt") {
-    h = `<input type="text" placeholder="Buscar equipo..." value="${cp.q.replace(/"/g, "&quot;")}" style="width:100%; margin-bottom:8px;" oninput="cpSet('q', this.value.toLowerCase().trim())" />` + ck(cp.onlyValue, "cpSet('onlyValue', this.checked)", "Solo con valor") + ck(cp.onlyFavs, "cpSet('onlyFavs', this.checked)", "Solo favoritos ⭐") + `<div class="pm-row"><span>Cuota mín.</span><input type="number" step="0.05" value="${cp.minO}" oninput="cpSet('minO', this.value)" /></div><div class="pm-row"><span>Cuota máx.</span><input type="number" step="0.05" value="${cp.maxO}" oninput="cpSet('maxO', this.value)" /></div><button class="small ghost" style="margin-top:10px;" onclick="cp.q=''; cp.onlyValue=false; cp.onlyFavs=false; cp.minO=''; cp.maxO=''; cp.rw=0; cp.ru=0; cp.leagues=[]; cp.book='auto'; cpWriteDom(); renderCoupon(); cpPop('flt')">Quitar todos los filtros</button>`;
+  } else if (kind === "flt") { cpFlt(cpFltTab); return;
   }
   document.getElementById("cpMB").innerHTML = h;
-  document.getElementById("cp-modal").classList.add("on");
+  document.getElementById("cp-modal").classList.add("on"); document.querySelector(".cp-mbox").classList.remove("wide");
 }
 function cpPopClose() { document.getElementById("cp-modal").classList.remove("on"); cpNotes(); }
+
+let cpFltTab = "mk", cpRp = null;
+function cpRngTxt(r) { return r ? (r[0] != null ? r[0] : "") + " – " + (r[1] != null ? r[1] : "") : ""; }
+function cpFlt(tab) {
+  cpFltTab = tab; cpRp = null;
+  document.getElementById("cpMT").textContent = "Añade/Cambia filtros";
+  const tabs = [["mk", "Filtros de mercado"], ["st", "Estadísticas"], ["rc", "Rachas"], ["vr", "Filtros varios"]].map(([k, l]) => `<span class="pf-chip ${k === tab ? "on" : ""}" onclick="cpFlt('${k}')">${l}</span>`).join("");
+  const cell = (store, key) => { const r = cp[store][key]; return `<td><span class="rg ${r ? "on" : ""}" onclick="cpRpOpen('${store}','${key}')">${r ? cpRngTxt(r) : "⊕"}</span></td>`; };
+  let body = "";
+  if (tab === "mk") {
+    const NM = { "1": ["Match Odds", "Team 1 (FT)"], X: ["Match Odds", "Empate (FT)"], "2": ["Match Odds", "Team 2 (FT)"], "+2.5": ["Over/Under 2.5", "Over 2.5"], "-2.5": ["Over/Under 2.5", "Under 2.5"], "BTTS+": ["Ambos marcan", "Sí"], "BTTS-": ["Ambos marcan", "No"] };
+    body = `<table class="rgt"><thead><tr><th style="text-align:left;">Mercado</th><th>Rango de cuota real</th><th>Rango de cuotas</th><th>Rango de valor %</th></tr></thead><tbody>${CP_COLS.map(c => `<tr><td style="text-align:left;"><div class="muted" style="font-size:12px;">${NM[c[2]][0]}</div><b>${NM[c[2]][1]}</b></td>${cell("rng", c[2] + "|r")}${cell("rng", c[2] + "|c")}${cell("rng", c[2] + "|v")}</tr>`).join("")}</tbody></table>`;
+  } else if (tab === "st") {
+    body = `<table class="rgt"><thead><tr><th style="text-align:left;">Estadística</th><th>Rango</th></tr></thead><tbody>${[["gl", "Goles prom. del local"], ["gv", "Goles prom. del visitante"], ["gt", "Goles prom. total (media)"]].map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="muted" style="font-size:11px; margin-top:8px;">Usa el historial cargado en Backtesting; los partidos sin datos se ocultan al filtrar.</div>`;
+  } else if (tab === "rc") {
+    body = `<table class="rgt"><thead><tr><th style="text-align:left;">Racha</th><th>Rango</th></tr></thead><tbody>${[["wl", "Ganados seguidos · local"], ["wv", "Ganados seguidos · visitante"], ["ul", "Sin perder seguidos · local"], ["uv", "Sin perder seguidos · visitante"]].map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="pm-row" style="margin-top:10px;"><span>Cualquier equipo con ≥ G</span><input type="number" min="0" value="${cp.rw}" oninput="cpSet('rw', parseInt(this.value) || 0)" /></div><div class="pm-row"><span>Cualquier equipo con ≥ I</span><input type="number" min="0" value="${cp.ru}" oninput="cpSet('ru', parseInt(this.value) || 0)" /></div>`;
+  } else {
+    const ck = (on, fn, lab) => `<label class="pg-ck"><input type="checkbox" ${on ? "checked" : ""} onchange="${fn}" /> ${lab}</label>`;
+    body = `<input type="text" placeholder="Buscar equipo..." value="${cp.q.replace(/"/g, "&quot;")}" style="width:100%; margin-bottom:8px;" oninput="cpSet('q', this.value.toLowerCase().trim())" />` + ck(cp.onlyValue, "cpSet('onlyValue', this.checked)", "Solo con valor (≥ 2 %)") + ck(cp.onlyFavs, "cpSet('onlyFavs', this.checked)", "Solo favoritos ⭐") + `<div class="pm-row"><span>Cualquier cuota mín.</span><input type="number" step="0.05" value="${cp.minO}" oninput="cpSet('minO', this.value)" /></div><div class="pm-row"><span>Cualquier cuota máx.</span><input type="number" step="0.05" value="${cp.maxO}" oninput="cpSet('maxO', this.value)" /></div>`;
+  }
+  document.getElementById("cpMB").innerHTML = `<div class="pm-chips" style="margin-bottom:12px;">${tabs}</div>${body}<div style="margin-top:14px; display:flex; justify-content:space-between;"><button class="small ghost" onclick="cp.q=''; cp.onlyValue=false; cp.onlyFavs=false; cp.minO=''; cp.maxO=''; cp.rw=0; cp.ru=0; cp.rng={}; cp.srng={}; cp.leagues=[]; cp.book='auto'; cpWriteDom(); renderCoupon(); cpFlt(cpFltTab)">Quitar todos</button></div><div id="cpRp" class="cp-rp" style="display:none;"></div>`;
+  document.querySelector(".cp-mbox").classList.add("wide");
+  document.getElementById("cp-modal").classList.add("on");
+}
+function cpRpOpen(store, key) {
+  cpRp = { store, key }; const r = cp[store][key] || [null, null], el = document.getElementById("cpRp");
+  el.style.display = "block";
+  el.innerHTML = `<button class="pg-nav" style="position:absolute; right:8px; top:8px; width:26px; height:26px; font-size:12px;" onclick="cpRpClose()">✕</button><div class="pm-row" style="justify-content:center; margin-top:14px;"><span>de</span><input id="cpRa" type="number" step="0.05" value="${r[0] != null ? r[0] : ""}" /><span>a</span><input id="cpRb" type="number" step="0.05" value="${r[1] != null ? r[1] : ""}" /></div><div class="pm-row" style="justify-content:space-around;"><button class="small ghost" onclick="delete cp['${store}']['${key}']; cpRpClose(true)">Eliminar</button><button class="small ghost" onclick="document.getElementById('cpRa').value=''; document.getElementById('cpRb').value=''">Limpiar</button><button class="small" onclick="cpRpSave()">Completado</button></div>`;
+}
+function cpRpSave() {
+  const a = parseFloat(document.getElementById("cpRa").value), b = parseFloat(document.getElementById("cpRb").value);
+  if (isNaN(a) && isNaN(b)) delete cp[cpRp.store][cpRp.key]; else cp[cpRp.store][cpRp.key] = [isNaN(a) ? null : a, isNaN(b) ? null : b];
+  cpRpClose(true);
+}
+function cpRpClose(apply) { cpRp = null; if (apply) { cp.page = 0; renderCoupon(); cpFlt(cpFltTab); } else { const e = document.getElementById("cpRp"); if (e) e.style.display = "none"; } }
 let exMode = "league";
 function setExMode(m) { exMode = m; document.querySelectorAll("#exModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === m)); document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
 function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
@@ -4050,6 +4092,10 @@ function renderCoupon() {
   });
   if (cp.onlyValue) rows = rows.filter(r => r.maxEv >= 0.02);
   if (cp.onlyFavs) rows = rows.filter(r => favs.has(r.m.home_team) || favs.has(r.m.away_team));
+  { const inR = (v, r) => v != null && (r[0] == null || v >= r[0]) && (r[1] == null || v <= r[1]);
+    Object.keys(cp.rng || {}).forEach(k => { const [lab, kd] = k.split("|"), r = cp.rng[k]; rows = rows.filter(x => { const c = x.cells.find(z => z.lab === lab); if (!c || !c.r) return false; const v = kd === "r" ? (c.r.fair ? 1 / c.r.fair : null) : kd === "c" ? c.r.price : (c.r.ev != null ? c.r.ev * 100 : null); return inR(v, r); }); });
+    const SV = { gl: t => t.hav, gv: t => t.aav, gt: t => (t.hav + t.aav) / 2, wl: t => t.hw, wv: t => t.aw, ul: t => t.hu, uv: t => t.au };
+    Object.keys(cp.srng || {}).forEach(k => { const r = cp.srng[k]; rows = rows.filter(x => { const t = cpMetrics(x.m); return t && inR(SV[k](t), r); }); }); }
   if (cp.rw > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hw, t.aw) >= cp.rw; });
   if (cp.ru > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hu, t.au) >= cp.ru; });
   const mn = parseFloat(cp.minO), mx = parseFloat(cp.maxO);
