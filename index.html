@@ -811,7 +811,10 @@
           <input id="waPhone" type="text" placeholder="Tu teléfono con prefijo, ej. 34600111222" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
           <input id="waKey" type="password" placeholder="Clave (API key) del servicio" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
           <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="small ghost" type="button" onclick="waTest()">Enviar prueba</button><button class="small ghost" type="button" onclick="waNotifAsk()">Avisos del navegador</button></div>
-          <div id="waMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div>
+          <div id="waMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div>
+          <div style="border-top:1px solid #232A33; margin-top:10px; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>Alarmas con la app cerrada</b> <span class="tooltip" title="Tu Worker de Cloudflare vigila los partidos en vivo cada minuto y te manda el WhatsApp aunque la app esté cerrada. Necesita la URL del Worker (arriba) y el KV ALARMS.">ⓘ</span></div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="small ghost" type="button" onclick="syncActivate()">Activar y comprobar</button><button class="small ghost" type="button" onclick="syncOff()">Desactivar</button></div>
+            <div id="syncMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
         <div style="display:flex; gap:10px;">
           <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:100%;" /></div>
@@ -5295,7 +5298,7 @@ async function openMatchSheet(home, away, leagueId, leagueName) {
 }
 let alType = "pre", alLeaguesSel = [];
 function getAlarms() { try { return JSON.parse(localStorage.getItem("radar-alarms") || "[]"); } catch (e) { return []; } }
-function saveAlarms(a) { try { localStorage.setItem("radar-alarms", JSON.stringify(a)); } catch (e) {} }
+function saveAlarms(a) { try { localStorage.setItem("radar-alarms", JSON.stringify(a)); } catch (e) {} try { alSyncSoon(); } catch (e) {} }
 function getAlLog() { try { return JSON.parse(localStorage.getItem("radar-alarm-log") || "[]"); } catch (e) { return []; } }
 function getAlFired() { try { return new Set(JSON.parse(localStorage.getItem("radar-alarm-fired") || "[]")); } catch (e) { return new Set(); } }
 function saveAlFired(set) { try { localStorage.setItem("radar-alarm-fired", JSON.stringify([...set].slice(-600))); } catch (e) {} }
@@ -5386,7 +5389,36 @@ function renderAlarms() {
 
 /* ===== Avisos en el móvil: WhatsApp (CallMeBot) + notificación del navegador ===== */
 function waCfg() { try { return JSON.parse(localStorage.getItem("radar-wa") || "{}"); } catch (e) { return {}; } }
-function waSave() { try { localStorage.setItem("radar-wa", JSON.stringify({ prov: document.getElementById("waProv").value, phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
+
+/* ===== Alarmas con la app cerrada: sincronización con el Worker (cron + KV) ===== */
+function syncTok() { let t = ""; try { t = localStorage.getItem("radar-sync-token") || ""; if (t.length < 16) { const a = new Uint8Array(24); crypto.getRandomValues(a); t = [...a].map(x => x.toString(16).padStart(2, "0")).join(""); localStorage.setItem("radar-sync-token", t); } } catch (e) { t = t || "x".repeat(24); } return t; }
+function syncOn() { try { return localStorage.getItem("radar-sync-on") === "1"; } catch (e) { return false; } }
+function syncSupported(a) { return a && a.active && a.type === "live" && !(a.w && a.w.mode === "last"); }
+function syncPrepare() {
+  let all = []; try { all = cpAll(); } catch (e) { }
+  return getAlarms().filter(a => a.active && a.type === "live").map(a => { const names = new Set((a.leagues || []).filter(l => String(l).startsWith("n:"))); (a.leagues || []).filter(l => !String(l).startsWith("n:")).forEach(id => { all.forEach(x => { if (x.l.id === id && x.m.mov_league) names.add("n:" + alLgNorm(x.m.mov_league)); }); const dd = DD_LEAGUES.find(l => l.id === id); if (dd) names.add("n:" + alLgNorm(dd.nm)); });
+    return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null }; });
+}
+let syncTimer = null;
+function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
+async function alSync() { const px = getFdProxy(); if (!px) throw new Error("Falta la URL de tu Worker en ⚙️"); const wa = waCfg();
+  const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null }) });
+  if (!r.ok) throw new Error("Worker " + r.status); const j = await r.json(); if (!j.ok) throw new Error(j.error || "El Worker rechazó los datos"); return j; }
+async function syncActivate() {
+  const m = document.getElementById("syncMsg"), say = t => { if (m) m.innerHTML = t; };
+  const px = getFdProxy(); if (!px) { say("Primero pon la URL de tu Worker en ⚙️ (campo «Proxy football-data»)."); return; }
+  const wa = waCfg(); if (!wa.phone || !wa.key) { say("Primero configura el WhatsApp (teléfono y clave) y prueba que te llega."); return; }
+  say("Sincronizando…");
+  try {
+    const j = await alSync(); const st = await (await fetch(px + "/alarms/status?token=" + encodeURIComponent(syncTok()))).json(); const n = getAlarms().filter(a => a.active && a.type === "live"), ok = n.filter(syncSupported).length;
+    if (!st.kv) { say('<span style="color:#E5484D;">El Worker no tiene el almacén <b>ALARMS</b> (KV). Hay que crearlo y enlazarlo (mira los pasos que te dio Claude).</span>'); return; }
+    if (!st.moviodds) { say(`<span style="color:#E5484D;">El Worker no consigue leer los partidos en vivo de Bet365 (${st.error || "sin respuesta"}). Las alarmas con la app cerrada no funcionarán; sigue usando la app abierta.</span>`); try { localStorage.setItem("radar-sync-on", "0"); } catch (e) { } return; }
+    try { localStorage.setItem("radar-sync-on", "1"); } catch (e) { }
+    say(`<span style="color:#3ECF8E;">✓ Activado.</span> El Worker ve ${st.live} partidos en vivo ahora. Alarmas en vivo activas: ${n.length} (${ok} se vigilan con la app cerrada${n.length > ok ? `; ${n.length - ok} de «últimos N minutos» solo funcionan con la app abierta` : ""}). Las alarmas de pregame siguen necesitando la app abierta.`);
+  } catch (e) { say(`<span style="color:#E5484D;">No se pudo: ${e.message}</span>`); }
+}
+function syncOff() { try { localStorage.setItem("radar-sync-on", "0"); } catch (e) { } const px = getFdProxy(); if (px) fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: [], wa: null }) }).catch(() => { }); const m = document.getElementById("syncMsg"); if (m) m.textContent = "Desactivado. Las alarmas solo avisan con la app abierta."; }
+function waSave() { try { alSyncSoon(); } catch (e) { } try { localStorage.setItem("radar-wa", JSON.stringify({ prov: document.getElementById("waProv").value, phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
 function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"), pv = document.getElementById("waProv"); if (pv) pv.value = c.prov || "callmebot"; if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
 function waSend(text) {
   const c = waCfg(); if (!c.phone || !c.key) return false;
@@ -5395,8 +5427,8 @@ function waSend(text) {
 }
 function waTest() { const m = document.getElementById("waMsg"), c = waCfg(); if (!c.phone || !c.key) { m.textContent = "Rellena el teléfono y la clave primero."; return; } waSend("✅ Radar de valor: aviso de prueba. Si lo lees, las alarmas te llegarán aquí."); m.textContent = "Enviado. Si no te llega en un minuto, revisa el teléfono (con prefijo, sin +) y la clave."; }
 function waNotifAsk() { const m = document.getElementById("waMsg"); if (!("Notification" in window)) { m.textContent = "Este navegador no permite notificaciones."; return; } Notification.requestPermission().then(r => { m.textContent = r === "granted" ? "Avisos del navegador activados." : "No has dado permiso para las notificaciones."; if (r === "granted") try { new Notification("Radar de valor", { body: "Avisos activados." }); } catch (e) { } }); }
-function alPush(title, body) {
-  waSend(`⏰ ${title}\n${body}`);
+function alPush(title, body, skipWa) {
+  if (!skipWa) waSend(`⏰ ${title}\n${body}`);
   try { if ("Notification" in window && Notification.permission === "granted") { const n = { body, tag: "radar-" + title, renotify: true }; if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r => r.showNotification("⏰ " + title, n)).catch(() => new Notification("⏰ " + title, n)); else new Notification("⏰ " + title, n); } } catch (e) { }
 }
 
@@ -5497,7 +5529,7 @@ function alFire(a, msg) {
   showToast(`<b style="color:#F0B429;">⏰ ${a.name}</b><br/>${msg}`); try { playTone(880, 0.15); setTimeout(() => playTone(1175, 0.15), 160); } catch (e) {}
   const log = getAlLog(); log.unshift({ name: a.name, msg: msg.replace(/<br\/?>/g, " · ").replace(/<[^>]+>/g, ""), t: new Date().toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) });
   try { localStorage.setItem("radar-alarm-log", JSON.stringify(log.slice(0, 50))); } catch (e) {}
-  alPush(a.name, msg.replace(/<br\/?>/g, "\n").replace(/<[^>]+>/g, ""));
+  alPush(a.name, msg.replace(/<br\/?>/g, "\n").replace(/<[^>]+>/g, ""), syncOn() && syncSupported(a));
 }
 function alIn(v, mn, mx) { return (mn === "" || mn == null || (v != null && v >= +mn)) && (mx === "" || mx == null || (v != null && v <= +mx)); }
 function runAlarms(matches, sport) {
