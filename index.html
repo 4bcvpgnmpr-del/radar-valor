@@ -4687,13 +4687,20 @@ function renderLive() {
 function lvPop(kind) {
   const T = { lg: "Ligas", mk: "Mercados", rc: "Rachas", st: "Eventos en directo", sort: "Ordenar", flt: "Filtros" }[kind];
   document.getElementById("lvMT").textContent = T; let h = "";
-  if (kind === "lg") { const m = {}; lvRows().forEach(r => { (m[r.id] = m[r.id] || { r, n: 0 }).n++; }); h = `<div class="pm-chips"><span class="pf-chip ${lv.leagues.length ? "" : "on"}" onclick="lv.leagues=[]; renderLive(); lvPop('lg')">Todas</span>${Object.values(m).sort((a, b) => b.n - a.n).map(o => `<span class="pf-chip ${lv.leagues.includes(o.r.id) ? "on" : ""}" onclick="lvToggleLeague('${o.r.id}'); lvPop('lg')">${o.r.lname} · ${o.n}</span>`).join("") || '<span class="muted">Actualiza en vivo para ver ligas.</span>'}</div>`; }
+  if (kind === "lg") { h = `<input id="lvLgQ" placeholder="Buscar liga o país..." oninput="lvLgDraw()" style="width:100%; margin-bottom:10px;"><div id="lvLgBox"></div>`; }
   else if (kind === "mk") h = CP_COLS.map(c => `<label class="pg-ck"><input type="checkbox" ${lv.cols.includes(c[2]) ? "checked" : ""} onchange="lv.cols = CP_COLS.map(x => x[2]).filter(x => x === '${c[2]}' ? this.checked : lv.cols.includes(x)); renderLive()" /> ${CP_LABF[c[2]]}</label>`).join("");
   else if (kind === "rc") h = `<div class="muted" style="font-size:12px; margin-bottom:8px;">Solo partidos donde algún equipo lleve esta racha (ganados o sin perder seguidos). 0 = sin filtro. Necesita historial cargado.</div><div class="pm-row"><span>Racha mínima ≥</span><input type="number" min="0" value="${lv.rw}" oninput="lv.rw = parseInt(this.value) || 0; renderLive()" /></div>`;
   else if (kind === "st") h = `<div class="muted" style="font-size:12px; line-height:1.6;">Bajo cada partido se dibuja la línea del tiempo con los goles (⚽) y tarjetas. Arriba van los del local y abajo los del visitante. Los datos salen de API-Football en cada actualización. Los partidos que solo vienen de bet365 no traen eventos.</div>`;
   else if (kind === "sort") h = [["time", "Por hora de inicio"], ["min", "Por minuto de juego"], ["league", "Por liga"]].map(([v, l]) => `<label class="pg-ck"><input type="radio" name="lvso" ${lv.sort === v ? "checked" : ""} onchange="lv.sort='${v}'; renderLive()" /> ${l}</label>`).join("");
   else h = `<label class="pg-ck"><input type="checkbox" ${lv.onlyOdds ? "checked" : ""} onchange="lv.onlyOdds=this.checked; renderLive()" /> Solo partidos con cuotas</label><div class="pm-row"><span>Minuto desde</span><input type="number" min="0" max="120" value="${lv.minMin}" oninput="lv.minMin = parseInt(this.value) || 0; renderLive()" /></div><div class="pm-row"><span>Minuto hasta</span><input type="number" min="0" max="120" value="${lv.maxMin}" oninput="lv.maxMin = isNaN(parseInt(this.value)) ? 120 : parseInt(this.value); renderLive()" /></div><button class="small ghost" style="margin-top:10px;" onclick="lv.onlyOdds=false; lv.minMin=0; lv.maxMin=120; lv.rw=0; lv.leagues=[]; lv.fav=false; renderLive(); lvPop('flt')">Quitar todos los filtros</button>`;
-  document.getElementById("lvMB").innerHTML = h; document.getElementById("lv-modal").classList.add("on");
+  document.getElementById("lvMB").innerHTML = h; document.getElementById("lv-modal").classList.add("on"); if (kind === "lg") lvLgDraw();
+}
+function lvLgDraw() {
+  const box = document.getElementById("lvLgBox"); if (!box) return; const q = alLgNorm((document.getElementById("lvLgQ") || {}).value || ""), m = {};
+  const nice = n => { const p = String(n || "").split(" · "); return p.length > 1 && p.every(x => x.trim() === p[0].trim()) ? p[0].trim() : String(n || "").trim(); };
+  lvRows().forEach(r => { (m[r.id] = m[r.id] || { r, n: 0, nm: nice(r.lname) }).n++; });
+  const all = Object.values(m).sort((a, b) => a.nm.localeCompare(b.nm, "es")), sel = o => lv.leagues.includes(o.r.id), list = all.filter(o => !q || alLgNorm(o.nm).includes(q) || sel(o));
+  box.innerHTML = `<div class="pm-chips"><span class="pf-chip ${lv.leagues.length ? "" : "on"}" onclick="lv.leagues=[]; renderLive(); lvPop('lg')">Todas (${all.length})</span>${list.map(o => `<span class="pf-chip ${sel(o) ? "on" : ""}" onclick="lvToggleLeague('${o.r.id}'); lvLgDraw()">${o.nm} · ${o.n}</span>`).join("") || '<span class="muted">Ninguna liga con ese nombre.</span>'}</div>`;
 }
 function lvPopClose() { document.getElementById("lv-modal").classList.remove("on"); }
 async function loadLiveScores() {
