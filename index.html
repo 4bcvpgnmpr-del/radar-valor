@@ -3878,9 +3878,10 @@ async function vsPhRun() {
     let u = null, px = getFdProxy();
     if (px) { try { u = (await (await fetch(`${px}/photo?id=${id}&n=${encodeURIComponent(VS_NM[id])}`)).json()).url || ""; } catch (e) {} }
     if (u === null) { try { const a = await (await fetch("https://sports.core.api.espn.com/v2/sports/soccer/athletes/" + id)).json(); u = (a.headshot && a.headshot.href) || ""; } catch (e) {} }
+    if (!u) { try { const j = await (await fetch("https://es.wikipedia.org/w/api.php?action=query&generator=search&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=160&format=json&origin=*&gsrsearch=" + encodeURIComponent(VS_NM[id] + " futbolista"))).json(), pg = Object.values((j.query || {}).pages || {})[0]; u = (pg && pg.thumbnail && pg.thumbnail.source) || ""; } catch (e) { } }
     if (!u) { try { const j = await (await fetch("https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=" + encodeURIComponent(VS_NM[id]))).json(), pl = (j.player || []).find(x => x.strSport === "Soccer") || (j.player || [])[0]; u = (pl && (pl.strCutout || pl.strThumb)) || ""; } catch (e) { if (u === null) { vsQB = false; return; } } }
     c[id] = u || "";
-    try { localStorage.setItem("radar-photo-cache", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 2200)); }
+    try { localStorage.setItem("radar-photo-cache", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 700)); }
   vsQB = false;
 }
 function vsLg(id, cls) { return `<img class="${cls || "vs-lg"}" src="${VS_LOGO(id)}" loading="lazy" onerror="this.style.visibility='hidden'" />`; }
