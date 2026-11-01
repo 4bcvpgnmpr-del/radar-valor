@@ -952,7 +952,7 @@
         </div><div class="hb-win" id="hbw-res">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Resultados de backtesting</div>
-          <input id="hbQ" type="text" placeholder="Buscar..." oninput="hbRender()" style="width:170px;" />
+          <input id="hbQ" type="text" placeholder="Buscar..." oninput="hbRenderD()" style="width:170px;" />
         </div>
         <div id="hbResults" style="margin-top:8px; overflow-x:auto;"></div>
         </div></div><div class="hb-col"><div class="hb-win" id="hbw-pk">
@@ -972,7 +972,7 @@
         
             <div class="seg" style="display:flex; width:fit-content; margin:8px auto;"><button class="seg-b active" id="hbGL" onclick="hbGroup('league')">Por liga</button><button class="seg-b" id="hbGT" onclick="hbGroup('team')">Por equipo</button></div>
             <div class="pg-h" id="hbRankT" style="text-align:center;">Ranking</div>
-            <input id="hbTeamQ" type="text" placeholder="Buscar equipo..." oninput="hbRender()" style="display:none; width:220px; margin:0 auto 8px;" />
+            <input id="hbTeamQ" type="text" placeholder="Buscar equipo..." oninput="hbRenderD()" style="display:none; width:220px; margin:0 auto 8px;" />
             <div id="hbRank" style="overflow-x:auto;"></div>
           
         </div></div></div>
@@ -992,8 +992,8 @@
         <div id="hbSysTbl" style="overflow-x:auto;"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:10px 0 4px;">
           <select id="hbSys" style="display:none;" onchange="hbSysLoad(this.value)" style=""><option value="">Sistemas guardados</option></select>
-          <input id="hbSysName" oninput="hbRender()" type="text" placeholder="Nombre del sistema" style="width:170px; flex:1;" />
-          <input id="hbSysNote" oninput="hbRender()" type="text" placeholder="Comentarios (opcional)" style="width:200px; flex:2;" />
+          <input id="hbSysName" oninput="hbRenderD()" type="text" placeholder="Nombre del sistema" style="width:170px; flex:1;" />
+          <input id="hbSysNote" oninput="hbRenderD()" type="text" placeholder="Comentarios (opcional)" style="width:200px; flex:2;" />
           <button class="small" onclick="hbSysSave()">💾 Guardar sistema</button>
           <button class="small ghost" onclick="hbSysDel()" title="Borrar el sistema seleccionado">Borrar sistema</button>
         </div>
@@ -1009,7 +1009,7 @@
             <div class="seg" id="hbModeSeg" style="display:flex; width:fit-content; margin-bottom:10px;"><button class="seg-b active" data-m="league" onclick="hbSetMode('league')">Modo liga</button><button class="seg-b" data-m="team" onclick="hbSetMode('team')">Modo equipo</button></div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;">
               <label>Momento de la cuota<select id="hbWhen" onchange="hbRender()"><option value="close">Cierre (o la que traiga el archivo)</option><option value="open">Apertura (para medir el CLV)</option></select></label>
-              <label>Unidad (€ por apuesta)<input id="hbUnit" type="number" min="0" step="1" value="1" oninput="hbRender()" /></label>
+              <label>Unidad (€ por apuesta)<input id="hbUnit" type="number" min="0" step="1" value="1" oninput="hbRenderD()" /></label>
               <label>Temporadas<details id="hbSeasD" style="position:relative;"><summary id="hbSeasS" style="cursor:pointer; padding:10px 12px; border:1px solid #2A3340; border-radius:12px; background:#0D1117; color:#E6EAF0; font-size:14px;">Todas</summary><div id="hbSeasL" style="position:absolute; z-index:20; left:0; right:0; max-height:240px; overflow:auto; background:#10151C; border:1px solid #2A3340; border-radius:12px; margin-top:4px; padding:8px;"></div></details></label>
             </div>
             <div class="pg-h" style="margin-top:14px;">Ligas</div>
@@ -1017,11 +1017,11 @@
           </div>
           <div class="hbT" id="hbT1" style="display:none;">
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px;">
-              <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRender()" /></label>
-              <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRender()" /></label>
-              <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRender()" /></label>
-              <label>Cuota simulada (mercados sin cuota)<input id="hbFix" type="number" step="0.05" placeholder="ej. 1.80" oninput="hbRender()" /></label>
-              <label>Muestra mínima (ranking)<input id="hbMinN" type="number" step="10" value="60" oninput="hbRender()" /></label>
+              <label>Cuota desde<input id="hbOMin" type="number" step="0.05" placeholder="1.50" oninput="hbRenderD()" /></label>
+              <label>Cuota hasta<input id="hbOMax" type="number" step="0.05" placeholder="4.00" oninput="hbRenderD()" /></label>
+              <label>Valor mínimo (EV %)<input id="hbEV" type="number" step="1" placeholder="sin filtro" oninput="hbRenderD()" /></label>
+              <label>Cuota simulada (mercados sin cuota)<input id="hbFix" type="number" step="0.05" placeholder="ej. 1.80" oninput="hbRenderD()" /></label>
+              <label>Muestra mínima (ranking)<input id="hbMinN" type="number" step="10" value="60" oninput="hbRenderD()" /></label>
             </div>
             <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">El valor mínimo compara tu cuota con la probabilidad justa de Pinnacle (o de la media si no hay Pinnacle), sin margen.</div>
           </div>
@@ -1047,18 +1047,18 @@
           <div class="hbT" id="hbT3" style="display:none;">
             <div class="pg-h">Posición en la liga (en el momento del partido)</div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px;">
-              <label>Local desde<input id="hbPhMin" type="number" min="1" oninput="hbRender()" /></label><label>Local hasta<input id="hbPhMax" type="number" min="1" oninput="hbRender()" /></label>
-              <label>Visitante desde<input id="hbPaMin" type="number" min="1" oninput="hbRender()" /></label><label>Visitante hasta<input id="hbPaMax" type="number" min="1" oninput="hbRender()" /></label>
+              <label>Local desde<input id="hbPhMin" type="number" min="1" oninput="hbRenderD()" /></label><label>Local hasta<input id="hbPhMax" type="number" min="1" oninput="hbRenderD()" /></label>
+              <label>Visitante desde<input id="hbPaMin" type="number" min="1" oninput="hbRenderD()" /></label><label>Visitante hasta<input id="hbPaMax" type="number" min="1" oninput="hbRenderD()" /></label>
             </div>
             <div class="pg-h" style="margin-top:14px;">Media de goles por partido de cada equipo (goles a favor + en contra)</div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px;">
-              <label>Local desde<input id="hbGhMin" type="number" step="0.1" oninput="hbRender()" /></label><label>Local hasta<input id="hbGhMax" type="number" step="0.1" oninput="hbRender()" /></label>
-              <label>Visitante desde<input id="hbGaMin" type="number" step="0.1" oninput="hbRender()" /></label><label>Visitante hasta<input id="hbGaMax" type="number" step="0.1" oninput="hbRender()" /></label>
+              <label>Local desde<input id="hbGhMin" type="number" step="0.1" oninput="hbRenderD()" /></label><label>Local hasta<input id="hbGhMax" type="number" step="0.1" oninput="hbRenderD()" /></label>
+              <label>Visitante desde<input id="hbGaMin" type="number" step="0.1" oninput="hbRenderD()" /></label><label>Visitante hasta<input id="hbGaMax" type="number" step="0.1" oninput="hbRenderD()" /></label>
             </div>
             <div class="pg-h" style="margin-top:14px;">Rachas (partidos seguidos antes del encuentro)</div>
             <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px;">
-              <label>Local: victorias seguidas ≥<input id="hbWh" type="number" min="0" oninput="hbRender()" /></label><label>Visitante: victorias seguidas ≥<input id="hbWa" type="number" min="0" oninput="hbRender()" /></label>
-              <label>Local: sin perder ≥<input id="hbUh" type="number" min="0" oninput="hbRender()" /></label><label>Visitante: sin perder ≥<input id="hbUa" type="number" min="0" oninput="hbRender()" /></label>
+              <label>Local: victorias seguidas ≥<input id="hbWh" type="number" min="0" oninput="hbRenderD()" /></label><label>Visitante: victorias seguidas ≥<input id="hbWa" type="number" min="0" oninput="hbRenderD()" /></label>
+              <label>Local: sin perder ≥<input id="hbUh" type="number" min="0" oninput="hbRenderD()" /></label><label>Visitante: sin perder ≥<input id="hbUa" type="number" min="0" oninput="hbRenderD()" /></label>
             </div>
             <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se calculan con los partidos anteriores de esa misma temporada y solo cuando ambos equipos ya llevan 3 partidos jugados.</div>
           </div>
@@ -3318,7 +3318,10 @@ function hbSysDel() {
 }
 const hbFmtD = d => { const x = new Date(d * 86400000); return `${String(x.getUTCDate()).padStart(2, "0")}/${String(x.getUTCMonth() + 1).padStart(2, "0")}/${x.getUTCFullYear()}`; };
 const hbEur = v => (v >= 0 ? "" : "-") + Math.abs(v).toFixed(2) + "€";
+let hbRT = null;
+function hbRenderD() { clearTimeout(hbRT); hbRT = setTimeout(hbRender, 250); }
 function hbRender() {
+  clearTimeout(hbRT);
   const sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters();
   if (!Object.keys(hbData).length) return;
   const rows = hbSelRows(f); hbDescRender(f, sel, bk); hbPicksRender();
