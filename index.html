@@ -429,6 +429,7 @@
   .pm-btn.on { border-color:#1EC8A5; color:#1EC8A5; }
   #view-live .lv-bar { margin-bottom:10px; }
   .wrap:has(#view-live.active) { max-width:1480px; }
+  .exyr { font-size:11px; color:#B8C3CF; display:inline-flex; align-items:center; gap:6px; } .exyr input { width:70px; background:rgba(0,0,0,.35); border:none; color:#E6EBF1; border-radius:999px; padding:5px 10px; text-align:center; }
   .pm-menu { background:#10151C; border:1px solid #1A212B; border-radius:14px; overflow:hidden; }
   .pm-item { padding:13px 16px; font-size:14px; cursor:pointer; border-bottom:1px solid #1A212B; display:flex; justify-content:space-between; align-items:center; }
   .pm-item:last-child { border-bottom:none; }
@@ -1197,13 +1198,14 @@
       <select id="exMarket" onchange="renderExplore()"><option value="all">Todos los mercados</option><option value="1x2">Resultado 1X2</option><option value="goals">Goles totales</option><option value="btts">Ambos marcan</option><option value="hcp">Hándicap</option><option value="team">Goles por equipo</option><option value="combo">Combinados</option><option value="exact">Goles exactos y par/impar</option><option value="ht">Descanso (1ª parte)</option><option value="half2">2ª parte</option><option value="htft">Descanso / Final</option><option value="scores">Marcadores</option></select>
     </div>
     <div class="ex-sel" id="exGameSel" style="display:none;">
+      <select id="exMatch" onchange="exPickMatch(this.value)" style="max-width:340px;"><option value="">Partidos próximos...</option></select>
       <select id="exHome" onchange="renderExplore()"></select><span class="muted">vs</span><select id="exAway" onchange="renderExplore()"></select>
     </div>
     <div class="ex-hero" id="exHero"><div id="exHeroTxt"></div>
       <div class="ex-ctl">
         <div class="ex-goals"><label>Local<br>Goles<input type="number" id="exL" min="0" max="9" value="0" oninput="renderExplore()" /></label><label>Visitante<br>Goles<input type="number" id="exV" min="0" max="9" value="0" oninput="renderExplore()" /></label></div>
         <div class="ex-rng"><div><span>Inicio del intervalo</span><b id="exSl">0'</b><input type="range" id="exS" min="0" max="90" value="0" oninput="exRng('s')" /></div><div><span>Fin del intervalo</span><b id="exEl">90'</b><input type="range" id="exE" min="0" max="90" value="90" oninput="exRng('e')" /></div></div>
-        <div class="ex-btns"><select id="exView" onchange="renderExplore()"><option value="market">Market Analysis</option><option value="next">Next Goal</option></select><button class="small" onclick="exLoadGoals()">⬇ Cargar minutos de goles</button></div>
+        <div class="ex-btns"><select id="exView" onchange="renderExplore()"><option value="market">Market Analysis</option><option value="next">Next Goal</option></select><label class="exyr">Temporada <input type="number" id="exYear" min="2005" max="2100" onchange="exGoalMem_reset(); renderExplore()" /></label><button class="small" onclick="exLoadGoals()">⬇ Cargar minutos de goles</button></div>
         <div id="exGoalMsg" class="ex-gm"></div>
       </div></div>
     <div id="ex-status" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
@@ -1431,7 +1433,7 @@ function switchView(v) {
   if (v === "alarms") renderAlarms();
   if (v === "profile") pfRender();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
-  if (v === "explore") { document.getElementById("exLeague").value = document.getElementById("trLeague").value; if (!trData) loadTrends(); else renderExplore(); }
+  if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
   if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
@@ -3973,7 +3975,15 @@ function cpRpClose(apply) { cpRp = null; if (apply) { cp.page = 0; renderCoupon(
 /* ===== Minutos de goles (ESPN) ===== */
 const ESPN_SLUG = { "39": "eng.1", "140": "esp.1", "135": "ita.1", "78": "ger.1", "61": "fra.1", "2": "uefa.champions", "88": "ned.1", "94": "por.1", "40": "eng.2", "71": "bra.1", "1": "fifa.world", "4": "uefa.euro" };
 const exGoalMem = {};
-function exGoalKey() { const lg = document.getElementById("trLeague").value, y = document.getElementById("trSeason").value || 2024; return { slug: ESPN_SLUG[lg], y, k: `radar-espn-goals-${ESPN_SLUG[lg]}-${y}` }; }
+let exEspn = null;
+function exSlug() { return exEspn || ESPN_SLUG[document.getElementById("trLeague").value]; }
+function exYearVal() { const el = document.getElementById("exYear"); if (el && !el.value) el.value = currentSeason(); return (el && el.value) || currentSeason(); }
+function exGoalMem_reset() { Object.keys(exGoalMem).forEach(k => delete exGoalMem[k]); }
+function exGoalKey() { const slug = exSlug(), y = exYearVal(); return { slug, y, k: `radar-espn-goals-${slug}-${y}` }; }
+const ESPN_EXTRA = [["Europa", [["uefa.europa", "🇪🇺 Europa League"], ["uefa.europa.conf", "🇪🇺 Conference League"], ["eng.3", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 League One"], ["eng.4", "🏴󠁧󠁢󠁥󠁮󠁧󠁿 League Two"], ["esp.2", "🇪🇸 Segunda"], ["ita.2", "🇮🇹 Serie B"], ["ger.2", "🇩🇪 2. Bundesliga"], ["fra.2", "🇫🇷 Ligue 2"], ["sco.1", "🏴󠁧󠁢󠁳󠁣󠁴󠁿 Escocia Premiership"], ["bel.1", "🇧🇪 Bélgica"], ["tur.1", "🇹🇷 Turquía"], ["gre.1", "🇬🇷 Grecia"], ["aut.1", "🇦🇹 Austria"], ["sui.1", "🇨🇭 Suiza"], ["den.1", "🇩🇰 Dinamarca"], ["nor.1", "🇳🇴 Noruega Eliteserien"], ["swe.1", "🇸🇪 Suecia Allsvenskan"], ["fin.1", "🇫🇮 Finlandia"], ["pol.1", "🇵🇱 Polonia"], ["cze.1", "🇨🇿 Chequia"], ["rou.1", "🇷🇴 Rumanía"], ["rus.1", "🇷🇺 Rusia"], ["ukr.1", "🇺🇦 Ucrania"], ["cro.1", "🇭🇷 Croacia"], ["srb.1", "🇷🇸 Serbia"], ["irl.1", "🇮🇪 Irlanda"]]],
+  ["América", [["arg.1", "🇦🇷 Argentina"], ["bra.2", "🇧🇷 Brasil Serie B"], ["chi.1", "🇨🇱 Chile"], ["col.1", "🇨🇴 Colombia"], ["uru.1", "🇺🇾 Uruguay"], ["par.1", "🇵🇾 Paraguay"], ["per.1", "🇵🇪 Perú"], ["ecu.1", "🇪🇨 Ecuador"], ["mex.1", "🇲🇽 Liga MX"], ["usa.1", "🇺🇸 MLS"], ["conmebol.libertadores", "🌎 Libertadores"], ["conmebol.sudamericana", "🌎 Sudamericana"], ["concacaf.champions", "🌎 Concacaf Champions"]]],
+  ["Asia y resto", [["jpn.1", "🇯🇵 Japón J1"], ["kor.1", "🇰🇷 Corea K League"], ["chn.1", "🇨🇳 China"], ["aus.1", "🇦🇺 Australia A-League"], ["ind.1", "🇮🇳 India"], ["sau.1", "🇸🇦 Arabia Saudí"], ["egy.1", "🇪🇬 Egipto"], ["rsa.1", "🇿🇦 Sudáfrica"]]]];
+function exFillLeagues() { const el = document.getElementById("exLeague"); if (!el || el.dataset.x) return; el.dataset.x = "1"; ESPN_EXTRA.forEach(([g, list]) => { const og = document.createElement("optgroup"); og.label = "Más ligas (ESPN) · " + g; list.forEach(([slug, nm]) => { const o = document.createElement("option"); o.value = "espn:" + slug; o.textContent = nm; og.appendChild(o); }); el.appendChild(og); }); }
 function exGoalSet() { try { const g = exGoalKey(); if (!g.slug) return []; if (exGoalMem[g.k]) return exGoalMem[g.k]; const c = JSON.parse(localStorage.getItem(g.k) || "null"); if (c && c.m) return (exGoalMem[g.k] = c.m.map(x => ({ d: x[0], h: x[1], a: x[2], hg: x[3], ag: x[4], g: x[5] }))); } catch (e) {} return []; }
 function exRng(w) { const s = document.getElementById("exS"), e = document.getElementById("exE"); if (+s.value > +e.value) { if (w === "s") e.value = s.value; else s.value = e.value; } document.getElementById("exSl").textContent = s.value + "'"; document.getElementById("exEl").textContent = e.value + "'"; renderExplore(); }
 async function espnGet(path) {
@@ -4031,8 +4041,31 @@ function exNextGoal(sets, S, E, active, total) {
 let exMode = "league";
 let exHidden = {};
 function exHide(k, on) { if (k === "all") exHidden = {}; else exHidden[k] = on; renderExplore(); }
-function setExMode(m) { exMode = m; { const sw = document.getElementById("exSw"); if (sw) sw.checked = m === "game"; const a = document.getElementById("exLblL"), b = document.getElementById("exLblG"); if (a) a.style.fontWeight = m === "game" ? 400 : 700; if (b) b.style.fontWeight = m === "game" ? 700 : 400; } document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); }
-function exPickLeague(id) { document.getElementById("trLeague").value = id; trData = null; loadTrends(); }
+function setExMode(m) { exMode = m; { const sw = document.getElementById("exSw"); if (sw) sw.checked = m === "game"; const a = document.getElementById("exLblL"), b = document.getElementById("exLblG"); if (a) a.style.fontWeight = m === "game" ? 400 : 700; if (b) b.style.fontWeight = m === "game" ? 700 : 400; } document.getElementById("exGameSel").style.display = m === "game" ? "flex" : "none"; renderExplore(); if (m === "game") { exAutoMatch = true; exLoadUpcoming(); } }
+function exPickLeague(id) { exAutoMatch = true; if (String(id).startsWith("espn:")) { exEspn = id.slice(5); document.getElementById("exHome").dataset.sig = ""; renderExplore(); exLoadUpcoming(); return; } exEspn = null; document.getElementById("trLeague").value = id; document.getElementById("exHome").dataset.sig = ""; trData = null; loadTrends(); exLoadUpcoming(); }
+let exAutoMatch = true, exUp = {}, exUpList = [];
+async function exLoadUpcoming() {
+  const slug = exSlug(), sel = document.getElementById("exMatch"); if (!sel) return;
+  if (!slug) { sel.innerHTML = '<option value="">Sin partidos próximos</option>'; return; }
+  let list = []; const c = exUp[slug];
+  if (c && Date.now() - c.t < 600000) list = c.list;
+  else {
+    sel.innerHTML = '<option value="">Buscando partidos...</option>';
+    const days = [...Array(7)].map((_, i) => { const d = new Date(Date.now() + i * 86400000); return d.toISOString().slice(0, 10).replace(/-/g, ""); });
+    const res = await Promise.all(days.map(d => espnGet(`${slug}/scoreboard?dates=${d}`).catch(() => null)));
+    res.forEach(j => ((j && j.events) || []).forEach(e => { const cc = e.competitions && e.competitions[0]; if (!cc || (cc.status && cc.status.type && cc.status.type.completed)) return; const hm = cc.competitors.find(x => x.homeAway === "home"), aw = cc.competitors.find(x => x.homeAway === "away"); if (hm && aw) list.push({ t: e.date, h: hm.team.displayName, a: aw.team.displayName }); }));
+    if (!list.length) { try { cpAll().forEach(x => { const t = Date.parse(x.m.commence_time); if (t > Date.now() - 2 * 3600000 && t < Date.now() + 7 * 86400000 && (String(x.l.id) === document.getElementById("trLeague").value) && !exEspn) list.push({ t: x.m.commence_time, h: x.m.home_team, a: x.m.away_team }); }); } catch (e) {} }
+    list.sort((a, b) => a.t.localeCompare(b.t)); exUp[slug] = { t: Date.now(), list };
+  }
+  exUpList = list;
+  sel.innerHTML = list.length ? list.map((m, i) => `<option value="${i}">${new Date(m.t).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })} · ${m.h} vs ${m.a}</option>`).join("") : '<option value="">Sin partidos en los próximos 7 días</option>';
+  if (list.length && exAutoMatch) exPickMatch("0", true);
+}
+function exPickMatch(i, auto) {
+  const m = exUpList[parseInt(i)]; if (!m) return; if (!auto) exAutoMatch = false;
+  const hs = document.getElementById("exHome"), as = document.getElementById("exAway"), names = o => [...o.options].map(x => x.value);
+  const H = msFind(m.h, names(hs)), A = msFind(m.a, names(as)); if (H) hs.value = H; if (A) as.value = A; document.getElementById("exMatch").value = String(i); renderExplore();
+}
 function exMarkets() {
   const mk = (l, f, ht) => ({ l, f, ht });
   const T = (x, side) => [mk(`${side === "h" ? "Local" : "Visitante"} más de ${x}`, (h, a) => (side === "h" ? h : a) > x), mk(`${side === "h" ? "Local" : "Visitante"} menos de ${x}`, (h, a) => (side === "h" ? h : a) < x)];
@@ -4055,12 +4088,14 @@ function renderExplore() {
   const hero = document.getElementById("exHeroTxt"), st = document.getElementById("ex-status");
   const gs = exGoalSet(), eL = parseInt(document.getElementById("exL").value) || 0, eV = parseInt(document.getElementById("exV").value) || 0, eS = parseInt(document.getElementById("exS").value) || 0, eE = parseInt(document.getElementById("exE").value); const E90 = isNaN(eE) ? 90 : eE;
   const active = eL > 0 || eV > 0 || eS > 0 || E90 < 90 || document.getElementById("exView").value === "next";
-  document.getElementById("exLeague").value = document.getElementById("trLeague").value;
-  if ((!trData || !trData.length) && !(active && gs.length)) { hero.innerHTML = `<div class="t">Explorar mercados</div><div class="s">Cargando datos de la liga...</div>`; out.innerHTML = ""; st.textContent = document.getElementById("trStatus").textContent; return; }
+  exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value;
+  exYearVal();
+  const espnOnly = !!exEspn, base = espnOnly ? gs.filter(m => m.g).map(m => ({ d: m.d, h: m.h, a: m.a, hg: m.hg, ag: m.ag, hh: m.g.filter(x => x[0] <= 45 && !x[1]).length, ha: m.g.filter(x => x[0] <= 45 && x[1]).length })) : (trData || []);
+  if ((!base || !base.length) && !(active && gs.length)) { hero.innerHTML = `<div class="t">${document.getElementById("exLeague").selectedOptions[0].textContent}</div><div class="s">${espnOnly ? "Sin datos todavía" : "Cargando datos de la liga..."}</div>`; if (espnOnly) { out.innerHTML = '<div class="muted" style="text-align:center; padding:24px;">Esta liga viene de ESPN: pulsa «⬇ Cargar minutos de goles» (elige la temporada) para descargar sus partidos y analizarla.</div>'; st.textContent = ""; return; } out.innerHTML = ""; st.textContent = espnOnly ? "" : document.getElementById("trStatus").textContent; return; }
   const N = parseInt(document.getElementById("exSample").value) || 0, sel = document.getElementById("exMarket").value;
   const lname = document.getElementById("exLeague").selectedOptions[0].textContent;
-  const byDate = [...(trData || [])].sort((a, b) => b.d.localeCompare(a.d));
-  const teams = [...new Set(((active && gs.length) || !(trData && trData.length) ? gs.flatMap(m => [m.h, m.a]) : trData.flatMap(f => [f.h, f.a])))].sort();
+  const byDate = [...base].sort((a, b) => b.d.localeCompare(a.d));
+  const teams = [...new Set(((active && gs.length) || espnOnly || !(trData && trData.length) ? gs.flatMap(m => [m.h, m.a]) : trData.flatMap(f => [f.h, f.a])))].sort();
   const sig = teams.join("|"), fill = (id, keep, def) => { const el = document.getElementById(id); if (el.dataset.sig !== sig) { el.innerHTML = teams.map(t => `<option>${t}</option>`).join(""); el.selectedIndex = def; el.dataset.sig = sig; } };
   fill("exHome", null, 0); fill("exAway", null, Math.min(1, teams.length - 1));
   let sets, sub = "";
@@ -4127,7 +4162,7 @@ let msCtx = "", msCtx2 = null;
 async function msGoExplore() {
   const c = msCtx2; if (!c) return; closeMatchSheet();
   if (document.getElementById("trLeague").value !== String(c.leagueId)) { document.getElementById("trLeague").value = c.leagueId; trData = null; }
-  switchView("explore"); setExMode("game");
+  exEspn = null; switchView("explore"); setExMode("game");
   if (!trData) await loadTrends();
   if (trData) { const teams = [...new Set(trData.flatMap(f => [f.h, f.a]))], H = msFind(c.home, teams), A = msFind(c.away, teams); if (H) document.getElementById("exHome").value = H; if (A) document.getElementById("exAway").value = A; renderExplore(); }
 }
