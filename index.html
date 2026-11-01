@@ -2562,6 +2562,8 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="pv-actions">
         <button onclick="studyMatch('${cardId}', '${H}', '${A}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar partido</button>
         <button class="small ghost" onclick="pvStats(${idx})">📊 Estadísticas</button>
+        <button class="small ghost" onclick="vsOpenMatch('${H}','${A}','${m.commence_time}',this)">Ver partido →</button>
+        <button class="small ghost" onclick="vsInline('${H}','${A}','${m.commence_time}',this,'${cardId}-bsd')">Árbitro y alineación</button>
         <button class="small ghost" onclick="loadForm('${cardId}', '${H}', '${A}')">Forma</button>
         <button class="small ghost" onclick="loadInjuries('${cardId}', '${H}', '${A}')">Bajas</button>
         <button class="small ghost" onclick="loadH2H('${cardId}', '${H}', '${A}')">Tarjetas H2H</button>
@@ -2570,6 +2572,7 @@ function renderMatches(matches, sport, isFiltered) {
         <button class="small ghost" onclick="analyzeWithAI('${cardId}', '${H}', '${A}')">Analizar con IA</button>
       </div>
       <div id="${cardId}-study-status"></div>
+      <div id="${cardId}-bsd" class="muted" style="font-size:12px;padding:4px 0"></div>
       <div class="mkt-tabs">${tabs.map((t, i) => `<button class="mkt-tab ${i === 0 ? "active" : ""}" onclick="switchTab('${cardId}', ${i})">${t.label}</button>`).join("")}</div>
       ${tabs.map((t, i) => `<div class="mkt-body ${i === 0 ? "active" : ""}" data-idx="${i}">${t.html}</div>`).join("")}
       <div id="${cardId}-model" style="margin-top:14px; text-align:center;"><button class="small" onclick="loadModel(${idx})" style="font-weight:700;">📐 Probabilidades del modelo</button></div>
@@ -3966,6 +3969,38 @@ function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel
 
 
 
+
+/* ===== Abrir la página de partido desde BetPractice (buscar el partido en ESPN por nombres) ===== */
+const VS_SB = {};
+async function vsResolve(home, away, iso) {
+  prInit(); const slugs = [...document.querySelectorAll("#plLeague option")].map(o => o.value), base = iso ? new Date(iso) : new Date();
+  const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(home), a = nm(away);
+  const ymd = off => { const d = new Date(base.getTime() + off * 864e5); return `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`; };
+  const look = (slug, ds) => { const evs = VS_SB[slug + "|" + ds]; if (!evs) return null; for (const e of evs) { const c = ((e.competitions || [])[0] || {}).competitors || [], hc = c.find(x => x.homeAway === "home"), ac = c.find(x => x.homeAway === "away"); if (hc && ac && near(nm(hc.team.displayName || hc.team.name), h) && near(nm(ac.team.displayName || ac.team.name), a)) return { slug, e, hc, ac }; } return null; };
+  for (const off of [0, -1, 1]) { const ds = ymd(off); let found = null;
+    for (const sl of slugs) { found = look(sl, ds); if (found) return found; }
+    await prPool(slugs.filter(sl => !((sl + "|" + ds) in VS_SB)), 8, async sl => { if (found) return; try { VS_SB[sl + "|" + ds] = (await espnGet(`${sl}/scoreboard?dates=${ds}`)).events || []; } catch (e) { VS_SB[sl + "|" + ds] = []; } const f = look(sl, ds); if (f) found = f; });
+    if (found) return found; }
+  return null;
+}
+async function vsOpenMatch(home, away, iso, el) {
+  const old = el ? el.textContent : ""; if (el) { el.textContent = "Buscando…"; el.disabled = true; }
+  try { const f = await vsResolve(home, away, iso);
+    if (!f) { if (el) { el.textContent = "No está en ESPN"; setTimeout(() => { el.textContent = old; el.disabled = false; }, 2500); } return; }
+    const c = f.e.competitions[0], key = `${f.slug}|${f.hc.team.id}|${f.ac.team.id}`;
+    VS_EV[key] = { slug: f.slug, hid: String(f.hc.team.id), aid: String(f.ac.team.id), date: f.e.date, hn: f.hc.team.displayName || f.hc.team.name, an: f.ac.team.displayName || f.ac.team.name, venue: (c.venue && c.venue.fullName) || "", lg: f.slug };
+    if (el) { el.textContent = old; el.disabled = false; } vsMatch(key);
+  } catch (e) { if (el) { el.textContent = "Error"; setTimeout(() => { el.textContent = old; el.disabled = false; }, 2500); } }
+}
+async function vsInline(home, away, iso, el, tid) {
+  const out = document.getElementById(tid); if (el) { el.textContent = "…"; el.disabled = true; }
+  try { const b = await vsBsd({ hn: home, an: away, date: iso || new Date().toISOString() }), f2 = x => (Math.round(x * 100) / 100).toString().replace(".", ","); let txt = "";
+    if (!b) txt = "BSD no tiene este partido.";
+    else { let r = b.ref; if (!r && b.ev.referee_id == null) txt += "Árbitro: sin asignar todavía. "; else if (r) txt += `Árbitro: <b>${r.name}</b> · ${f2(r.avg_yellow_per_match)} amar. · ${f2(r.avg_fouls_per_match)} faltas por partido. `;
+      const lx = b.lin && b.lin.lineups; txt += lx && lx.home && (lx.home.players || []).length ? `Alineación ${b.lin.lineup_status === "confirmed" ? "confirmada" : "probable"}: ${lx.home.formation || "?"} vs ${(lx.away || {}).formation || "?"}.` : "Alineación aún no publicada."; }
+    if (out) out.innerHTML = txt; if (el) { el.textContent = "Árbitro y alineación"; el.disabled = false; }
+  } catch (e) { if (out) out.textContent = e.message; if (el) { el.textContent = "Árbitro y alineación"; el.disabled = false; } }
+}
 /* ===== Bzzoiro Sports Data (BSD): alineaciones, estadísticas, árbitros ===== */
 async function bsdGet(path) {
   let k = ""; try { k = localStorage.getItem("radar-bsd-key") || ""; } catch (e) { }
@@ -4485,7 +4520,7 @@ function renderLive() {
     const hit = r.hit, hq = r.home.replace(/'/g, "\\'"), aq = r.away.replace(/'/g, "\\'"), lq = String(r.lname).replace(/'/g, "\\'");
     const cells = lv.cols.map(c => { const d = CP_COLS.find(x => x[2] === c); if (!hit) return '<div class="lvo muted">–</div>'; const key = d[1] === "home" ? hit.m.home_team : d[1] === "away" ? hit.m.away_team : d[1]; const p = cpPick(hit.m.bookmakers, d[0], key); if (!p) return '<div class="lvo muted">–</div>'; const fo = p.fair ? 1 / p.fair : null; return `<div class="lvo">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb ${p.ev != null && p.ev >= 0.02 ? "v" : ""}"><i class="ic b3">365</i>${p.price.toFixed(2)}</div></div>`; }).join("");
     return `<div class="lvr" style="${grid}" onclick="${r.kind === "af" ? `openMatchSheet('${hq}', '${aq}', '${r.id}', '${lq}')` : ""}"><div class="lvl"><span class="lvlive">${["FT", "AET", "PEN"].includes(r.st) ? "FIN" : "LIVE"}</span><span class="lvfl">${r.flag}</span><span class="lvcode">${r.code}</span></div>
-      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div>${r.kind === "af" ? lvTimeline(r) : ""}${lvStats(r)}</div>${cells}</div>`;
+      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div><div><button class="small ghost" onclick="event.stopPropagation();vsOpenMatch(this.dataset.h,this.dataset.a,'',this)" data-h="${String(r.home).replace(/"/g,'&quot;')}" data-a="${String(r.away).replace(/"/g,'&quot;')}">Ver partido →</button></div>${r.kind === "af" ? lvTimeline(r) : ""}${lvStats(r)}</div>${cells}</div>`;
   }).join("") || '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>';
 }
 function lvPop(kind) {
