@@ -150,6 +150,10 @@
     .sidebar .wordmark { margin-bottom:0; margin-right:12px; }
     .sidebar-nav { flex-direction:row; }
     .sidebar-footer { display:none; }
+    .sidebar { position:sticky; top:0; z-index:50; padding:8px 10px; gap:6px; -webkit-overflow-scrolling:touch; scrollbar-width:none; } .sidebar::-webkit-scrollbar { display:none; }
+    .sidebar .wordmark h1, .sidebar-section { display:none; } .sidebar .wordmark { margin-right:4px; flex-shrink:0; }
+    .sidebar-nav { overflow-x:visible; overflow-y:visible; } .side-btn { white-space:nowrap; flex-shrink:0; padding:8px 12px; font-size:13px; }
+    header { padding-left:10px; padding-right:10px; }
   }
   .mono { font-family:'IBM Plex Mono',monospace; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
@@ -685,7 +689,6 @@
   @media (max-width:900px) { .al-grid { grid-template-columns:repeat(2,1fr); } }
   @media (max-width:720px) { .dash-grid { grid-template-columns:repeat(2,1fr); } .acc-grid { grid-template-columns:1fr 1fr; } header { position:static; } }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="toast-container" id="toast-container"></div>
@@ -699,6 +702,7 @@
       <button class="side-btn active" data-v="home" onclick="switchView('home')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg> Inicio</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
       <button class="side-btn" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
+      <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
       <button class="side-btn" data-v="jorn" onclick="switchView('jorn')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Jornada</button>
 
       <div class="sidebar-section">Analizar</div>
@@ -718,7 +722,6 @@
       <button class="side-btn" data-v="players" onclick="switchView('players')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg> Props de jugadores</button>
       <button class="side-btn" data-v="lineups" onclick="switchView('lineups')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Formaciones</button>
       <button class="side-btn" data-v="arbitrage" onclick="switchView('arbitrage')"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v18M6 8l-3 5a3 3 0 006 0zM18 8l-3 5a3 3 0 006 0zM4 8h16M9 21h6"/></svg> Arbitraje</button>
-      <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
 
       <div class="sidebar-section">Mi actividad</div>
       <button class="side-btn" data-v="historial" onclick="switchView('historial')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h7v7"/></svg> Historial y CLV</button>
@@ -731,17 +734,24 @@
     </div>
     <div class="sidebar-footer muted" style="font-size:11px; line-height:1.5;">
       Herramienta informativa. No procesa apuestas ni dinero real.
-      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.8.0 — ver novedades</span></div>
+      <div style="margin-top:8px;"><span class="tooltip" style="cursor:pointer;" onclick="toggleChangelog(true)">v1.9.0 — ver novedades</span></div>
     </div>
   </div>
 
   <div id="changelog-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; align-items:center; justify-content:center;" onclick="if(event.target===this) toggleChangelog(false)">
     <div class="panel" style="width:380px; max-height:75vh; overflow-y:auto; background:#171C23;">
       <div class="row" style="margin-bottom:10px;">
-        <div style="font-weight:600;">Novedades — v1.8.0</div>
+        <div style="font-weight:600;">Novedades — v1.9.0</div>
         <button class="small ghost" onclick="toggleChangelog(false)">Cerrar ✕</button>
       </div>
       <ul style="margin:0; padding-left:18px; font-size:13px; line-height:1.9;">
+        <li><b>Avisos en el móvil:</b> las alarmas te llegan por WhatsApp (CallMeBot) y como notificación; configúralo en ⚙️</li>
+        <li><b>🤖 Oportunidades con IA:</b> el botón de arriba revisa pregame y en vivo y te propone partido, mercado y motivo</li>
+        <li>Alarma por partido con parte en vivo (marcador, minutos y estadística en un tramo)</li>
+        <li>Página de partido con pestaña En vivo, árbitro y alineaciones (BSD) y medias de equipo</li>
+        <li>Tarjeta de partido en vivo con eventos, jugadores (FC, FD, TCK, YC, SOT, SHT, SV) y estadísticas de equipo</li>
+        <li>Estadísticas FT 0,5 / 1,5 y 1ª parte 0,5 / 1,5 en Tendencias, Previa y Rachas</li>
+        <li>Tema claro/oscuro con un botón, menú en 5 bloques, más ligas (ESPN) y carga inicial más ligera</li>
         <li>football-data.org como fuente gratuita de la temporada actual (Tendencias, Explorar y ficha)</li>
         <li>Bet365 en la ficha del partido (vía API-Football): cuota, mejor otra casa y edge</li>
         <li>Alarmas en vivo por tramo: tiros a puerta, tiros fuera, goles o córners entre dos minutos o en los últimos X minutos, con vigilancia automática</li>
@@ -775,7 +785,8 @@
   <header>
     <div style="width:40px;"></div>
     <h2 id="view-title">Partidos y valor</h2>
-    <div style="display:flex; gap:8px; align-items:center; width:40px; justify-content:flex-end;">
+    <div style="display:flex; gap:8px; align-items:center; min-width:40px; justify-content:flex-end;">
+      <button class="ghost" id="aiBtn" onclick="aiOpp()" title="La IA busca oportunidades de apuesta ahora mismo">🤖</button>
       <button class="ghost" id="themeBtn" onclick="themeToggle()" title="Cambiar entre tema claro y oscuro">☀️</button>
       <button class="ghost" onclick="toggleSettingsModal(true)" title="Configuración">⚙️</button>
     </div>
@@ -795,6 +806,11 @@
         <div><div class="muted" style="margin-bottom:4px;">Clave de Bzzoiro Sports Data (alineaciones, estadísticas de partido, árbitros) <span class="tooltip" title="Se guarda solo en este navegador. Si tu Worker tiene la variable BSD_KEY puedes dejarla vacía.">ⓘ</span></div><input id="bsdKey" type="password" placeholder="Token de sports.bzzoiro.com" style="width:100%;" autocomplete="off" /></div>
         <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
+        <div style="border-top:1px solid #232A33; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>Avisos en el móvil (WhatsApp)</b> <span class="tooltip" title="Usa el servicio gratuito CallMeBot: te manda un WhatsApp a ti mismo cuando salta una alarma. Sigue las instrucciones de callmebot.com (WhatsApp) para conseguir tu clave. Funciona mientras la app esté abierta.">ⓘ</span></div>
+          <input id="waPhone" type="text" placeholder="Tu teléfono con prefijo, ej. 34600111222" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
+          <input id="waKey" type="password" placeholder="Clave de CallMeBot" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
+          <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="small ghost" type="button" onclick="waTest()">Enviar prueba</button><button class="small ghost" type="button" onclick="waNotifAsk()">Avisos del navegador</button></div>
+          <div id="waMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
         <div style="display:flex; gap:10px;">
           <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:100%;" /></div>
@@ -1965,7 +1981,7 @@ function toggleChangelog(show) {
   document.getElementById("changelog-overlay").style.display = show ? "flex" : "none";
 }
 
-function toggleSettingsModal(show) {
+function toggleSettingsModal(show) { try { waInit(); } catch (e) { }
   document.getElementById("settings-overlay").style.display = show ? "flex" : "none";
 }
 
@@ -2298,7 +2314,7 @@ function pvPickLeague(odds) { document.getElementById("sport").value = odds; loa
 let fdSched = (() => { try { const c = JSON.parse(localStorage.getItem("radar-fd-sched") || "null"); return c && Date.now() - c.t < 3 * 3600000 ? c.n : null; } catch (e) { return null; } })(), fdSchedBusy = false;
 const FD_ESPN = { "39": "eng.1", "140": "esp.1", "135": "ita.1", "78": "ger.1", "2": "uefa.champions", "61": "fra.1", "88": "ned.1", "94": "por.1", "40": "eng.2", "71": "bra.1", "1": "fifa.world", "4": "uefa.euro" };
 async function fdSchedLoad() {
-  if (fdSched || fdSchedBusy) return; fdSchedBusy = true;
+  if (fdSched || fdSchedBusy) return; fdSchedBusy = true; await new Promise(r => setTimeout(r, 4000));
   try {
     const f = d => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`, rng = `${f(new Date())}-${f(new Date(Date.now() + 7 * 864e5))}`, n = {};
     await prPool(Object.keys(FD_ESPN), 6, async id => { try { const j = await espnGet(`${FD_ESPN[id]}/scoreboard?dates=${rng}&limit=300`); n[id] = (j.events || []).length; } catch (e) { } });
@@ -3133,8 +3149,9 @@ function exportValueLogCsv() {
   const log = getValueLog();
   downloadCSV(log, ["loggedAt","home","away","marketLabel","selection","bookie","odds","ev","kind"], "value_bets.csv");
 }
-function downloadXLSX(rows, headers, sheetName, filename) {
-  if (typeof XLSX === "undefined") { alert("No se pudo cargar la librería de Excel. Revisa tu conexión e inténtalo de nuevo."); return; }
+function loadXlsxLib() { return new Promise((ok, no) => { if (typeof XLSX !== "undefined") return ok(); const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = () => ok(); sc.onerror = () => no(new Error("no carga")); document.head.appendChild(sc); }); }
+async function downloadXLSX(rows, headers, sheetName, filename) {
+  try { await loadXlsxLib(); } catch (e) { alert("No se pudo cargar la librería de Excel. Revisa tu conexión e inténtalo de nuevo."); return; }
   const cleanRows = rows.map(r => { const o = {}; headers.forEach(h => o[h] = r[h]); return o; });
   const ws = XLSX.utils.json_to_sheet(cleanRows);
   const wb = XLSX.utils.book_new();
@@ -3487,7 +3504,8 @@ function movInject(m) {
     if (f) { m.bookmakers = [...(m.bookmakers || []), f.bookmakers[0]]; if (f.mov_cor && !m.mov_cor) m.mov_cor = f.mov_cor; }
   } catch (e) {} return m;
 }
-function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
+let movMemo = { raw: null, v: null };
+function movGet() { try { const raw = localStorage.getItem(MOV_KEY) || "null"; if (raw === movMemo.raw) return movMemo.v; const c = JSON.parse(raw), v = c && c.data ? c : null; movMemo = { raw, v }; return v; } catch (e) { return null; } }
 const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
 function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; const pl = (st.players || []).map(x => ({ n: x.name, t: x.team, s: x.shirt, g: x.goals || 0, sh: x.shots || 0, sot: x.shots_on_target || 0, xg: x.xg || 0, yc: x.yellow_cards || 0, rc: x.red_cards || 0, f: x.fouls || 0, fd: x.fouls_drawn || 0, tk: x.tackles || 0, as: x.assists || 0, sv: x.saves || 0 })).filter(x => x.g || x.sh || x.sot || x.xg || x.yc || x.rc || x.f || x.fd || x.tk || x.as || x.sv); return { h: f(st.home), a: f(st.away), t: st.updated_at || null, pl }; }
 const MOV_PP = {};
@@ -3517,7 +3535,9 @@ function movConvert(d) {
   });
   return { out, st };
 }
-async function movLoad(silent) {
+let movBusy = null;
+async function movLoad(silent) { if (movBusy) return movBusy; movBusy = movLoad0(silent).finally(() => { movBusy = null; }); return movBusy; }
+async function movLoad0(silent) {
   const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
   if (!silent) say("Descargando cuotas de Bet365...");
   try {
@@ -5349,10 +5369,62 @@ function renderAlarms() {
   const log = getAlLog();
   document.getElementById("alLog").innerHTML = log.length ? log.slice(0, 20).map(l => `<div class="al-item"><div><div class="t">${l.name}</div><div class="d">${l.msg}</div></div><div class="muted" style="font-size:11px;">${l.t}</div></div>`).join("") + `<div style="text-align:center; margin-top:8px;"><button class="small ghost" onclick="alClearLog()">Borrar historial</button></div>` : `<div class="muted" style="text-align:center; padding:10px;">Todavía no ha saltado ninguna.</div>`;
 }
+
+/* ===== Avisos en el móvil: WhatsApp (CallMeBot) + notificación del navegador ===== */
+function waCfg() { try { return JSON.parse(localStorage.getItem("radar-wa") || "{}"); } catch (e) { return {}; } }
+function waSave() { try { localStorage.setItem("radar-wa", JSON.stringify({ phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
+function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"); if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
+function waSend(text) {
+  const c = waCfg(); if (!c.phone || !c.key) return false;
+  try { fetch(`https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(c.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`, { mode: "no-cors" }).catch(() => { }); return true; } catch (e) { return false; }
+}
+function waTest() { const m = document.getElementById("waMsg"), c = waCfg(); if (!c.phone || !c.key) { m.textContent = "Rellena el teléfono y la clave primero."; return; } waSend("✅ Radar de valor: aviso de prueba. Si lo lees, las alarmas te llegarán aquí."); m.textContent = "Enviado. Si no te llega en un minuto, revisa el teléfono (con prefijo, sin +) y la clave."; }
+function waNotifAsk() { const m = document.getElementById("waMsg"); if (!("Notification" in window)) { m.textContent = "Este navegador no permite notificaciones."; return; } Notification.requestPermission().then(r => { m.textContent = r === "granted" ? "Avisos del navegador activados." : "No has dado permiso para las notificaciones."; if (r === "granted") try { new Notification("Radar de valor", { body: "Avisos activados." }); } catch (e) { } }); }
+function alPush(title, body) {
+  waSend(`⏰ ${title}\n${body}`);
+  try { if ("Notification" in window && Notification.permission === "granted") { const n = { body, tag: "radar-" + title, renotify: true }; if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r => r.showNotification("⏰ " + title, n)).catch(() => new Notification("⏰ " + title, n)); else new Notification("⏰ " + title, n); } } catch (e) { }
+}
+
+/* ===== IA: buscar oportunidades (pregame y en vivo) ===== */
+function aiGather() {
+  const now = Date.now(), pre = [], live = [], f2 = v => v == null ? null : Math.round(v * 100) / 100;
+  let all = []; try { all = cpAll(); } catch (e) { }
+  all.filter(x => { const t = Date.parse(x.m.commence_time); return t > now - 5 * 60000 && t < now + 36 * 3600000 && !x.m.mov_live; }).forEach(x => {
+    const cells = CP_COLS.map(c => { const key = c[1] === "home" ? x.m.home_team : c[1] === "away" ? x.m.away_team : c[1], r = cpPick(x.m.bookmakers, c[0], key); return r && r.price ? { mercado: c[2], cuota: f2(r.price), prob_justa: r.fair ? f2(r.fair) : null, valor_pct: r.ev != null ? f2(r.ev * 100) : null } : null; }).filter(Boolean);
+    const best = Math.max(-1, ...cells.map(c => c.valor_pct == null ? -1 : c.valor_pct)); if (best < 1) return;
+    let mt = null; try { mt = cpMetrics(x.m); } catch (e) { }
+    pre.push({ partido: `${x.m.home_team} vs ${x.m.away_team}`, liga: x.l.nm, hora: new Date(x.m.commence_time).toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" }), _iso: x.m.commence_time, _h: x.m.home_team, _a: x.m.away_team, mejores_mercados: cells.filter(c => c.valor_pct != null && c.valor_pct >= 1).sort((a, b) => b.valor_pct - a.valor_pct).slice(0, 4), media_goles_local_casa: mt ? f2(mt.hav) : undefined, media_goles_visitante_fuera: mt ? f2(mt.aav) : undefined, _best: best });
+  });
+  pre.sort((a, b) => b._best - a._best); const preTop = pre.slice(0, 14);
+  const c = movGet(); if (c) c.data.filter(m => m.mov_live && m.mov_stats).slice(0, 14).forEach(m => {
+    const S = m.mov_stats, o = {}; MOV_SK.forEach(k => { if (S.h[k] != null) o[k] = [S.h[k], S.a[k]]; });
+    const tot = (m.bookmakers[0] && m.bookmakers[0].markets.find(k => k.key === "totals")), cor = (m.mov_cor || []).filter(z => z[0] === "O").slice(0, 6).map(z => ({ linea: z[1], cuota_over: z[2] }));
+    live.push({ partido: `${m.home_team} vs ${m.away_team}`, liga: m.mov_league, marcador: m.mov_score, minuto: m.mov_min, estadisticas_local_visitante: o, cuotas_goles: tot ? tot.outcomes.map(z => `${z.name} ${z.point}: ${f2(z.price)}`) : undefined, lineas_corners_over: cor.length ? cor : undefined, _h: m.home_team, _a: m.away_team, _iso: m.commence_time });
+  });
+  return { pre: preTop, live };
+}
+async function aiOpp() {
+  let ov = document.getElementById("ai-ov"); if (!ov) { ov = document.createElement("div"); ov.id = "ai-ov"; ov.className = "plov"; ov.onclick = e => { if (e.target === ov) ov.style.display = "none"; }; document.body.appendChild(ov); }
+  const box = html => { ov.innerHTML = `<div class="plbox" style="max-width:640px; width:100%; max-height:92vh; overflow-y:auto;"><button class="ms-close" onclick="document.getElementById('ai-ov').style.display='none'">✕</button><div style="font-weight:800; font-size:17px; text-align:center; margin-bottom:4px;">🤖 Oportunidades según la IA</div>${html}</div>`; ov.style.display = "flex"; };
+  const key = getAnthropicKey(); if (!key) { box('<div class="muted" style="text-align:center; padding:16px;">Añade tu Anthropic API key en ⚙️ Configuración para usar la IA.</div>'); return; }
+  const D = aiGather(); if (!D.pre.length && !D.live.length) { box('<div class="muted" style="text-align:center; padding:16px;">No hay partidos con cuotas cargadas ahora mismo. Pulsa «Cuotas Bet365» para traer partidos y vuelve a probar.</div>'); return; }
+  box('<div class="muted" style="text-align:center; padding:24px;">Analizando ' + D.pre.length + ' partidos de pregame y ' + D.live.length + ' en vivo…</div>');
+  const clean = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith("_") ? undefined : v));
+  const prompt = `Eres un analista de apuestas deportivas prudente. Tienes datos reales de cuotas de Bet365, probabilidad justa (quitando el margen de la casa), valor estimado (% de ventaja) y, en vivo, estadísticas del partido. Elige como máximo 6 oportunidades en total que de verdad merezcan la pena, mezclando pregame y en vivo si procede. Reglas: usa SOLO los datos dados, no inventes cifras; si nada convence, devuelve una lista vacía; prefiere valor claro y respaldado por estadísticas; en vivo explica qué dicen los números del partido (presión, tiros, córners, tarjetas) y si es buen momento ahora. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","oportunidades":[{"tipo":"pregame|vivo","partido":"exactamente como viene","mercado":"p. ej. Más de 2.5 goles","cuota":number,"motivo":"2 frases como máximo","confianza":1-5,"momento":"ahora|esperar|antes del partido"}]}\n\nPREGAME:\n${JSON.stringify(clean(D.pre))}\n\nEN VIVO:\n${JSON.stringify(clean(D.live))}`;
+  try { const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1800, messages: [{ role: "user", content: prompt }] }) });
+    if (!res.ok) { const t = await res.text(); throw new Error(res.status + " " + t.slice(0, 160)); }
+    const j = await res.json(), txt = ((j.content || [])[0] || {}).text || "", m = /\{[\s\S]*\}/.exec(txt); if (!m) throw new Error("La IA no devolvió una lista legible."); const out = JSON.parse(m[0]), src = [...D.pre, ...D.live];
+    const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), conf = n => "●".repeat(Math.max(1, Math.min(5, n | 0))) + "○".repeat(5 - Math.max(1, Math.min(5, n | 0)));
+    const list = (out.oportunidades || []).map(o => { const f = src.find(z => nm(z.partido) === nm(o.partido)) || src.find(z => nm(z.partido).includes(nm(o.partido)) || nm(o.partido).includes(nm(z.partido))); const hq = f ? f._h.replace(/'/g, "\\'") : "", aq = f ? f._a.replace(/'/g, "\\'") : "";
+      return `<div style="border:1px solid #232A33; border-radius:12px; padding:12px; margin-top:10px;"><div style="display:flex; justify-content:space-between; gap:8px; align-items:center;"><b>${o.partido}</b><span class="${/viv/i.test(o.tipo) ? "chip-live" : "chip-ft"}">${/viv/i.test(o.tipo) ? "EN VIVO" : "PREGAME"}</span></div><div style="margin:6px 0; font-size:15px;"><b style="color:#3ECF8E;">${o.mercado}</b>${o.cuota ? ` · cuota <b>${Number(o.cuota).toFixed(2)}</b>` : ""}</div><div class="muted" style="font-size:12.5px; line-height:1.5;">${o.motivo || ""}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;"><span title="Confianza">${conf(o.confianza)} <span class="muted">· ${o.momento || ""}</span></span>${f ? `<button class="small ghost" onclick="document.getElementById('ai-ov').style.display='none'; vsOpenMatch('${hq}','${aq}','${f._iso}',this)">Ver partido →</button>` : ""}</div></div>`; }).join("");
+    box(`<div class="muted" style="text-align:center; font-size:12.5px; margin-bottom:2px;">${out.resumen || ""}</div>${list || '<div class="muted" style="text-align:center; padding:18px;">Ahora mismo la IA no ve nada que merezca la pena.</div>'}<div class="muted" style="font-size:11px; text-align:center; margin-top:12px; line-height:1.5;">Herramienta informativa. La IA puede equivocarse: contrasta siempre los datos antes de apostar.</div>`);
+  } catch (e) { box(`<div class="muted" style="text-align:center; padding:16px;">No se pudo analizar: ${e.message}</div>`); }
+}
 function alFire(a, msg) {
   showToast(`<b style="color:#F0B429;">⏰ ${a.name}</b><br/>${msg}`); try { playTone(880, 0.15); setTimeout(() => playTone(1175, 0.15), 160); } catch (e) {}
   const log = getAlLog(); log.unshift({ name: a.name, msg: msg.replace(/<br\/?>/g, " · ").replace(/<[^>]+>/g, ""), t: new Date().toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) });
   try { localStorage.setItem("radar-alarm-log", JSON.stringify(log.slice(0, 50))); } catch (e) {}
+  alPush(a.name, msg.replace(/<br\/?>/g, "\n").replace(/<[^>]+>/g, ""));
 }
 function alIn(v, mn, mx) { return (mn === "" || mn == null || (v != null && v >= +mn)) && (mx === "" || mx == null || (v != null && v <= +mx)); }
 function runAlarms(matches, sport) {
