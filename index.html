@@ -528,6 +528,8 @@
       <label class="pv-tg"><input type="checkbox" id="onlyFavs" onchange="applyFilters()" /> ⭐</label>
       <select id="pvSort" onchange="pv.sort=this.value; applyFilters()"><option value="time">Orden: hora</option><option value="ev">Orden: mejor valor</option></select>
       <button onclick="loadOdds(true)">Actualizar cuotas</button>
+      <button class="ghost" onclick="movLoad()" title="Cuotas de Bet365 gratis (prepartido y en vivo) de muchas ligas">Cuotas Bet365</button>
+      <label class="muted" style="font-size:12px; display:inline-flex; gap:4px; align-items:center;" title="Actualiza las cuotas de Bet365 cada 2 minutos mientras la página esté abierta"><input type="checkbox" class="movAuto" style="width:auto;" onchange="movAutoSet(this.checked)" /> auto</label>
       <button class="ghost" onclick="loadAllLeagues()" title="Descarga las cuotas de todas las ligas (gasta unas 6 consultas por liga)">Cargar todas las ligas</button>
     </div>
     <details id="more-filters" class="pv-more"><summary class="muted" style="cursor:pointer; font-size:12px; text-align:center;">Más filtros</summary>
@@ -740,6 +742,7 @@
           <div style="font-weight:600; font-size:15px;">Picks del sistema</div>
           <input id="hbPQ" type="text" placeholder="Buscar..." oninput="hbPicksRender()" style="width:150px;" />
           <button class="small ghost" onclick="movLoad()" title="Descarga gratis las cuotas de Bet365 de muchas más ligas (servicio MoviOdds, sin clave)">⬇ Cuotas Bet365</button>
+          <label class="muted" style="font-size:11px; display:inline-flex; gap:4px; align-items:center;"><input type="checkbox" class="movAuto" style="width:auto;" onchange="movAutoSet(this.checked)" /> auto 2 min</label>
         </div>
         <div id="movMsg" class="muted" style="font-size:11px; margin-top:4px;"></div>
         <div id="hbPicks" style="margin-top:8px; overflow-x:auto;"></div>
@@ -1432,6 +1435,7 @@ async function loadAllLeagues() {
   st.textContent = `Listo: ${ok} ligas cargadas${fail ? `, ${fail} sin datos (fuera de temporada)` : ""}${left ? `. Te quedan ${left} consultas este mes` : ""}.`;
   try { hbInit(); } catch (e) {}
 }
+window.addEventListener("load", () => { try { movAutoInit(); } catch (e) {} });
 window.addEventListener("offline", () => showToast("📡 Sin conexión. Se mostrarán los últimos datos guardados."));
 window.addEventListener("online", () => showToast("✅ Conexión recuperada."));
 
@@ -2791,46 +2795,58 @@ function hbNowMetrics(l, home, away) {
 const MOV_KEY = "radar-valor-mov-cache";
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
 function movConvert(d) {
-  const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0 };
+  const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0 };
   (d.matches || []).forEach(x => {
-    if (x.in_play || !x.home || !x.away) return;
-    const t = Date.parse(x.kickoff_utc); if (isNaN(t) || t < now - 3 * 3600000 || t > now + 8 * 86400000) return;
-    const qs = (x.quotes || []).filter(q => q.phase !== "inplay" && q.odds_dec > 1), mk = [];
-    const ft = qs.filter(q => /^Full Time Result$/i.test(q.group_name || "")), oc = [];
+    if (!x.home || !x.away) return;
+    const live = !!x.in_play, t = Date.parse(x.kickoff_utc); if (isNaN(t)) return;
+    if (live ? t < now - 5 * 3600000 : (t < now - 3 * 3600000 || t > now + 8 * 86400000)) return;
+    const qs = (x.quotes || []).filter(q => q.odds_dec > 1 && (live ? q.phase === "inplay" : q.phase !== "inplay")), mk = [];
+    const ft = qs.filter(q => /^Full ?Time Result$/i.test(q.group_name || "")), oc = [];
     [[x.home, x.home], ["Draw", "Draw"], [x.away, x.away]].forEach(([lab, nm]) => { const q = ft.find(z => (z.label || "").trim() === lab); if (q) oc.push({ name: nm, price: q.odds_dec }); });
     if (oc.length === 3) { mk.push({ key: "h2h", outcomes: oc }); st.h2h++; }
-    const to = qs.filter(q => /Goals Over\/Under/i.test(q.group_name || "") && (q.line || q.handicap)), tout = [];
+    const to = qs.filter(q => (/Goals Over\/Under/i.test(q.group_name || "") || (live && / Goals$/i.test(q.group_name || ""))) && (q.line || q.handicap)), tout = [];
     to.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) tout.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) tout.push({ name: "Under", price: q.odds_dec, point: pt }); });
     if (tout.length >= 2) { mk.push({ key: "totals", outcomes: tout }); st.tot++; }
     const bt = qs.filter(q => /Both Teams/i.test(q.group_name || "") && /^(yes|no)$/i.test((q.label || "").trim())).map(q => ({ name: /^yes$/i.test(q.label.trim()) ? "Yes" : "No", price: q.odds_dec }));
     if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
-    if (!mk.length) return;
-    st.n++; out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", bookmakers: [{ key: "bet365", title: "Bet365", markets: mk }] });
+    if (!mk.length && !live) return;
+    st.n++; if (live) st.live++;
+    out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", mov_live: live, mov_score: x.score || "", mov_min: x.clock && x.clock.min != null ? x.clock.min : null, bookmakers: mk.length ? [{ key: "bet365", title: "Bet365", markets: mk }] : [] });
   });
   return { out, st };
 }
-async function movLoad() {
-  const msg = document.getElementById("movMsg"); if (msg) msg.textContent = "Descargando cuotas de Bet365...";
+async function movLoad(silent) {
+  const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
+  if (!silent) say("Descargando cuotas de Bet365...");
   try {
     const res = await fetch("https://moviodds.com/odds?sport=soccer"); if (!res.ok) throw new Error("HTTP " + res.status);
     const { out, st } = movConvert(await res.json());
-    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { if (msg) msg.textContent = "No cabe en el almacenamiento del navegador."; return; }
-    if (msg) msg.textContent = `Bet365: ${st.n} partidos (${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`;
-  } catch (e) { if (msg) msg.textContent = "No se pudo descargar: " + e.message; return; }
-  hbPicksRender();
+    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
+    say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`);
+  } catch (e) { say("No se pudo descargar Bet365: " + e.message); return; }
+  try { hbPicksRender(); } catch (e) {}
+  try { if (document.getElementById("cpChips")) renderCoupon(); } catch (e) {}
+  try { renderDdChips(); } catch (e) {}
 }
+let movTimer = null;
+function movAutoSet(on) { try { localStorage.setItem("radar-mov-auto", on ? "1" : "0"); } catch (e) {} clearInterval(movTimer); if (on) { movLoad(true); movTimer = setInterval(() => movLoad(true), 120000); } }
+function movAutoInit() { let on = false; try { on = localStorage.getItem("radar-mov-auto") === "1"; } catch (e) {} document.querySelectorAll(".movAuto").forEach(c => { c.checked = on; }); if (on) movAutoSet(true); }
 function movAugment(items) {
   const c = movGet(); if (!c || !c.data.length) return items;
   const norm = (x) => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
-  const mv = c.data.map(m => ({ m, h: norm(m.home_team), a: norm(m.away_team), t: Date.parse(m.commence_time), used: false }));
+  if (!c.mv) c.mv = c.data.map(m => ({ m, h: norm(m.home_team), a: norm(m.away_team), t: Date.parse(m.commence_time) }));
+  const used = new Set();
   const out = items.map(it => {
     const t = Date.parse(it.m.commence_time), h = norm(it.m.home_team), a = norm(it.m.away_team);
-    const f = mv.find(z => !z.used && Math.abs(z.t - t) < 4 * 3600000 && near(z.h, h) && near(z.a, a));
-    if (!f) return it; f.used = true;
-    if ((it.m.bookmakers || []).some(b => b.key.includes("bet365"))) return it;
-    return { ...it, m: { ...it.m, bookmakers: [...(it.m.bookmakers || []), f.m.bookmakers[0]] } };
+    const f = c.mv.find(z => !used.has(z) && Math.abs(z.t - t) < 4 * 3600000 && near(z.h, h) && near(z.a, a));
+    if (!f) return it; used.add(f);
+    const nb = f.m.bookmakers[0], flag = { mov_live: f.m.mov_live, mov_score: f.m.mov_score, mov_min: f.m.mov_min };
+    if (!nb) return { ...it, m: { ...it.m, ...flag } };
+    const old = (it.m.bookmakers || []).find(b => b.key.includes("bet365")), keys = new Set(nb.markets.map(x => x.key));
+    const merged = { ...nb, markets: [...nb.markets, ...(old ? old.markets.filter(x => !keys.has(x.key)) : [])] };
+    return { ...it, m: { ...it.m, ...flag, bookmakers: [...(it.m.bookmakers || []).filter(b => !b.key.includes("bet365")), merged] } };
   });
-  mv.filter(z => !z.used).forEach(z => out.push({ m: z.m, l: { id: "mov", nm: z.m.mov_league, fl: "🌍", odds: "mov" } }));
+  c.mv.filter(z => !used.has(z)).forEach(z => { if (z.m.bookmakers.length) out.push({ m: z.m, l: { id: "mov", nm: z.m.mov_league, fl: "🌍", odds: "mov" } }); });
   return out;
 }
 function hbPickPrice(m, sel, bk) {
@@ -2854,7 +2870,8 @@ function hbPicksRender() {
   const q = (document.getElementById("hbPQ").value || "").trim().toLowerCase(), now = Date.now(), lgs = Object.keys(hbData), names = {};
   lgs.forEach(l => { names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]; });
   const out = []; let seen = 0;
-  movAugment(cpAll()).forEach(({ m }) => {
+  cpAll().forEach(({ m }) => {
+    if (m.mov_live) return;
     const t = Date.parse(m.commence_time); if (t < now - 3600000 || t > now + 8 * 86400000) return; seen++;
     let lg = null, hn = null, an = null;
     const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
@@ -3379,7 +3396,7 @@ function cpAll() {
     else { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) data = c.data; } catch (e) {} }
     (data || []).forEach(m => out.push({ m, l }));
   });
-  return out;
+  return movAugment(out);
 }
 function cpPick(bks, mk, key) {
   const rows = bks.map(b => { const m = b.markets.find(x => x.key === mk); return m ? { b: b.key, o: mk === "totals" ? m.outcomes.filter(x => x.point === 2.5) : m.outcomes } : null; }).filter(Boolean);
@@ -3387,7 +3404,7 @@ function cpPick(bks, mk, key) {
   rows.forEach(r => { const names = r.o.map(outcomeKey); if (names.includes(key) && r.o.length > 1) { const ip = r.o.map(x => 1 / x.price), t = ip.reduce((a, c) => a + c, 0); fairs.push(ip[names.indexOf(key)] / t); } });
   let shown = null;
   for (const fb of (pfActive().books || [])) { shown = rows.find(r => r.b === fb); if (shown) break; }
-  shown = shown || rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b));
+  shown = shown || rows.find(r => DISPLAY_BOOKMAKER_MATCH.some(d => r.b.toLowerCase().includes(d))) || rows.find(r => REFERENCE_BOOKMAKERS.includes(r.b)) || rows.find(r => r.b.includes("bet365")) || rows[0];
   if (!shown) return null;
   const o = shown.o.find(x => outcomeKey(x) === key); if (!o) return null;
   const fair = fairs.length >= 2 ? fairs.reduce((a, c) => a + c, 0) / fairs.length : null;
@@ -3543,6 +3560,7 @@ async function openMatchSheet(home, away, leagueId, leagueName) {
   ov.style.display = "flex"; document.body.style.overflow = "hidden";
   msCtx = home; msCtx2 = { home, away, leagueId };
   const head = `<div class="ms-title">${home} <span style="color:#3ECF8E">vs</span> ${away}</div><div class="ms-sub">${leagueName || ""} · <a href="#" style="color:#3ECF8E;" onclick="msGoOdds(); return false;">Ver cuotas y valor →</a> · <a href="#" style="color:#3ECF8E;" onclick="msGoExplore(); return false;">Explorar mercados →</a></div>`;
+  if (leagueId === "mov") { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Esta liga solo tiene cuotas de Bet365; no hay ficha con estadísticas.</div>`; return; }
   if (!getFootballKey() && !getFdKey()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
   const season = document.getElementById("trSeason").value || 2024;
   body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Cargando datos de la temporada ${season}...</div>`;
@@ -3755,7 +3773,7 @@ function renderCoupon() {
   let base = cpAll().filter(x => Date.parse(x.m.commence_time) >= now - 3 * 3600000);
   if (cp.dayOff != null) { const t0 = day0.getTime() + cp.dayOff * 86400000; base = base.filter(x => { const t = Date.parse(x.m.commence_time); return t >= t0 && t < t0 + 86400000; }); }
   if (cp.q) base = base.filter(x => x.m.home_team.toLowerCase().includes(cp.q) || x.m.away_team.toLowerCase().includes(cp.q));
-  document.getElementById("cpChips").innerHTML = pfLeaguesOrdered().map(l => { const n = base.filter(x => x.l.id === l.id).length; return `<div class="chip ${cp.leagues.includes(l.id) ? "active" : ""}" onclick="cpToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span><span class="ct ${n ? "" : "zero"}">${n}</span></div>`; }).join("");
+  document.getElementById("cpChips").innerHTML = [...pfLeaguesOrdered(), { id: "mov", fl: "🌍", nm: "Otras ligas (Bet365)" }].map(l => { const n = base.filter(x => x.l.id === l.id).length; return `<div class="chip ${cp.leagues.includes(l.id) ? "active" : ""}" onclick="cpToggleLeague('${l.id}')"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span><span class="ct ${n ? "" : "zero"}">${n}</span></div>`; }).join("");
   if (!cpAll().length) { document.getElementById("cpCount").textContent = ""; document.getElementById("cpPages").innerHTML = ""; el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Aún no hay cuotas cargadas. Ve a "Partidos y valor" y pulsa "Actualizar cuotas" (cada liga que cargues se guarda aquí).</div>'; return; }
   let rows = base.filter(x => !cp.leagues.length || cp.leagues.includes(x.l.id)).map(x => {
     const cells = CP_COLS.filter(c => cp.cols.includes(c[2])).map(c => { const key = c[1] === "home" ? x.m.home_team : c[1] === "away" ? x.m.away_team : c[1]; return { lab: c[2], r: cpPick(x.m.bookmakers, c[0], key) }; });
@@ -3777,7 +3795,7 @@ function renderCoupon() {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
     if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
-    html += `<tr><td class="cm" onclick="openMatchSheet('${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgm"><div class="pgm-top"><span class="lgtag">${r.l.fl} ${r.l.nm}</span><span>${hm}</span></div><div class="pgm-t">${r.m.home_team}</div><div class="pgm-vs">vs</div><div class="pgm-t">${r.m.away_team}</div><div style="margin-top:6px; display:flex; gap:6px;"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
+    html += `<tr><td class="cm" onclick="openMatchSheet('${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgm"><div class="pgm-top"><span class="lgtag">${r.l.fl} ${r.l.nm}</span><span>${r.m.mov_live ? `<b style="color:#E5484D;">● EN VIVO ${r.m.mov_score || ""}${r.m.mov_min != null ? " " + r.m.mov_min + "'" : ""}</b>` : hm}</span></div><div class="pgm-t">${r.m.home_team}</div><div class="pgm-vs">vs</div><div class="pgm-t">${r.m.away_team}</div><div style="margin-top:6px; display:flex; gap:6px;"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${safe}', '${r.m.away_team.replace(/'/g, "\\'")}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button></div></div></td>` +
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : ""; return `<td><span class="codd ${cls}" title="${c.r.ev != null ? "EV " + (c.r.ev * 100).toFixed(1) + "%" : "sin prob. justa"}">${c.r.price.toFixed(2)}</span></td>`; }).join("") + "</tr>" +
       `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}</tr>`;
   });
