@@ -4050,11 +4050,12 @@ async function vsRefFetch(ev) {
 function vsMTab(t) { vsM.tab = t; vsMatchDraw(); }
 function vsMatchDraw() {
   const M = vsM, box = document.getElementById("vsMatchBox"), d = new Date(M.date), tabs = [["prev", "Previa"], ["lin", "Alineaciones"], ["arb", "Árbitro"], ["cla", "Clasificación"]];
-  const body = M.tab === "prev" ? vsMPrev() : M.tab === "lin" ? vsMLin() : M.tab === "arb" ? vsMArb() : vsMCla();
+  const body = M.tab === "prev" ? vsMPrev() + `<div class="vs-card2" id="vsBsdAv" style="margin-top:14px;"><b>Estadísticas de BSD</b><div class="muted" style="font-size:12px; margin-top:6px;">Cargando…</div></div>` : M.tab === "lin" ? vsMLin() : M.tab === "arb" ? vsMArb() : vsMCla();
   box.innerHTML = `<a class="vs-back" onclick="vsBack()">← Volver</a><div class="vs-head" style="justify-content:space-between; padding:22px 40px;"><a class="vs-a" style="text-align:center;" onclick="vsTeam('${M.slug}','${M.hid}')">${vsLg(M.hid, "big")}<h2 style="font-size:20px; margin-top:6px;">${M.hn}</h2></a>
     <div style="text-align:center;"><div class="muted" style="font-size:12px;">${M.lg || ""}</div><div style="font-size:30px; font-weight:800; margin:4px 0;">${d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</div><div class="muted" style="font-size:12px;">${d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })}${M.venue ? " · " + M.venue : ""}</div></div>
     <a class="vs-a" style="text-align:center;" onclick="vsTeam('${M.slug}','${M.aid}')">${vsLg(M.aid, "big")}<h2 style="font-size:20px; margin-top:6px;">${M.an}</h2></a></div>
     <div class="vs-tabs" style="justify-content:center;">${tabs.map(([k, t]) => `<span class="${M.tab === k ? "on" : ""}" style="cursor:pointer;" onclick="vsMTab('${k}')">${t}</span>`).join("")}</div><div style="padding:16px 22px 22px;">${body}</div>`;
+  if (M.tab === "prev") vsBsdAvFill();
 }
 function vsMPrev() {
   const M = vsM, H = M.ms[M.hid] || [], A = M.ms[M.aid] || [], f1 = v => (Math.round(v * 10) / 10).toString().replace(".", ","), av = (a, k) => a.length ? a.reduce((x, m) => x + (m.a[k] || 0), 0) / a.length : 0;
@@ -4068,6 +4069,26 @@ function vsMPrev() {
     <div class="vs-g2" style="margin-top:14px;">${trend(H, M.hid, M.hn)}${trend(A, M.aid, M.an)}</div>
     <div class="vs-card2" style="margin-top:14px;"><b>Enfrentamientos directos ${h2h.length ? `<small class="muted">· ${h2h.length}</small>` : ""}</b>${h2h.length ? `<div style="display:flex; justify-content:center; gap:30px; margin:10px 0; text-align:center; font-size:12px;"><div><div style="font-size:24px; font-weight:800; color:var(--v-g);">${hw}</div>victorias ${M.hn}</div><div><div style="font-size:24px; font-weight:800;">${h2h.length - hw - aw}</div>empates</div><div><div style="font-size:24px; font-weight:800; color:var(--v-g);">${aw}</div>victorias ${M.an}</div></div>` + h2h.map(x => `<div style="display:flex; gap:10px; font-size:12.5px; padding:5px 0; border-top:1px solid #edf2ef;"><span class="muted" style="width:70px;">${vsFmtD(x.d)}</span><span style="flex:1; text-align:right;">${x.hn}</span><b>${x.hs} - ${x.as}</b><span style="flex:1;">${x.an}</span></div>`).join("") : '<div class="muted" style="margin-top:6px; font-size:12px;">ESPN no devuelve enfrentamientos recientes entre estos equipos.</div>'}</div>
     ${mo ? `<div class="vs-card2" style="margin-top:14px;"><b>Mejores cuotas · resultado final (Bet365)</b><div style="display:flex; gap:10px; margin-top:8px;">${[["1", M.hn, mo.h], ["X", "Empate", mo.d], ["2", M.an, mo.a]].map(([a, n, o]) => `<div style="flex:1; text-align:center; background:#f1f5f2; border-radius:10px; padding:10px;"><div class="muted" style="font-size:11px;">${a} · ${n}</div><div style="font-size:22px; font-weight:800;">${o ? o.toFixed(2) : "–"}</div></div>`).join("")}</div></div>` : ""}`;
+}
+
+/* ===== Medias de BSD por equipo (entradas, pases, córners, faltas…) de sus últimos partidos ===== */
+const VS_BSDK = [["Entradas", "tackles"], ["Pases", "passes"], ["Faltas", "fouls"], ["Córners", "corner_kicks"], ["Tarjetas amarillas", "yellow_cards"], ["Tiros", "total_shots"], ["Tiros a puerta", "shots_on_target"], ["Intercepciones", "interceptions"], ["Despejes", "clearances"], ["Posesión (%)", "ball_possession"]];
+async function vsBsdTeamAvg(tid, n) {
+  const ck = "radar-bsd-ta"; let st = {}; try { st = JSON.parse(localStorage.getItem(ck) || "{}"); } catch (e) { }
+  const c = st[tid]; if (c && Date.now() - c.t < 12 * 36e5 && c.n === n) return c.a;
+  const j = await bsdGet(`events/?team_id=${tid}&status=finished&limit=${n}`), evs = (j.results || []).filter(e => e.home_team_id != null), sum = {}, cnt = {}; let games = 0;
+  await prPool(evs, 4, async e => { try { const r = await bsdGet(`events/${e.id}/stats/`), side = String(e.home_team_id) === String(tid) ? "home" : "away", x = r.stats && r.stats[side]; if (!x) return; games++;
+    VS_BSDK.forEach(([, k]) => { let v = x[k]; if (v && typeof v === "object") v = v.value; if (typeof v === "number") { sum[k] = (sum[k] || 0) + v; cnt[k] = (cnt[k] || 0) + 1; } }); } catch (er) { } });
+  const a = { games }; VS_BSDK.forEach(([, k]) => { if (cnt[k]) a[k] = sum[k] / cnt[k]; });
+  try { st[tid] = { t: Date.now(), n, a }; localStorage.setItem(ck, JSON.stringify(st)); } catch (e) { } return a;
+}
+async function vsBsdAvFill() {
+  const box = document.getElementById("vsBsdAv"), M = vsM; if (!box) return;
+  const ev = M.bsd && M.bsd.ev; if (!ev || !ev.home_team_id) { box.innerHTML = `<b>Estadísticas de BSD</b><div class="muted" style="font-size:12px; margin-top:6px;">BSD no tiene este partido, así que no puedo sacar las medias de sus equipos.</div>`; return; }
+  try { const [h, a] = await Promise.all([vsBsdTeamAvg(ev.home_team_id, 6), vsBsdTeamAvg(ev.away_team_id, 6)]); if (!document.getElementById("vsBsdAv")) return;
+    const f1 = v => v == null ? "–" : (Math.round(v * 10) / 10).toString().replace(".", ","), rows = VS_BSDK.filter(([, k]) => h[k] != null || a[k] != null).map(([lab, k]) => { const x = h[k] || 0, y = a[k] || 0, mx = Math.max(x, y, 0.01); return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span>${f1(h[k])}</span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span>${f1(a[k])}</span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#e3ebe6; border-radius:3px; display:flex; justify-content:flex-end;"><div style="width:${x / mx * 100}%; background:var(--v-g,#2e9e5b); border-radius:3px;"></div></div><div style="flex:1; background:#e3ebe6; border-radius:3px;"><div style="width:${y / mx * 100}%; background:#6b7f74; border-radius:3px;"></div></div></div></div>`; }).join("");
+    box.innerHTML = `<b>Estadísticas de BSD <small class="muted">· medias de sus últimos ${Math.max(h.games, a.games)} partidos</small></b>${rows || `<div class="muted" style="font-size:12px; margin-top:6px;">BSD no tiene estadísticas de partidos recientes de estos equipos.</div>`}<div class="muted" style="font-size:11px; margin-top:8px;">${M.hn} a la izquierda · ${M.an} a la derecha. Incluye todas las competiciones que cubre BSD.</div>`;
+  } catch (e) { box.innerHTML = `<b>Estadísticas de BSD</b><div class="muted" style="font-size:12px; margin-top:6px;">${e.message}</div>`; }
 }
 function vsMOdds(hn, an, date) { const c = movGet(); if (!c) return null; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), t = Date.parse(date), m = c.data.find(x => near(nm(x.home_team), nm(hn)) && near(nm(x.away_team), nm(an)) && Math.abs(Date.parse(x.commence_time) - t) < 6 * 3600000), bk = m && (m.bookmakers || [])[0], mk = bk && bk.markets.find(k => k.key === "h2h"); if (!mk) return null; const g = n => (mk.outcomes.find(o => o.name === n) || {}).price; return { h: g(m.home_team), d: g("Draw"), a: g(m.away_team) }; }
 function vsMLinB() {
