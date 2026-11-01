@@ -609,6 +609,7 @@
   .alp-rng input::-webkit-slider-runnable-track { background:transparent; } .alp-rng input::-moz-range-track { background:transparent; }
   .alp-save { text-align:center; margin:22px 0 26px; } .alp-save > b { display:block; font-size:12px; margin-bottom:6px; } .alp-save input { width:240px; text-align:center; display:block; margin:0 auto 10px; }
   @media (max-width:700px){ .alp-box,.alp-box.w3 { max-width:none; flex:1 1 100%; } .alp-top { gap:14px; } }
+  .lvxs { display:flex; flex-wrap:wrap; gap:4px 8px; margin-top:6px; justify-content:center; } .lvx { font-size:10.5px; color:#E6EAF0; background:#0D1117; border:1px solid #1A212B; border-radius:8px; padding:2px 7px; white-space:nowrap; } .lvx i { font-style:normal; color:#7C8797; margin-right:3px; }
   .al-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
   .al-grid label { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#7C8797; }
   .al-grid input, .al-grid select { width:100%; }
@@ -857,7 +858,7 @@
       <div class="pg-main" style="padding:0 6px 10px;"><div id="lvHead"></div><div id="live-scores" class="lv-list2"></div></div>
     </div>
     <div id="lv-modal" class="cp-modal" onclick="if (event.target === this) lvPopClose()"><div class="cp-mbox"><div class="cp-mh"><b id="lvMT"></b><button class="pg-nav" onclick="lvPopClose()" style="width:30px; height:30px; font-size:14px;">✕</button></div><div id="lvMB"></div><div style="margin-top:14px; text-align:right;"><button class="small" onclick="lvPopClose()">Listo</button></div></div></div>
-    <div class="muted" style="text-align:center; font-size:11px; margin-top:12px;">Marcador y minutos de gol: API-Football (1 petición por actualización). Cuotas en directo: bet365 vía MoviOdds si pulsaste «Cuotas Bet365» en Backtesting → Picks. «b» = cuota justa estimada.</div>
+    <div class="muted" style="text-align:center; font-size:11px; margin-top:12px;">Marcador, minuto, cuotas y estadísticas (córners, tiros, posesión, xG, tarjetas) en directo: bet365 vía MoviOdds, gratis. Los minutos de gol del cronograma vienen de API-Football (1 petición por actualización). «b» = cuota justa estimada.</div>
   </div>
 
   <div id="view-lineups" class="view">
@@ -1298,7 +1299,7 @@
               <label id="alWToL">Hasta el minuto<input id="alWTo" type="number" min="1" max="120" placeholder="75" /></label>
               <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
             </div>
-            <small>Ej.: "Tiros a puerta · cualquiera · al menos 3 · entre el 60 y el 75". Los tiros se calculan comparando fotos de las estadísticas cada ~90 s: la app debe estar abierta.</small>
+            <small>Ej.: "Tiros a puerta · cualquiera · al menos 3 · entre el 60 y el 75". Las estadísticas (tiros, córners, tarjetas) vienen de Bet365 en directo y se comprueban cada minuto: la app debe estar abierta.</small>
           </div>
         </div>
       </div>
@@ -3161,6 +3162,8 @@ function hbNowMetrics(l, home, away) {
 /* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
 const MOV_KEY = "radar-valor-mov-cache";
 function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
+const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
+function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; return { h: f(st.home), a: f(st.away), t: st.updated_at || null }; }
 function movConvert(d) {
   const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0 };
   (d.matches || []).forEach(x => {
@@ -3180,7 +3183,7 @@ function movConvert(d) {
     if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
     if (!mk.length && !live) return;
     st.n++; if (live) st.live++;
-    out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", mov_live: live, mov_score: x.score || "", mov_min: x.clock && x.clock.min != null ? x.clock.min : null, bookmakers: mk.length ? [{ key: "bet365", title: "Bet365", markets: mk }] : [] });
+    out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", mov_live: live, mov_score: x.score || "", mov_min: x.clock && x.clock.min != null ? x.clock.min : null, mov_stats: movStatsCompact(x.stats), bookmakers: mk.length ? [{ key: "bet365", title: "Bet365", markets: mk }] : [] });
   });
   return { out, st };
 }
@@ -3188,16 +3191,21 @@ async function movLoad(silent) {
   const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
   if (!silent) say("Descargando cuotas de Bet365...");
   try {
-    const res = await fetch("https://moviodds.com/odds?sport=soccer"); if (!res.ok) throw new Error("HTTP " + res.status);
-    const { out, st } = movConvert(await res.json());
+    const [res, rs] = await Promise.all([fetch("https://moviodds.com/odds?sport=soccer"), fetch("https://moviodds.com/odds?sport=soccer&in_play=1&stats=1").catch(() => null)]);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const dj = await res.json();
+    try { if (rs && rs.ok) { const lj = await rs.json(), by = {}; (lj.matches || []).forEach(m => { by[m.id] = m; }); const have = new Set((dj.matches || []).map(m => m.id)); (dj.matches || []).forEach(m => { if (m.in_play && by[m.id]) { m.stats = by[m.id].stats; if (by[m.id].score) m.score = by[m.id].score; if (by[m.id].clock) m.clock = by[m.id].clock; } }); (lj.matches || []).forEach(m => { if (m.in_play && !have.has(m.id)) (dj.matches = dj.matches || []).push(m); }); } } catch (e) {}
+    const { out, st } = movConvert(dj);
     try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`);
-  } catch (e) { say("No se pudo descargar Bet365: " + e.message); return; }
+  } catch (e) { say("No se pudo descargar Bet365: " + e.message); return false; }
   try { hbPicksRender(); } catch (e) {}
   try { if (document.getElementById("cpChips")) renderCoupon(); } catch (e) {}
   try { if (lastSport === "mov" && pvMovSel) pvPickMov(pvMovSel); else pvMoreDraw(); } catch (e) {}
   try { renderDdChips(); } catch (e) {}
   try { hmRender(); } catch (e) {}
+  try { if (document.getElementById("view-live").classList.contains("active")) renderLive(); } catch (e) {}
+  return true;
 }
 let movTimer = null;
 function movAutoSet(on) { try { localStorage.setItem("radar-mov-auto", on ? "1" : "0"); } catch (e) {} clearInterval(movTimer); if (on) { movLoad(true); movTimer = setInterval(() => movLoad(true), 120000); } }
@@ -3642,6 +3650,11 @@ function lvTimeline(r) {
   (r.ev || []).forEach(e => { const m = e.time && e.time.elapsed; if (m == null) return; const home = e.team && e.team.id === r.hid, ic = e.type === "Goal" ? (e.detail === "Missed Penalty" ? "" : "⚽") : e.type === "Card" ? (/Red/.test(e.detail) ? '<i class="lvc r"></i>' : '<i class="lvc y"></i>') : ""; if (!ic) return; (home ? up : dn).push(`<span class="lve" style="left:${pos(m)}%" title="${m}' ${e.player && e.player.name || ""}">${ic}</span>`); });
   return `<div class="lvtl"><div class="lvev up">${up.join("")}</div><div class="lvbar"><i style="width:${pct}%"></i><b>HT</b></div><div class="lvev dn">${dn.join("")}</div></div>`;
 }
+function lvStats(r) {
+  const s = r.hit && r.hit.m.mov_stats; if (!s) return "";
+  const p = (l, k, sfx, d) => { const a = s.h[k], b = s.a[k]; if (a == null || b == null) return ""; const f = v => d ? Number(v).toFixed(d) : v; return `<span class="lvx"><i>${l}</i> ${f(a)}${sfx || ""} - ${f(b)}${sfx || ""}</span>`; };
+  return `<div class="lvxs">${p("Córners", "corners")}${p("Tiros a puerta", "shots_on_target")}${p("Tiros", "shots")}${p("Posesión", "possession", "%")}${p("xG", "xg", "", 2)}${p("Ataq. peligrosos", "dangerous_attacks")}${p("Amarillas", "yellow_cards")}${p("Rojas", "red_cards")}</div>`;
+}
 function renderLive() {
   const el = document.getElementById("live-scores"); if (!el) return;
   let rows = lvRows(); const fav = getFavorites();
@@ -3666,7 +3679,7 @@ function renderLive() {
     const hit = r.hit, hq = r.home.replace(/'/g, "\\'"), aq = r.away.replace(/'/g, "\\'"), lq = String(r.lname).replace(/'/g, "\\'");
     const cells = lv.cols.map(c => { const d = CP_COLS.find(x => x[2] === c); if (!hit) return '<div class="lvo muted">–</div>'; const key = d[1] === "home" ? hit.m.home_team : d[1] === "away" ? hit.m.away_team : d[1]; const p = cpPick(hit.m.bookmakers, d[0], key); if (!p) return '<div class="lvo muted">–</div>'; const fo = p.fair ? 1 / p.fair : null; return `<div class="lvo">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb ${p.ev != null && p.ev >= 0.02 ? "v" : ""}"><i class="ic b3">365</i>${p.price.toFixed(2)}</div></div>`; }).join("");
     return `<div class="lvr" style="${grid}" onclick="${r.kind === "af" ? `openMatchSheet('${hq}', '${aq}', '${r.id}', '${lq}')` : ""}"><div class="lvl"><span class="lvlive">${["FT", "AET", "PEN"].includes(r.st) ? "FIN" : "LIVE"}</span><span class="lvfl">${r.flag}</span><span class="lvcode">${r.code}</span></div>
-      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div>${r.kind === "af" ? lvTimeline(r) : ""}</div>${cells}</div>`;
+      <div class="lvm"><div class="lvt"><span class="n">${r.hl ? `<img src="${r.hl}" />` : ""}${r.home}</span><span class="vs">vs</span><span class="n r">${r.away}${r.al ? `<img src="${r.al}" />` : ""}</span></div><div class="lvs">${r.gh} - ${r.ga}</div><div class="lvst">${stTxt(r)}</div>${r.kind === "af" ? lvTimeline(r) : ""}${lvStats(r)}</div>${cells}</div>`;
   }).join("") || '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>';
 }
 function lvPop(kind) {
@@ -4428,20 +4441,59 @@ function runLiveAlarms(fixtures) {
     snapSave();
   })();
 }
+const MOV_WK = { sot: "shots_on_target", soff: "shots_off_target", shots: "shots", corners: "corners", yellow: "yellow_cards", goals: "goals" };
+function movWinEval(a, m, min) {
+  const w = a.w, key = MOV_WK[w.kind], s = m.mov_stats; if (!key || !s || min == null) return null;
+  let from, to;
+  if (w.mode === "last") { from = Math.max(0, min - w.last); to = min; } else { from = w.from || 0; to = w.to; if (min < from - 3 || min > to + 2) return null; }
+  const sn = liveSnap[m.id] = liveSnap[m.id] || { t: 0, d: {} }; sn.t = Date.now();
+  const arr = sn.d[w.kind] = sn.d[w.kind] || [], cur = { m: min, h: s.h[key] || 0, a: s.a[key] || 0 }, last = arr[arr.length - 1];
+  if (!last || last.m !== cur.m || last.h !== cur.h || last.a !== cur.a) arr.push(cur); if (arr.length > 200) arr.shift();
+  const at = t => { let r = null; arr.forEach(x => { if (x.m <= t) r = x; }); return r; };
+  const end = at(Math.min(min, to)) || arr[arr.length - 1]; let base = at(from), approx = null;
+  if (!base) { base = from <= 0 ? { h: 0, a: 0, m: 0 } : arr[0]; if (from > 0) approx = arr[0].m; }
+  const h = end.h - base.h, aw = end.a - base.a, count = w.team === "home" ? h : w.team === "away" ? aw : w.team === "sum" ? h + aw : Math.max(h, aw);
+  return { count, h, aw, from, to, approx };
+}
+function runMovAlarms() {
+  const alarms = getAlarms().filter(a => a.active && a.type === "live"); if (!alarms.length) return;
+  const c = movGet(); if (!c) return; let all = []; try { all = cpAll(); } catch (e) {}
+  const fired = getAlFired(); let any = false;
+  c.data.filter(m => m.mov_live).forEach(m => {
+    const mm = /(\d+)\s*[-:]\s*(\d+)/.exec(m.mov_score || ""), gh = mm ? +mm[1] : 0, ga = mm ? +mm[2] : 0, min = m.mov_min, it = all.find(x => x.m.id === m.id), lid = it ? it.l.id : null;
+    alarms.forEach(a => {
+      if (a.leagues.length && (!lid || !a.leagues.includes(lid))) return;
+      if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
+      if (!alIn(min, a.mMin, a.mMax)) return;
+      if (a.w) {
+        const r = movWinEval(a, m, min); if (!r || r.count < a.w.min) return;
+        const k = `${a.id}|${m.id}|w|${a.w.mode === "last" ? Math.floor((min || 0) / Math.max(5, a.w.last)) : "x"}`; if (fired.has(k)) return; fired.add(k); any = true;
+        const nm = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase();
+        alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min}' · ${nm}: local ${r.h}, visitante ${r.aw} (del ${r.from}' al ${r.to}')${r.approx != null ? ` · contado desde el ${r.approx}', cuando empezó la vigilancia` : ""}`); return;
+      }
+      const k = `${a.id}|${m.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
+      alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min ?? "—"}'`);
+    });
+  });
+  snapSave(); if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
+}
 /* Vigilancia automática: consulta los partidos en vivo cada ~90 s solo si hay alarmas en vivo y partidos que deberían estar jugándose */
 let liveWatchLast = null, liveWatchState = "";
 function liveWatchWanted() {
   const al = getAlarms().filter(a => a.active && a.type === "live"); if (!al.length) { liveWatchState = "sin alarmas en vivo activas"; return false; }
-  if (!getFootballKey()) { liveWatchState = "falta la key de API-Football"; return false; }
-  const now = Date.now(), ok = cpAll().some(x => { const t = Date.parse(x.m.commence_time); return t >= now - 150 * 60000 && t <= now + 3 * 60000 && al.some(a => !a.leagues.length || a.leagues.includes(x.l.id)); });
-  liveWatchState = ok ? "activa" : "en espera (no hay partidos en juego en las ligas de tus alarmas, según las cuotas cargadas)"; return ok;
+  liveWatchState = "activa (Bet365 gratis, cada minuto)"; return true;
 }
 async function liveWatchTick() {
-  try { if (!liveWatchWanted()) { alWatchRender(); return; } const data = await apiFootball(`/fixtures?live=all`, getFootballKey()); reqTrack(1); liveWatchLast = new Date(); runLiveAlarms(data); } catch (e) { liveWatchState = "error: " + e.message; }
+  try {
+    if (!liveWatchWanted()) { alWatchRender(); return; }
+    if (await movLoad(true)) { runMovAlarms(); liveWatchLast = new Date(); }
+    else if (getFootballKey()) { const data = await apiFootball(`/fixtures?live=all`, getFootballKey()); reqTrack(1); liveWatchLast = new Date(); runLiveAlarms(data); }
+    else liveWatchState = "no se pudo descargar Bet365";
+  } catch (e) { liveWatchState = "error: " + e.message; }
   alWatchRender();
 }
 function alWatchRender() { const el = document.getElementById("alWatch"); if (!el) return; liveWatchWanted(); const n = reqToday(); el.innerHTML = `Vigilancia en vivo: <b style="color:#3ECF8E;">${liveWatchState}</b>${liveWatchLast ? " · última comprobación " + liveWatchLast.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""} · peticiones de alarmas hoy: ${n}${n >= 80 ? ' <b style="color:#F0B429;">(cerca del límite del plan gratuito: 100/día)</b>' : ""}`; }
-setInterval(liveWatchTick, 90000);
+setInterval(liveWatchTick, 60000);
 function renderCoupon() {
   const el = document.getElementById("coupon-content"); if (!el) return;
   const day0 = new Date(); day0.setHours(0, 0, 0, 0);
