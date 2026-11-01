@@ -695,6 +695,7 @@
       <div class="sidebar-section">Jugadores y tarjetas</div>
       <button class="side-btn" data-v="players" onclick="switchView('players')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg> Jugadores (props)</button>
 
+      <button class="side-btn" data-v="tteam" onclick="switchView('tteam')"><svg class="icon" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg> Rachas de equipos</button>
       <button class="side-btn" data-v="pstreak" onclick="switchView('pstreak')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h7v7"/></svg> Tendencias de jugadores</button>
       <button class="side-btn" data-v="cardsw" onclick="switchView('cardsw')"><svg class="icon" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/></svg> Jugadores apercibidos</button>
 
@@ -1433,6 +1434,23 @@
     </div>
   </div>
 
+  <div id="view-tteam" class="view vs-view">
+    <div class="pl-wrap">
+      <div class="pl-hero"><div class="pl-k">TENDENCIAS · BETA</div><h2>Rachas de equipos</h2><div class="muted">Equipos de los partidos del día con una racha seguida en goles, córners, tarjetas o tiros (por ejemplo "+2.5 goles en los últimos 6"). Se calcula con los partidos de ESPN; los ya vistos se guardan en tu navegador.</div></div>
+      <div class="pl-filters">
+        <label>Liga<select id="ttLeague"></select></label>
+        <label>Día<select id="ttDay"></select></label>
+        <label>Categoría<div class="seg" id="ttCSeg"><button class="seg-b active" data-c="all" onclick="ttSetC('all')">Todas</button><button class="seg-b" data-c="goals" onclick="ttSetC('goals')">Goles</button><button class="seg-b" data-c="corners" onclick="ttSetC('corners')">Córners</button><button class="seg-b" data-c="cards" onclick="ttSetC('cards')">Tarjetas</button><button class="seg-b" data-c="shots" onclick="ttSetC('shots')">Tiros</button></div></label>
+        <label>Localía<div class="seg" id="ttVSeg"><button class="seg-b active" data-c="all" onclick="ttSetV('all')">Todos</button><button class="seg-b" data-c="venue" onclick="ttSetV('venue')">Mismo campo</button></div></label>
+        <label><span>Racha mínima: <b id="ttMinL">5</b>+</span><input id="ttMin" type="range" min="3" max="12" value="5" oninput="document.getElementById('ttMinL').textContent=this.value" /></label>
+        <button id="ttBtn" onclick="ttSearch()">Buscar rachas</button>
+      </div>
+      <div id="ttMsg" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+      <div class="pl-bar2"><div id="ttCount" style="font-weight:700;"></div><input id="ttQ" type="text" placeholder="Equipo" oninput="ttRender()" /></div>
+      <div id="ttGrid" class="prg-grid"></div>
+    </div>
+  </div>
+
   <div id="view-vsteam" class="view vs-view"><div class="pl-wrap" id="vsTeamBox"></div></div>
   <div id="view-vsplayer" class="view vs-view"><div class="pl-wrap" id="vsPlayerBox"></div></div>
 
@@ -1565,7 +1583,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1579,6 +1597,7 @@ function switchView(v) {
   if (v === "cardsw") apInit();
   if (v === "refs") rfInit();
   if (v === "pstreak") tpInit();
+  if (v === "tteam") ttInit();
   if (v === "profile") pfRender();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
@@ -3848,6 +3867,51 @@ function vsLg(id, cls) { return `<img class="${cls || "vs-lg"}" src="${VS_LOGO(i
 function vsWho(r) { return `<div class="vs-who">${vsPh(r.pid)}<div style="min-width:0;"><a class="nm vs-a" onclick="vsPlayer('${r.slug}','${r.tid}','${r.pid}')">${r.name}</a><div class="tm">${vsLg(r.tid)}<a class="vs-a" onclick="vsTeam('${r.slug}','${r.tid}')">${r.team}</a>${r.pos ? `<span class="vs-tag">${r.pos}</span>` : ""}</div></div></div>`; }
 function vsDayTabs(selId) { const sel = document.getElementById(selId); if (!sel || sel.dataset.t) return; sel.dataset.t = 1; const bar = document.createElement("div"); bar.className = "vs-days"; const draw = () => { bar.innerHTML = [...sel.options].map(o => `<button class="${o.value === sel.value ? "on" : ""}" data-v="${o.value}"><b>${o.text.split(" · ")[0]}</b><span>${o.text.split(" · ")[1] || ""}</span></button>`).join(""); bar.querySelectorAll("button").forEach(b => b.onclick = () => { sel.value = b.dataset.v; draw(); }); }; draw(); const lab = sel.closest("label"); lab.style.display = "none"; lab.closest(".pl-filters").before(bar); }
 
+
+/* ===== Rachas de equipos (ESPN) ===== */
+let ttRes = [], ttBusy = false, ttC = "all", ttV = "all";
+const TT_DEF = { goals: [["Goles del partido", (m, t) => m.c[0].s + m.c[1].s, [1.5, 2.5, 3.5]], ["Goles del equipo", (m, t) => (m.c.find(x => x.id === t) || {}).s, [1, 2]], ["Ambos marcan", (m, t) => (m.c[0].s > 0 && m.c[1].s > 0) ? 1 : 0, [1]]],
+  corners: [["Córners del partido", (m, t) => ((m.ts[m.c[0].id] || {}).wonCorners || 0) + ((m.ts[m.c[1].id] || {}).wonCorners || 0), [8.5, 9.5, 10.5, 11.5]]],
+  cards: [["Tarjetas del partido", (m, t) => [0, 1].reduce((a, i) => a + ((m.ts[m.c[i].id] || {}).yellowCards || 0) + ((m.ts[m.c[i].id] || {}).redCards || 0), 0), [2.5, 3.5, 4.5, 5.5]]],
+  shots: [["Tiros del equipo", (m, t) => (m.ts[t] || {}).totalShots || 0, [10, 12, 14]], ["Tiros a puerta del equipo", (m, t) => (m.ts[t] || {}).shotsOnTarget || 0, [4, 5, 6]]] };
+function ttInit() { prInit(); ["ttLeague", "ttDay"].forEach(id => { const el = document.getElementById(id); if (el && !el.dataset.x) { el.dataset.x = 1; el.innerHTML = document.getElementById(id === "ttLeague" ? "plLeague" : "plDay").innerHTML; } }); vsDayTabs("ttDay"); }
+function ttSetC(c) { ttC = c; document.querySelectorAll("#ttCSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.c === c)); if (ttRes.length) ttRender(); }
+function ttSetV(c) { ttV = c; document.querySelectorAll("#ttVSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.c === c)); if (document.getElementById("ttGrid").dataset.ok) ttSearch(); }
+async function ttSearch() {
+  if (ttBusy) return; prCacheLoad(); ttBusy = true;
+  const $ = id => document.getElementById(id), msg = $("ttMsg"), btn = $("ttBtn"), slug = $("ttLeague").value, dayOff = +$("ttDay").value, minS = +$("ttMin").value;
+  btn.disabled = true; ttRes = []; $("ttGrid").innerHTML = ""; $("ttCount").textContent = "";
+  try {
+    const d = new Date(Date.now() + dayOff * 864e5), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    msg.textContent = "Buscando partidos…"; const sb = await espnGet(`${slug}/scoreboard?dates=${ds}`), evs = (sb.events || []).filter(e => !(e.status && e.status.type && e.status.type.completed));
+    if (!evs.length) { msg.textContent = "No hay partidos pendientes ese día en esta liga."; return; }
+    const teams = new Map(); evs.forEach(e => (((e.competitions || [])[0] || {}).competitors || []).forEach(c => teams.set(String(c.team.id), c.team.displayName || c.team.name)));
+    const take = Math.max(14, minS + 4), sched = {}; let n = 0;
+    await prPool([...teams.keys()], 5, async id => { try { const sc = await espnGet(`${slug}/teams/${id}/schedule`); sched[id] = (sc.events || []).filter(vsDone).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, take).map(e => String(e.id)); } catch (e) { sched[id] = []; } msg.textContent = `Calendarios ${++n}/${teams.size}`; });
+    await vsEnsure(slug, [...new Set(Object.values(sched).flat())], msg, true);
+    const res = [];
+    evs.forEach(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return;
+      [[hc, ac, 1], [ac, hc, 0]].forEach(([me, rv, isH]) => { const tid = String(me.team.id); let ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(m => m && m.v === 2 && m.c && m.c.length === 2);
+        if (ttV === "venue") ms = ms.filter(m => { const x = m.c.find(y => y.id === tid); return x && !!x.h === !!isH; });
+        const pats = []; Object.keys(TT_DEF).forEach(cat => TT_DEF[cat].forEach(([label, fn, ths]) => { let best = null;
+          ths.forEach(t => { let k = 0; while (k < ms.length && fn(ms[k], tid) >= t + (t % 1 ? .5 : 0)) k++; if (k >= minS && (!best || t > best.t || (t === best.t && k > best.k))) best = { t, k }; });
+          if (best) { const th = best.t + (best.t % 1 ? .5 : 0), last10 = ms.slice(0, 10); pats.push({ cat, label, t: best.t, k: best.k, vals: ms.slice(0, Math.max(best.k, 8)).map(m => fn(m, tid)), th, h10: last10.filter(m => fn(m, tid) >= th).length, n10: last10.length }); } }));
+        if (pats.length) res.push({ slug, tid, team: me.team.displayName || me.team.name, rival: rv.team.displayName || rv.team.name, home: !!isH, time: e.date, lg: (sb.leagues && sb.leagues[0] && sb.leagues[0].name) || slug, pats, max: Math.max(...pats.map(x => x.k)) }); }); });
+    res.sort((a, b) => b.max - a.max || b.pats.length - a.pats.length); ttRes = res; $("ttGrid").dataset.ok = 1;
+    msg.textContent = res.length ? "" : "Ningún equipo llega a esa racha. Baja la racha mínima.";
+    ttRender();
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  finally { ttBusy = false; btn.disabled = false; }
+}
+function ttRender() {
+  const q = (document.getElementById("ttQ").value || "").trim().toLowerCase(), list = ttRes.map(r => ({ ...r, pats: r.pats.filter(x => ttC === "all" || x.cat === ttC) })).filter(r => r.pats.length && (!q || r.team.toLowerCase().includes(q) || r.rival.toLowerCase().includes(q)));
+  document.getElementById("ttCount").innerHTML = ttRes.length ? `<span class="vs-pill">${list.length}</span> equipos con racha` : "";
+  const fm = t => String(t).replace(".", ",");
+  document.getElementById("ttGrid").innerHTML = list.slice(0, 120).map(r => `<div class="plc"><div class="h"><span>${r.lg}</span><b>${new Date(r.time).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</b></div>
+    <div style="display:flex; align-items:center; gap:10px; margin:6px 0;">${vsLg(r.tid)}<div><b>${r.team}</b><div class="muted" style="font-size:11.5px;">${r.home ? "vs" : "en casa de"} ${r.rival} · ${r.home ? "en casa" : "fuera"}</div></div></div>
+    ${r.pats.sort((a, b) => b.k - a.k).map(x => `<div style="margin-top:8px;"><div class="hit" style="padding:6px 10px;"><span><b>${x.label}${x.label === "Ambos marcan" ? "" : " +" + fm(x.t % 1 ? x.t : x.t - .5)}</b></span><div class="bar"><i style="width:${Math.min(100, x.k / 12 * 100)}%"></i></div><b class="p" style="font-size:15px;">L${x.k}</b></div><div class="res" style="margin-top:5px;"><span style="background:var(--v-bg2);">últ. 10: ${x.h10}/${x.n10}</span>${x.vals.map(v => `<span class="${v >= x.th ? "y" : ""}">${Math.round(v * 10) / 10}</span>`).join("")}</div></div>`).join("")}
+    <div class="vs-ft"><a class="vs-a" onclick="vsTeam('${r.slug}','${r.tid}')">Ver equipo →</a></div></div>`).join("") || (ttRes.length ? '<div class="muted" style="grid-column:1/-1; text-align:center; padding:16px;">Nada en esta categoría.</div>' : "");
+}
 /* ===== Ficha de equipo y de jugador (estilo ValueStats, datos ESPN) ===== */
 let vsFrom = "players", vsT = { slug: null, tid: null, lim: 20, loc: "all", sel: "all" }, vsP = { slug: null, tid: null, pid: null, lim: 20, loc: "all", start: false };
 function vsBack() { switchView(vsFrom || "players"); }
