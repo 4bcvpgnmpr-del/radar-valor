@@ -3865,7 +3865,7 @@ const VS_IMG = id => `https://a.espncdn.com/i/headshots/soccer/players/full/${id
 const VS_HEAD = {}, VS_NM = {};
 function vsPh(id, cls) { return `<img class="${cls || "vs-ph"}" src="${VS_HEAD[id] || vsPCget()[id] || VS_IMG(id)}" loading="lazy" referrerpolicy="no-referrer" onerror="vsPhErr(this,'${id}')" />`; }
 let vsPC = null, vsQ = [], vsQB = false;
-function vsPCget() { if (!vsPC) { try { vsPC = JSON.parse(localStorage.getItem("radar-photo-cache") || "{}"); } catch (e) { vsPC = {}; } } return vsPC; }
+function vsPCget() { if (!vsPC) { try { vsPC = JSON.parse(localStorage.getItem("radar-photo-cache2") || "{}"); } catch (e) { vsPC = {}; } } return vsPC; }
 function vsPhErr(el, id) {
   const c = vsPCget(), cls = el.className, n = (VS_NM[id] || "?").split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase(), d = document.createElement("span");
   d.className = cls; d.dataset.pid = id; d.textContent = n; d.style.cssText = "display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:#1f6b4a;font-size:" + (/big/.test(cls) ? 28 : 15) + "px"; el.replaceWith(d);
@@ -3881,7 +3881,7 @@ async function vsPhRun() {
     if (!u) { try { const j = await (await fetch("https://es.wikipedia.org/w/api.php?action=query&generator=search&gsrlimit=1&prop=pageimages&piprop=thumbnail&pithumbsize=160&format=json&origin=*&gsrsearch=" + encodeURIComponent(VS_NM[id] + " futbolista"))).json(), pg = Object.values((j.query || {}).pages || {})[0]; u = (pg && pg.thumbnail && pg.thumbnail.source) || ""; } catch (e) { } }
     if (!u) { try { const j = await (await fetch("https://www.thesportsdb.com/api/v1/json/3/searchplayers.php?p=" + encodeURIComponent(VS_NM[id]))).json(), pl = (j.player || []).find(x => x.strSport === "Soccer") || (j.player || [])[0]; u = (pl && (pl.strCutout || pl.strThumb)) || ""; } catch (e) { if (u === null) { vsQB = false; return; } } }
     c[id] = u || "";
-    try { localStorage.setItem("radar-photo-cache", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 700)); }
+    try { localStorage.setItem("radar-photo-cache2", JSON.stringify(c)); } catch (e) { } if (c[id]) vsPhSwap(id, c[id]); await new Promise(r => setTimeout(r, 700)); }
   vsQB = false;
 }
 function vsLg(id, cls) { return `<img class="${cls || "vs-lg"}" src="${VS_LOGO(id)}" loading="lazy" onerror="this.style.visibility='hidden'" />`; }
