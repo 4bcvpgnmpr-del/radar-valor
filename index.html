@@ -739,7 +739,9 @@
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
           <div style="font-weight:600; font-size:15px;">Picks del sistema</div>
           <input id="hbPQ" type="text" placeholder="Buscar..." oninput="hbPicksRender()" style="width:150px;" />
+          <button class="small ghost" onclick="movLoad()" title="Descarga gratis las cuotas de Bet365 de muchas más ligas (servicio MoviOdds, sin clave)">⬇ Cuotas Bet365</button>
         </div>
+        <div id="movMsg" class="muted" style="font-size:11px; margin-top:4px;"></div>
         <div id="hbPicks" style="margin-top:8px; overflow-x:auto;"></div>
         </div><div class="hb-win">
         <div style="font-weight:600; font-size:15px;">Descripción del sistema</div>
@@ -2784,6 +2786,53 @@ function hbNowMetrics(l, home, away) {
   const strk = (res, f) => { let k = 0; for (let i = res.length - 1; i >= 0 && f(res[i]); i--) k++; return k; };
   return { ok: true, l, hp: order.indexOf(home) + 1, ap: order.indexOf(away) + 1, hav: (h.gf + h.ga) / h.pj, aav: (a.gf + a.ga) / a.pj, hw: strk(h.res, x => x === "W"), aw: strk(a.res, x => x === "W"), hu: strk(h.res, x => x !== "L"), au: strk(a.res, x => x !== "L") };
 }
+
+/* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
+const MOV_KEY = "radar-valor-mov-cache";
+function movGet() { try { const c = JSON.parse(localStorage.getItem(MOV_KEY) || "null"); return c && c.data ? c : null; } catch (e) { return null; } }
+function movConvert(d) {
+  const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0 };
+  (d.matches || []).forEach(x => {
+    if (x.in_play || !x.home || !x.away) return;
+    const t = Date.parse(x.kickoff_utc); if (isNaN(t) || t < now - 3 * 3600000 || t > now + 8 * 86400000) return;
+    const qs = (x.quotes || []).filter(q => q.phase !== "inplay" && q.odds_dec > 1), mk = [];
+    const ft = qs.filter(q => /^Full Time Result$/i.test(q.group_name || "")), oc = [];
+    [[x.home, x.home], ["Draw", "Draw"], [x.away, x.away]].forEach(([lab, nm]) => { const q = ft.find(z => (z.label || "").trim() === lab); if (q) oc.push({ name: nm, price: q.odds_dec }); });
+    if (oc.length === 3) { mk.push({ key: "h2h", outcomes: oc }); st.h2h++; }
+    const to = qs.filter(q => /Goals Over\/Under/i.test(q.group_name || "") && (q.line || q.handicap)), tout = [];
+    to.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) tout.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) tout.push({ name: "Under", price: q.odds_dec, point: pt }); });
+    if (tout.length >= 2) { mk.push({ key: "totals", outcomes: tout }); st.tot++; }
+    const bt = qs.filter(q => /Both Teams/i.test(q.group_name || "") && /^(yes|no)$/i.test((q.label || "").trim())).map(q => ({ name: /^yes$/i.test(q.label.trim()) ? "Yes" : "No", price: q.odds_dec }));
+    if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
+    if (!mk.length) return;
+    st.n++; out.push({ id: "mov" + x.id, commence_time: new Date(t).toISOString(), home_team: x.home, away_team: x.away, mov_league: x.league || "", bookmakers: [{ key: "bet365", title: "Bet365", markets: mk }] });
+  });
+  return { out, st };
+}
+async function movLoad() {
+  const msg = document.getElementById("movMsg"); if (msg) msg.textContent = "Descargando cuotas de Bet365...";
+  try {
+    const res = await fetch("https://moviodds.com/odds?sport=soccer"); if (!res.ok) throw new Error("HTTP " + res.status);
+    const { out, st } = movConvert(await res.json());
+    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { if (msg) msg.textContent = "No cabe en el almacenamiento del navegador."; return; }
+    if (msg) msg.textContent = `Bet365: ${st.n} partidos (${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`;
+  } catch (e) { if (msg) msg.textContent = "No se pudo descargar: " + e.message; return; }
+  hbPicksRender();
+}
+function movAugment(items) {
+  const c = movGet(); if (!c || !c.data.length) return items;
+  const norm = (x) => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
+  const mv = c.data.map(m => ({ m, h: norm(m.home_team), a: norm(m.away_team), t: Date.parse(m.commence_time), used: false }));
+  const out = items.map(it => {
+    const t = Date.parse(it.m.commence_time), h = norm(it.m.home_team), a = norm(it.m.away_team);
+    const f = mv.find(z => !z.used && Math.abs(z.t - t) < 4 * 3600000 && near(z.h, h) && near(z.a, a));
+    if (!f) return it; f.used = true;
+    if ((it.m.bookmakers || []).some(b => b.key.includes("bet365"))) return it;
+    return { ...it, m: { ...it.m, bookmakers: [...(it.m.bookmakers || []), f.m.bookmakers[0]] } };
+  });
+  mv.filter(z => !z.used).forEach(z => out.push({ m: z.m, l: { id: "mov", nm: z.m.mov_league, fl: "🌍", odds: "mov" } }));
+  return out;
+}
 function hbPickPrice(m, sel, bk) {
   const mk = sel === "O" || sel === "U" ? "totals" : "h2h", key = { H: "home", D: "Draw", A: "away", O: "Over +2.5", U: "Under +2.5" }[sel];
   const want = key === "home" ? m.home_team : key === "away" ? m.away_team : key;
@@ -2805,7 +2854,7 @@ function hbPicksRender() {
   const q = (document.getElementById("hbPQ").value || "").trim().toLowerCase(), now = Date.now(), lgs = Object.keys(hbData), names = {};
   lgs.forEach(l => { names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]; });
   const out = []; let seen = 0;
-  cpAll().forEach(({ m }) => {
+  movAugment(cpAll()).forEach(({ m }) => {
     const t = Date.parse(m.commence_time); if (t < now - 3600000 || t > now + 8 * 86400000) return; seen++;
     let lg = null, hn = null, an = null;
     const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
