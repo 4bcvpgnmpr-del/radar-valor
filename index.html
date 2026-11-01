@@ -2922,7 +2922,7 @@ const HB_ORDER = ["H", "D", "A", "O", "U"];
 let hbData = {};
 function hbDb() { return new Promise((res, rej) => { const r = indexedDB.open("radar-valor-hist", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
 async function hbSave() { try { const db = await hbDb(); await new Promise((res, rej) => { const t = db.transaction("kv", "readwrite"); t.objectStore("kv").put(hbData, "hist"); t.oncomplete = res; t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); }); return true; } catch (e) { return false; } }
-async function hbLoad() { try { const db = await hbDb(); hbData = await new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get("hist"); q.onsuccess = () => res(q.result || {}); q.onerror = () => rej(q.error); }); } catch (e) { hbData = {}; } try { localStorage.removeItem(HB_KEY); } catch (e) {} }
+async function hbLoad() { try { const db = await hbDb(); hbData = await new Promise((res, rej) => { const q = db.transaction("kv").objectStore("kv").get("hist"); q.onsuccess = () => res(q.result || {}); q.onerror = () => rej(q.error); }); } catch (e) { hbData = {}; } Object.values(hbData).forEach(a => a.forEach(r => { r[5] = hbSeasNorm(r[5]); })); try { localStorage.removeItem(HB_KEY); } catch (e) {} }
 function hbCsv(text) {
   text = text.replace(/^﻿/, ""); const rows = []; let row = [], cur = "", q = false;
   for (let i = 0; i < text.length; i++) {
@@ -2934,7 +2934,8 @@ function hbCsv(text) {
   if (cur || row.length) { row.push(cur); rows.push(row); } return rows.filter(r => r.length > 3);
 }
 function hbParseDate(d) { const m = String(d || "").trim().match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/); if (!m) return null; let y = +m[3]; if (y < 100) y += y > 70 ? 1900 : 2000; return Date.UTC(y, +m[2] - 1, +m[1]); }
-function hbSeasonOf(ts, given) { if (given) { const g = String(given).trim(); if (g) return g; } const d = new Date(ts), y = d.getUTCFullYear(); return d.getUTCMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`; }
+function hbSeasNorm(g) { g = String(g || "").trim().replace(/[-–]/g, "/"); const m = g.match(/^(\d{4})\/(\d{2}|\d{4})$/); return m ? `${m[1]}/${m[2].slice(-2)}` : g; }
+function hbSeasonOf(ts, given) { if (given) { const g = hbSeasNorm(given); if (g) return g; } const d = new Date(ts), y = d.getUTCFullYear(); return d.getUTCMonth() >= 6 ? `${y}/${String(y + 1).slice(2)}` : `${y - 1}/${String(y).slice(2)}`; }
 function hbFromCsv(text, fname) {
   const rows = hbCsv(text); if (rows.length < 2) return {};
   const h = rows[0].map(x => x.trim()), ix = n => h.indexOf(n), col = (...ns) => { for (const n of ns) { const i = ix(n); if (i >= 0) return i; } return -1; };
