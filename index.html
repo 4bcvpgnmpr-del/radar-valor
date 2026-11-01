@@ -557,6 +557,7 @@
   .pv-pill.e { background:#2E1416; color:#E5484D; } .pv-pill.n { background:#1A212B; color:#9AA5B1; }
   .pv-day { font-size:12px; font-weight:600; color:#7C8797; padding:8px 4px 0; }
   .pv-day::first-letter { text-transform:uppercase; }
+  .pv-more { flex-basis:100%; text-align:center; } .pv-more summary { cursor:pointer; color:#7C8797; font-size:12px; list-style:none; } .pv-more summary:hover { color:#E6EAF0; }
   .pv-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:12px 0; }
   #pv-body details.analysis-section:not([open]) { display:none; }
   #pv-body .acc-grid { display:block; margin-top:6px; }
@@ -2577,16 +2578,18 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="ms-sub">${lg.fl} ${lg.nm} · ${dateStr}</div>
       <div class="pv-actions">
         <button onclick="studyMatch('${cardId}', '${H}', '${A}', '${sport}', '${m.id}')" style="font-weight:700;">🔍 Estudiar partido</button>
-        <button class="small ghost" onclick="pvStats(${idx})">📊 Estadísticas</button>
-        <button class="small ghost" onclick="pvCorners(${idx})">Valor córners</button>
         <button class="small ghost" onclick="vsOpenMatch('${H}','${A}','${m.commence_time}',this)">Ver partido →</button>
+        <button class="small ghost" onclick="pvCorners(${idx})">Valor córners</button>
         <button class="small ghost" onclick="vsInline('${H}','${A}','${m.commence_time}',this,'${cardId}-bsd')">Árbitro y alineación</button>
+        <details class="pv-more"><summary>Más herramientas ▾</summary><div class="pv-actions" style="margin:8px 0 0;">
+        <button class="small ghost" onclick="pvStats(${idx})">📊 Estadísticas</button>
         <button class="small ghost" onclick="loadForm('${cardId}', '${H}', '${A}')">Forma</button>
         <button class="small ghost" onclick="loadInjuries('${cardId}', '${H}', '${A}')">Bajas</button>
         <button class="small ghost" onclick="loadH2H('${cardId}', '${H}', '${A}')">Tarjetas H2H</button>
         <button class="small ghost" onclick="runMonteCarlo('${cardId}', '${H}', '${A}')">Simular</button>
         <button class="small ghost" onclick="loadExtraMarkets('${sport}', '${m.id}', '${cardId}')">Más mercados</button>
         <button class="small ghost" onclick="analyzeWithAI('${cardId}', '${H}', '${A}')">Analizar con IA</button>
+        </div></details>
       </div>
       <div id="${cardId}-study-status"></div>
       <div id="${cardId}-bsd" class="muted" style="font-size:12px;padding:4px 0"></div>
