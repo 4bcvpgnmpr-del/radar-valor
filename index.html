@@ -807,8 +807,9 @@
         <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">Anthropic API key <span class="tooltip" title="console.anthropic.com — opcional, para el botón Analizar con IA.">ⓘ</span></div><input id="anthropicKey" type="password" placeholder="sk-ant-..." style="width:100%;" /></div>
         <div style="border-top:1px solid #232A33; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>Avisos en el móvil (WhatsApp)</b> <span class="tooltip" title="Usa el servicio gratuito CallMeBot: te manda un WhatsApp a ti mismo cuando salta una alarma. Sigue las instrucciones de callmebot.com (WhatsApp) para conseguir tu clave. Funciona mientras la app esté abierta.">ⓘ</span></div>
+          <select id="waProv" style="width:100%; margin-bottom:6px;" onchange="waSave()"><option value="callmebot">Servicio: CallMeBot</option><option value="textmebot">Servicio: TextMeBot</option></select>
           <input id="waPhone" type="text" placeholder="Tu teléfono con prefijo, ej. 34600111222" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
-          <input id="waKey" type="password" placeholder="Clave de CallMeBot" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
+          <input id="waKey" type="password" placeholder="Clave (API key) del servicio" style="width:100%; margin-bottom:6px;" oninput="waSave()" />
           <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="small ghost" type="button" onclick="waTest()">Enviar prueba</button><button class="small ghost" type="button" onclick="waNotifAsk()">Avisos del navegador</button></div>
           <div id="waMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
@@ -5372,11 +5373,12 @@ function renderAlarms() {
 
 /* ===== Avisos en el móvil: WhatsApp (CallMeBot) + notificación del navegador ===== */
 function waCfg() { try { return JSON.parse(localStorage.getItem("radar-wa") || "{}"); } catch (e) { return {}; } }
-function waSave() { try { localStorage.setItem("radar-wa", JSON.stringify({ phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
-function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"); if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
+function waSave() { try { localStorage.setItem("radar-wa", JSON.stringify({ prov: document.getElementById("waProv").value, phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
+function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"), pv = document.getElementById("waProv"); if (pv) pv.value = c.prov || "callmebot"; if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
 function waSend(text) {
   const c = waCfg(); if (!c.phone || !c.key) return false;
-  try { fetch(`https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(c.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`, { mode: "no-cors" }).catch(() => { }); return true; } catch (e) { return false; }
+  const url = c.prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(c.phone)}&apikey=${encodeURIComponent(c.key)}&text=${encodeURIComponent(text)}` : `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(c.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`;
+  try { fetch(url, { mode: "no-cors" }).catch(() => { }); return true; } catch (e) { return false; }
 }
 function waTest() { const m = document.getElementById("waMsg"), c = waCfg(); if (!c.phone || !c.key) { m.textContent = "Rellena el teléfono y la clave primero."; return; } waSend("✅ Radar de valor: aviso de prueba. Si lo lees, las alarmas te llegarán aquí."); m.textContent = "Enviado. Si no te llega en un minuto, revisa el teléfono (con prefijo, sin +) y la clave."; }
 function waNotifAsk() { const m = document.getElementById("waMsg"); if (!("Notification" in window)) { m.textContent = "Este navegador no permite notificaciones."; return; } Notification.requestPermission().then(r => { m.textContent = r === "granted" ? "Avisos del navegador activados." : "No has dado permiso para las notificaciones."; if (r === "granted") try { new Notification("Radar de valor", { body: "Avisos activados." }); } catch (e) { } }); }
