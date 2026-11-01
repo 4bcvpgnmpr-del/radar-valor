@@ -656,6 +656,7 @@
       <div class="sidebar-section">Jugadores y tarjetas</div>
       <button class="side-btn" data-v="players" onclick="switchView('players')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.5 3.6-7 8-7s8 2.5 8 7"/></svg> Jugadores (props)</button>
 
+      <button class="side-btn" data-v="pstreak" onclick="switchView('pstreak')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-9"/><path d="M14 7h7v7"/></svg> Tendencias de jugadores</button>
       <button class="side-btn" data-v="cardsw" onclick="switchView('cardsw')"><svg class="icon" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/></svg> Jugadores apercibidos</button>
 
       <button class="side-btn" data-v="refs" onclick="switchView('refs')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21l2-6h10l2 6"/></svg> Árbitros</button>
@@ -1376,6 +1377,23 @@
     </div>
   </div>
 
+  <div id="view-pstreak" class="view">
+    <div class="pl-wrap">
+      <div class="pl-hero"><div class="pl-k">TENDENCIAS Y RACHAS · BETA</div><h2>Tendencias de jugadores</h2><div class="muted">Jugadores de los partidos del día que llevan una racha seguida cumpliendo una estadística (por ejemplo "1+ tiros en los últimos 7 partidos"). Datos de ESPN; los partidos ya vistos se guardan en tu navegador.</div></div>
+      <div class="pl-filters">
+        <label>Liga<select id="tpLeague"></select></label>
+        <label>Día<select id="tpDay"></select></label>
+        <label>Categoría<div class="seg" id="tpCSeg"><button class="seg-b active" data-c="all" onclick="tpSetC('all')">Todos</button><button class="seg-b" data-c="goals" onclick="tpSetC('goals')">Goles</button><button class="seg-b" data-c="shots" onclick="tpSetC('shots')">Tiros</button><button class="seg-b" data-c="cards" onclick="tpSetC('cards')">Tarjetas</button><button class="seg-b" data-c="fouls" onclick="tpSetC('fouls')">Faltas</button></div></label>
+        <label><span>Racha mínima: <b id="tpMinL">6</b>+</span><input id="tpMin" type="range" min="3" max="12" value="6" oninput="document.getElementById('tpMinL').textContent=this.value" /></label>
+        <label class="pl-ck"><input type="checkbox" id="tpStart" /> Solo titulares</label>
+        <button id="tpBtn" onclick="tpSearch()">Buscar rachas</button>
+      </div>
+      <div id="tpMsg" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+      <div class="pl-bar2"><div id="tpCount" style="font-weight:700;"></div><input id="tpQ" type="text" placeholder="Jugador o equipo" oninput="tpRender()" /></div>
+      <div id="tpGrid" class="prg-grid"></div>
+    </div>
+  </div>
+
   <div id="alq-overlay" style="display:none;" onclick="if(event.target===this) alqClose()">
     <div class="ms-box" style="max-width:520px;">
       <button class="ms-close" onclick="alqClose()" aria-label="Cerrar">✕</button>
@@ -1505,7 +1523,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1518,6 +1536,7 @@ function switchView(v) {
   if (v === "players") prInit();
   if (v === "cardsw") apInit();
   if (v === "refs") rfInit();
+  if (v === "pstreak") tpInit();
   if (v === "profile") pfRender();
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
@@ -3780,6 +3799,49 @@ function plLive(id, tab, team) {
   ov.style.display = "flex";
 }
 
+/* ===== Tendencias de jugadores (rachas, ESPN) ===== */
+const TP_DEF = { goals: [["totalGoals", "gol", [1]]], shots: [["totalShots", "tiros", [1, 2, 3]], ["shotsOnTarget", "tiros a puerta", [1, 2]]], cards: [["yellowCards", "amarilla", [1]]], fouls: [["foulsCommitted", "faltas cometidas", [1, 2, 3]], ["foulsSuffered", "faltas recibidas", [1, 2, 3]]] };
+let tpC = "all", tpRes = [], tpBusy = false;
+function tpInit() { prInit(); ["tpLeague", "tpDay"].forEach(id => { const el = document.getElementById(id); if (el && !el.dataset.x) { el.dataset.x = 1; el.innerHTML = document.getElementById(id === "tpLeague" ? "plLeague" : "plDay").innerHTML; } }); }
+function tpSetC(c) { tpC = c; document.querySelectorAll("#tpCSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.c === c)); if (tpRes.length) tpRender(); }
+async function tpSearch() {
+  if (tpBusy) return; prCacheLoad(); tpBusy = true;
+  const $ = id => document.getElementById(id), msg = $("tpMsg"), btn = $("tpBtn"), slug = $("tpLeague").value, dayOff = +$("tpDay").value, minS = +$("tpMin").value, onlyS = $("tpStart").checked;
+  btn.disabled = true; tpRes = []; $("tpGrid").innerHTML = ""; $("tpCount").textContent = "";
+  try {
+    const d = new Date(Date.now() + dayOff * 864e5), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    msg.textContent = "Buscando partidos…"; const sb = await espnGet(`${slug}/scoreboard?dates=${ds}`), evs = (sb.events || []).filter(e => !(e.status && e.status.type && e.status.type.completed));
+    if (!evs.length) { msg.textContent = "No hay partidos pendientes ese día en esta liga."; return; }
+    const teams = new Map(); evs.forEach(e => (((e.competitions || [])[0] || {}).competitors || []).forEach(c => teams.set(String(c.team.id), c.team.displayName || c.team.name)));
+    const take = Math.max(12, minS + 2), sched = {}; let n = 0;
+    await prPool([...teams.keys()], 5, async id => { try { const sc = await espnGet(`${slug}/teams/${id}/schedule`); sched[id] = (sc.events || []).filter(e => { const st = e.status || ((e.competitions || [])[0] || {}).status; return st && st.type && st.type.completed; }).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, take).map(e => String(e.id)); } catch (e) { sched[id] = []; } msg.textContent = `Calendarios ${++n}/${teams.size}`; });
+    const need = [...new Set(Object.values(sched).flat())].filter(id => !prCache.has(slug + "|" + id)); let m = 0;
+    await prPool(need, 6, async id => { try { prCache.set(slug + "|" + id, prCompact(await espnGet(`${slug}/summary?event=${id}`))); } catch (e) {} m++; if (m % 3 === 0 || m === need.length) msg.textContent = `Descargando partidos ${m}/${need.length} (los ya vistos se guardan)`; });
+    prCacheSave();
+    const res = [];
+    evs.forEach(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return;
+      [[hc, ac], [ac, hc]].forEach(([me, rv]) => { const tid = String(me.team.id), ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(Boolean), by = new Map();
+        ms.forEach((mt, idx) => mt.pl.filter(x => x.t === tid).forEach(x => { if (!by.has(x.i)) by.set(x.i, { n: x.n, p: x.p, rows: [] }); by.get(x.i).rows.push({ idx, k: x.k, s: x.s }); }));
+        const last = ms[0];
+        by.forEach((o, pid) => { if (!last || !last.pl.some(x => x.i === pid && x.t === tid)) return; const lastStart = !!last.pl.find(x => x.i === pid && x.t === tid && x.s); if (onlyS && !lastStart) return;
+          const pats = [];
+          Object.keys(TP_DEF).forEach(cat => TP_DEF[cat].forEach(([stat, label, ths]) => { let best = null; ths.forEach(t => { let k = 0; while (k < o.rows.length && (o.rows[k].k[stat] || 0) >= t) k++; if (k >= minS && (!best || t > best.t || (t === best.t && k > best.k))) best = { t, k }; });
+            if (best) pats.push({ cat, label, t: best.t, k: best.k, n: o.rows.length, vals: o.rows.slice(0, Math.max(best.k, 7)).map(r => r.k[stat] || 0), avg: o.rows.slice(0, best.k).reduce((a, r) => a + (r.k[stat] || 0), 0) / best.k }); }));
+          if (pats.length) res.push({ name: o.n, pos: o.p, team: me.team.displayName || me.team.name, rival: rv.team.displayName || rv.team.name, home: me === hc, time: e.date, lg: (sb.leagues && sb.leagues[0] && sb.leagues[0].name) || slug, pats, lastStart, max: Math.max(...pats.map(x => x.k)) }); }); }); });
+    res.sort((a, b) => b.max - a.max || b.pats.length - a.pats.length); tpRes = res;
+    msg.textContent = res.length ? "" : "Ningún jugador llega a esa racha. Baja la racha mínima.";
+    tpRender();
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  finally { tpBusy = false; btn.disabled = false; }
+}
+function tpRender() {
+  const q = (document.getElementById("tpQ").value || "").trim().toLowerCase(), list = tpRes.map(r => ({ ...r, pats: r.pats.filter(x => tpC === "all" || x.cat === tpC) })).filter(r => r.pats.length && (!q || r.name.toLowerCase().includes(q) || r.team.toLowerCase().includes(q)));
+  document.getElementById("tpCount").innerHTML = tpRes.length ? `<span style="color:#3ECF8E">${list.length}</span> jugadores con racha` : "";
+  document.getElementById("tpGrid").innerHTML = list.slice(0, 150).map(r => `<div class="plc"><div class="h"><span>${r.lg}</span><span>${new Date(r.time).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })}</span></div>
+    <div class="nm">${r.name}</div><div class="tm">${r.team}${r.pos ? " · " + r.pos : ""} ${r.lastStart ? '<span style="color:#3ECF8E;">· titular último partido</span>' : ""}</div>
+    <div class="vs">${r.home ? r.team + " vs " + r.rival : r.rival + " vs " + r.team} · ${r.home ? "juega en casa" : "juega fuera"}</div>
+    ${r.pats.sort((a, b) => b.k - a.k).map(x => `<div style="margin-top:8px;"><div class="hit" style="padding:6px 10px;"><span><b>${x.t}+ ${x.label}</b></span><div class="bar"><i style="width:${Math.min(100, x.k / x.n * 100)}%"></i></div><b class="p" style="font-size:15px;">L${x.k}/${x.k}</b></div><div class="res" style="margin-top:5px;"><span style="background:#0D1117;">media ${x.avg.toFixed(2)}</span>${x.vals.map(v => `<span class="${v >= x.t ? "y" : ""}">${v}</span>`).join("")}</div></div>`).join("")}</div>`).join("") || (tpRes.length ? '<div class="muted" style="grid-column:1/-1; text-align:center; padding:16px;">Nada en esta categoría.</div>' : "");
+}
 /* ===== Árbitros (CSV football-data) ===== */
 let rf = { s: "cur", m: 1, sort: "ta", dir: -1 };
 async function rfInit() { if (!Object.keys(hbData).length) { try { await hbLoad(); } catch (e) {} } const el = document.getElementById("rfLg"), cur = el.value; el.innerHTML = '<option value="">Todas las ligas</option>' + Object.keys(hbData).sort().map(l => `<option value="${l.replace(/"/g, "&quot;")}">${l}</option>`).join(""); el.value = cur; rfRender(); }
