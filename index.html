@@ -2272,14 +2272,12 @@ let pv = { day: null, onlyValue: false, sort: "time" }, pvItems = {};
 function pvSetDay(d) { pv.day = d; document.querySelectorAll("#pvDay .seg-b").forEach(b => b.classList.toggle("active", b.dataset.d === String(d))); applyFilters(); }
 function pvPickLeague(odds) { document.getElementById("sport").value = odds; loadOdds(); }
 let fdSched = (() => { try { const c = JSON.parse(localStorage.getItem("radar-fd-sched") || "null"); return c && Date.now() - c.t < 3 * 3600000 ? c.n : null; } catch (e) { return null; } })(), fdSchedBusy = false;
+const FD_ESPN = { "39": "eng.1", "140": "esp.1", "135": "ita.1", "78": "ger.1", "2": "uefa.champions", "61": "fra.1", "88": "ned.1", "94": "por.1", "40": "eng.2", "71": "bra.1", "1": "fifa.world", "4": "uefa.euro" };
 async function fdSchedLoad() {
-  if (fdSched || fdSchedBusy || !getFdKey()) return; fdSchedBusy = true;
+  if (fdSched || fdSchedBusy) return; fdSchedBusy = true;
   try {
-    const d0 = new Date(), d1 = new Date(Date.now() + 7 * 86400000), iso = d => d.toISOString().slice(0, 10);
-    const res = await fetch(`${fdBase()}/v4/matches?competitions=${Object.values(FD_CODES).join(",")}&dateFrom=${iso(d0)}&dateTo=${iso(d1)}`, { headers: fdHeaders() });
-    if (!res.ok) throw new Error(res.status); const j = await res.json(), n = {};
-    const byCode = Object.fromEntries(Object.entries(FD_CODES).map(([id, c]) => [c, id]));
-    (j.matches || []).forEach(m => { const id = byCode[m.competition && m.competition.code]; if (id) n[id] = (n[id] || 0) + 1; });
+    const f = d => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, "0")}${String(d.getUTCDate()).padStart(2, "0")}`, rng = `${f(new Date())}-${f(new Date(Date.now() + 7 * 864e5))}`, n = {};
+    await prPool(Object.keys(FD_ESPN), 6, async id => { try { const j = await espnGet(`${FD_ESPN[id]}/scoreboard?dates=${rng}&limit=300`); n[id] = (j.events || []).length; } catch (e) { } });
     fdSched = n; try { localStorage.setItem("radar-fd-sched", JSON.stringify({ t: Date.now(), n })); } catch (e) {}
     pvChips();
   } catch (e) { fdSched = null; } finally { fdSchedBusy = false; }
