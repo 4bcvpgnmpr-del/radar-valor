@@ -1566,6 +1566,7 @@
         <label>Dónde contar<select id="alqWMode"><option value="fixed">Entre los minutos de arriba</option><option value="last">En los últimos X minutos</option></select></label>
         <label>Últimos (minutos)<input id="alqWLast" type="number" min="1" max="45" placeholder="10" /></label>
       </div>
+      <label class="pg-ck" style="justify-content:center; margin-top:12px;"><input type="checkbox" id="alqKick" /> Avisarme también cuando empiece el partido</label>
       <div style="display:flex; gap:10px; justify-content:center; margin-top:14px;"><input id="alqName" type="text" placeholder="Descripción (opcional)" style="width:240px;" /><button onclick="alqSave()">Guardar y activar</button></div>
       <div id="alqMsg" class="muted" style="text-align:center; font-size:12px; margin-top:8px;"></div>
     </div>
@@ -5309,7 +5310,7 @@ function alMatchOK(a, home, away) {
   return near(nm(home), nm(a.home)) && near(nm(away), nm(a.away));
 }
 function alFromMatch(h, a) { let f = null; try { const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (p, q) => p && q && (p === q || p.includes(q) || q.includes(p)), hn = nm(h), an = nm(a), now = Date.now() - 3 * 3600000; f = cpAll().find(x => Date.parse(x.m.commence_time) >= now && near(nm(x.m.home_team), hn) && near(nm(x.m.away_team), an)) || null; } catch (e) { } alQuick(f ? f.m.id : "", h, a, f ? f.l.id : ""); }
-function alQuick(matchId, home, away, leagueId) { alqCtx = { matchId, label: `${home} vs ${away}`, leagueId, home, away }; { const pre = !!matchId, g = document.getElementById("alqPreGrid"), h = document.getElementById("alqLiveHd"); if (g) g.style.display = pre ? "" : "none"; if (h) h.textContent = pre ? "En vivo (opcional)" : "Condiciones en vivo"; } { const k = document.getElementById("alqWKind"), src = document.getElementById("alWKind"); if (k && src && !k.options.length) k.innerHTML = src.innerHTML; k.value = ""; document.getElementById("alqWTeam").value = "any"; document.getElementById("alqWMode").value = "fixed"; } document.getElementById("alqMatch").textContent = alqCtx.label; document.getElementById("alqMsg").textContent = ""; ["alqEMin","alqOMin","alqOMax","alqRMin","alqDMin","alqName","alqGH","alqGA","alqMMin","alqMMax","alqWMin","alqWLast"].forEach(i => document.getElementById(i).value = ""); document.getElementById("alqSel").value = "any"; document.getElementById("alq-overlay").style.display = "flex"; }
+function alQuick(matchId, home, away, leagueId) { alqCtx = { matchId, label: `${home} vs ${away}`, leagueId, home, away }; { const pre = !!matchId, g = document.getElementById("alqPreGrid"), h = document.getElementById("alqLiveHd"); if (g) g.style.display = pre ? "" : "none"; if (h) h.textContent = pre ? "En vivo (opcional)" : "Condiciones en vivo"; } { const k = document.getElementById("alqWKind"), src = document.getElementById("alWKind"); if (k && src && !k.options.length) k.innerHTML = src.innerHTML; k.value = ""; document.getElementById("alqWTeam").value = "any"; document.getElementById("alqWMode").value = "fixed"; } document.getElementById("alqMatch").textContent = alqCtx.label; document.getElementById("alqMsg").textContent = ""; try { document.getElementById("alqKick").checked = false; } catch (e) { } ["alqEMin","alqOMin","alqOMax","alqRMin","alqDMin","alqName","alqGH","alqGA","alqMMin","alqMMax","alqWMin","alqWLast"].forEach(i => document.getElementById(i).value = ""); document.getElementById("alqSel").value = "any"; document.getElementById("alq-overlay").style.display = "flex"; }
 function alqClose() { document.getElementById("alq-overlay").style.display = "none"; }
 function alqSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alqMsg"), made = [];
@@ -5322,9 +5323,10 @@ function alqSave() {
     const from = +(live.mMin || 0), to = +(live.mMax || 90); if (mode === "fixed" && !(to > from)) { msg.textContent = "El minuto final debe ser mayor que el inicial."; return; }
     live.w = { kind: v("alqWKind"), team: v("alqWTeam"), min: n, mode, from, to, last: parseInt(v("alqWLast")) || 10 }; }
   const hasLive = !!(live.gh || live.ga || live.mMin || live.mMax || live.w);
-  if (!hasPre && !hasLive) { msg.textContent = "Añade al menos una condición."; return; }
+  const kick = document.getElementById("alqKick") && document.getElementById("alqKick").checked;
+  if (!hasPre && !hasLive && !kick) { msg.textContent = "Añade al menos una condición o marca «Avisarme cuando empiece»."; return; }
   const nm = v("alqName") || alqCtx.label;
-  if (hasPre) { pre.name = nm; made.push(pre); } if (hasLive) { live.name = hasPre ? nm + " · en vivo" : nm; made.push(live); }
+  if (hasPre) { pre.name = nm; made.push(pre); } if (hasLive) { live.name = hasPre ? nm + " · en vivo" : nm; made.push(live); } if (kick) made.push({ id: "a" + (Date.now() + 2), type: "live", active: true, leagues: [], matchId: alqCtx.matchId, matchLabel: alqCtx.label, home: alqCtx.home, away: alqCtx.away, gh: "", ga: "", mMin: "", mMax: "4", kick: true, name: (v("alqName") || alqCtx.label) + " · empieza" });
   const all = getAlarms(); made.slice().reverse().forEach(a => all.unshift(a)); saveAlarms(all.slice(0, 40)); alqClose(); showToast(`Alarma creada: ${nm}${made.length > 1 ? " (pregame y en vivo)" : ""}`); renderAlarms();
 }
 function alDd(id) { document.querySelectorAll(".alp-panel").forEach(p => { if (p.id !== id) p.classList.remove("open"); }); document.getElementById(id).classList.toggle("open"); }
@@ -5399,7 +5401,7 @@ function syncSupported(a) { return a && a.active && a.type === "live" && !(a.w &
 function syncPrepare() {
   let all = []; try { all = cpAll(); } catch (e) { }
   return getAlarms().filter(a => a.active && a.type === "live").map(a => { const names = new Set((a.leagues || []).filter(l => String(l).startsWith("n:"))); (a.leagues || []).filter(l => !String(l).startsWith("n:")).forEach(id => { all.forEach(x => { if (x.l.id === id && x.m.mov_league) names.add("n:" + alLgNorm(x.m.mov_league)); }); const dd = DD_LEAGUES.find(l => l.id === id); if (dd) names.add("n:" + alLgNorm(dd.nm)); });
-    return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null }; });
+    return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null, kick: !!a.kick }; });
 }
 let syncTimer = null;
 function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
@@ -5609,8 +5611,8 @@ function runLiveAlarms(fixtures) {
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
       if (a.w) { jobs.push([a, f]); return; }
-      const k = `${a.id}|${f.fixture.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
-      alFire(a, `${f.teams.home.name} ${gh}-${ga} ${f.teams.away.name}<br/>Minuto ${min ?? "—"}'`);
+      const k = a.kick ? `${a.id}|${f.fixture.id}|k` : `${a.id}|${f.fixture.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
+      alFire(a, a.kick ? `⚽ Empezó el partido<br/>${f.teams.home.name} vs ${f.teams.away.name}` : `${f.teams.home.name} ${gh}-${ga} ${f.teams.away.name}<br/>Minuto ${min ?? "—"}'`);
     });
   });
   if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
@@ -5659,8 +5661,8 @@ function runMovAlarms() {
         const nm = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase();
         alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min}' · ${nm}: local ${r.h}, visitante ${r.aw} (del ${r.from}' al ${r.to}')${r.approx != null ? ` · contado desde el ${r.approx}', cuando empezó la vigilancia` : ""}`); return;
       }
-      const k = `${a.id}|${m.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
-      alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min ?? "—"}'`);
+      const k = a.kick ? `${a.id}|${m.id}|k` : `${a.id}|${m.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
+      alFire(a, a.kick ? `⚽ Empezó el partido<br/>${m.home_team} vs ${m.away_team}` : `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min ?? "—"}'`);
     });
   });
   snapSave(); if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
