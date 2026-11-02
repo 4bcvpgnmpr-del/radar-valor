@@ -598,6 +598,7 @@
   .alp { max-width:1180px; margin:0 auto; }
   .alp-top { display:flex; justify-content:center; gap:60px; flex-wrap:wrap; margin-bottom:22px; }
   .alp-dd { position:relative; } .alp-pill { background:#1A212B; border:1px solid #232C38; color:#E6EAF0; border-radius:14px; padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; }
+  .lvr, .plc { content-visibility:auto; contain-intrinsic-size:auto 170px; }
   .alp-panel { display:none; position:absolute; top:34px; left:50%; transform:translateX(-50%); z-index:50; background:#10151C; border:1px solid #232C38; border-radius:12px; padding:12px; width:min(560px,90vw); max-height:320px; overflow:auto; }
   .alp-panel.open { display:block; }
   .alp-t { text-align:center; font-size:12px; font-weight:700; margin-bottom:12px; } .alp-t small { display:block; font-weight:400; font-style:italic; color:#7C8797; font-size:10px; }
@@ -3358,9 +3359,11 @@ function hbStOk(m, S) {
   if ((S.wh != null && m.hw < S.wh) || (S.wa != null && m.aw < S.wa) || (S.uh != null && m.hu < S.uh) || (S.ua != null && m.au < S.ua)) return false;
   return true;
 }
+let hbSelMemo = { k: "", v: null };
 function hbSelRows(f) {
-  const ls = Object.keys(hbData).filter(l => !f.leagues || f.leagues.has(l));
-  return ls.flatMap(l => hbData[l]).sort((a, b) => a[0] - b[0]);
+  const ls = Object.keys(hbData).filter(l => !f.leagues || f.leagues.has(l)), tot = ls.reduce((n, l) => n + hbData[l].length, 0), k = ls.join("\u0001") + "|" + tot + "|" + Object.keys(hbData).length;
+  if (hbSelMemo.k === k && hbSelMemo.v) return hbSelMemo.v;
+  const v = ls.flatMap(l => hbData[l]).sort((a, b) => a[0] - b[0]); hbSelMemo = { k, v }; return v;
 }
 function hbInit() {
   try { hbwInit(); } catch (e) {}
@@ -3543,6 +3546,15 @@ function movConvert(d) {
 }
 let movBusy = null;
 async function movLoad(silent) { if (movBusy) return movBusy; movBusy = movLoad0(silent).finally(() => { movBusy = null; }); return movBusy; }
+let movTailT = null, movTailDirty = false;
+function movRenderTail() {
+  if (document.hidden) { movTailDirty = true; return; } clearTimeout(movTailT);
+  movTailT = setTimeout(async () => {
+    const steps = [() => hbPicksRender(), () => { if (document.getElementById("cpChips")) renderCoupon(); }, () => { if (lastSport === "mov" && pvMovSel) pvPickMov(pvMovSel); else pvMoreDraw(); }, () => renderDdChips(), () => hmRender(), () => { if (document.getElementById("view-live").classList.contains("active")) renderLive(); }];
+    for (const f of steps) { try { f(); } catch (e) { } await new Promise(r => setTimeout(r, 0)); }
+  }, 60);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden && movTailDirty) { movTailDirty = false; movRenderTail(); } });
 async function movLoad0(silent) {
   const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
   if (!silent) say("Descargando cuotas de Bet365...");
@@ -3555,12 +3567,7 @@ async function movLoad0(silent) {
     try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`);
   } catch (e) { say("No se pudo descargar Bet365: " + e.message); return false; }
-  try { hbPicksRender(); } catch (e) {}
-  try { if (document.getElementById("cpChips")) renderCoupon(); } catch (e) {}
-  try { if (lastSport === "mov" && pvMovSel) pvPickMov(pvMovSel); else pvMoreDraw(); } catch (e) {}
-  try { renderDdChips(); } catch (e) {}
-  try { hmRender(); } catch (e) {}
-  try { if (document.getElementById("view-live").classList.contains("active")) renderLive(); } catch (e) {}
+  movRenderTail();
   return true;
 }
 let movTimer = null;
@@ -5676,6 +5683,7 @@ function liveWatchWanted() {
 async function liveWatchTick() {
   try {
     if (!liveWatchWanted()) { alWatchRender(); return; }
+    if (document.hidden && syncOn() && getAlarms().filter(a => a.active && a.type === "live").every(syncSupported)) { liveWatchState = "la vigila tu Worker (app en segundo plano)"; return; }
     if (await movLoad(true)) { runMovAlarms(); liveWatchLast = new Date(); }
     else if (getFootballKey()) { const data = await apiFootball(`/fixtures?live=all`, getFootballKey()); reqTrack(1); liveWatchLast = new Date(); runLiveAlarms(data); }
     else liveWatchState = "no se pudo descargar Bet365";
@@ -5699,6 +5707,7 @@ function cpState(m, hm) {
   return { st: "", chip: `<span>${hm}</span>`, hg: null, ag: null };
 }
 async function cpResEnsure() {
+  if (document.hidden) return;
   if (cpRes.busy || Date.now() - cpRes.t < 120000) return; cpRes.busy = true;
   try { prInit(); const slugs = [...document.querySelectorAll("#plLeague option")].map(o => o.value), d = new Date(), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`, list = [];
     await prPool(slugs, 8, async sl => { try { const j = await espnGet(`${sl}/scoreboard?dates=${ds}`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"), t = (c.status || e.status || {}).type || {}; if (!hc || !ac || hc.score == null || t.state === "pre") return;
