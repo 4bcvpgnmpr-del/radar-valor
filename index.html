@@ -703,6 +703,7 @@
       <button class="side-btn active" data-v="home" onclick="switchView('home')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg> Inicio</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
       <button class="side-btn" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
+      <button class="side-btn" data-v="ai" onclick="switchView('ai')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg> Ideas de la IA</button>
       <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
       <button class="side-btn" data-v="jorn" onclick="switchView('jorn')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Jornada</button>
 
@@ -815,7 +816,11 @@
           <div id="waMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div>
           <div style="border-top:1px solid #232A33; margin-top:10px; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>Alarmas con la app cerrada</b> <span class="tooltip" title="Tu Worker de Cloudflare vigila los partidos en vivo cada minuto y te manda el WhatsApp aunque la app esté cerrada. Necesita la URL del Worker (arriba) y el KV ALARMS.">ⓘ</span></div>
             <div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="small ghost" type="button" onclick="syncActivate()">Activar y comprobar</button><button class="small ghost" type="button" onclick="syncOff()">Desactivar</button></div>
-            <div id="syncMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div></div>
+            <div id="syncMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div>
+          <div style="border-top:1px solid #232A33; margin-top:10px; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>🤖 Análisis de la mañana (pregame)</b> <span class="tooltip" title="Cada mañana, tu Worker le pide a la IA ideas de pregame con tus reglas y te las manda por WhatsApp. Usa las últimas cuotas que la app guardó (cada vez que la abres). Tu clave de Anthropic se guarda en tu Worker.">ⓘ</span></div>
+            <label class="pg-ck"><input type="checkbox" id="aiMorOn" onchange="aiMorSave()" /> Enviarme las ideas cada mañana</label>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:6px;"><span class="muted">Hora</span><input type="time" id="aiMorTime" value="09:00" onchange="aiMorSave()" /></div>
+            <div id="aiMorMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div></div>
         <div><div class="muted" style="margin-bottom:4px;">iSports API key <span class="tooltip" title="Opcional — marcador en vivo alternativo.">ⓘ</span></div><input id="isportsKey" type="password" placeholder="iSports API key" style="width:100%;" /></div>
         <div style="display:flex; gap:10px;">
           <div style="flex:1;"><div class="muted" style="margin-bottom:4px;">Bankroll</div><input id="bankroll" type="number" placeholder="1000" style="width:100%;" /></div>
@@ -1367,6 +1372,8 @@
     </div>
   </div>
 
+  <div id="view-ai" class="view"><div style="max-width:880px; margin:0 auto; padding:6px 4px 40px;" id="aiPage"></div></div>
+
   <div id="view-alarms" class="view">
     <div data-help="alarms"></div>
     <div class="alp">
@@ -1683,7 +1690,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { vsmatch:"Partido", plstats:"Estadísticas de jugadores", jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { ai:"Ideas de la IA", vsmatch:"Partido", plstats:"Estadísticas de jugadores", jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1693,6 +1700,7 @@ function switchView(v) {
   if (v === "stats") renderStats();
   if (v === "lineups") { renderFormationStats(); luRenderChips(); if (!document.querySelector("#lineup-picker .lv-row")) loadTodayForLineups(); }
   if (v === "alarms") renderAlarms();
+  if (v === "ai" && !aiNoShow) { aiShow(); aiMorFetch(); }
   if (v === "players") prInit();
   if (v === "cardsw") apInit();
   if (v === "refs") rfInit();
@@ -3554,8 +3562,10 @@ function movRenderTail() {
   movTailT = setTimeout(async () => {
     const steps = [() => hbPicksRender(), () => { if (document.getElementById("cpChips")) renderCoupon(); }, () => { if (lastSport === "mov" && pvMovSel) pvPickMov(pvMovSel); else pvMoreDraw(); }, () => renderDdChips(), () => hmRender(), () => { if (document.getElementById("view-live").classList.contains("active")) renderLive(); }];
     for (const f of steps) { try { f(); } catch (e) { } await new Promise(r => setTimeout(r, 0)); }
+    movSnapSoon(); runPreAll();
   }, 60);
 }
+function movSnapSoon() { try { aiSnapPush(); } catch (e) { } }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && movTailDirty) { movTailDirty = false; movRenderTail(); } });
 async function movLoad0(silent) {
   const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
@@ -5415,7 +5425,7 @@ function syncPrepare() {
 let syncTimer = null;
 function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
 async function alSync() { const px = getFdProxy(); if (!px) throw new Error("Falta la URL de tu Worker en ⚙️"); const wa = waCfg();
-  const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null }) });
+  const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null, ai: aiMorPayload() }) });
   if (!r.ok) throw new Error("Worker " + r.status); const j = await r.json(); if (!j.ok) throw new Error(j.error || "El Worker rechazó los datos"); return j; }
 async function syncActivate() {
   const m = document.getElementById("syncMsg"), say = t => { if (m) m.innerHTML = t; };
@@ -5431,6 +5441,22 @@ async function syncActivate() {
   } catch (e) { say(`<span style="color:#E5484D;">No se pudo: ${e.message}</span>`); }
 }
 function syncOff() { try { localStorage.setItem("radar-sync-on", "0"); } catch (e) { } const px = getFdProxy(); if (px) fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: [], wa: null }) }).catch(() => { }); const m = document.getElementById("syncMsg"); if (m) m.textContent = "Desactivado. Las alarmas solo avisan con la app abierta."; }
+
+/* ===== Análisis de la mañana (el Worker llama a la IA y manda WhatsApp) ===== */
+function aiMorCfg() { try { return JSON.parse(localStorage.getItem("radar-ai-morning") || "{}"); } catch (e) { return {}; } }
+function aiMorInit() { const c = aiMorCfg(), a = document.getElementById("aiMorOn"), t = document.getElementById("aiMorTime"); if (a) a.checked = !!c.on; if (t) t.value = c.time || "09:00"; }
+function aiMorSave() { const on = document.getElementById("aiMorOn").checked, time = document.getElementById("aiMorTime").value || "09:00", m = document.getElementById("aiMorMsg");
+  try { localStorage.setItem("radar-ai-morning", JSON.stringify({ on, time })); } catch (e) { }
+  if (on && !syncOn()) { m.innerHTML = '<span style="color:#F0B429;">Primero activa «Alarmas con la app cerrada» (arriba), porque usa el mismo Worker.</span>'; return; }
+  if (on && !getAnthropicKey()) { m.innerHTML = '<span style="color:#F0B429;">Falta tu Anthropic API key en ⚙️.</span>'; return; }
+  m.textContent = on ? "Guardado. Cada mañana a las " + time + " recibirás las ideas por WhatsApp (se usan las últimas cuotas que la app guardó)." : "Desactivado."; alSync().then(() => { if (on) aiSnapPush(true); }).catch(e => { m.innerHTML = '<span style="color:#E5484D;">No se pudo guardar: ' + e.message + '</span>'; }); }
+function aiMorPayload() { const c = aiMorCfg(); if (!c.on || !getAnthropicKey()) return null; let tz = "Europe/Madrid"; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch (e) { } return { time: c.time || "09:00", key: getAnthropicKey(), rules: aiRules().trim(), stats: aiStatsText(), tz }; }
+let aiSnapT = 0;
+async function aiSnapPush(force) { try { const c = aiMorCfg(), px = getFdProxy(); if (!c.on || !syncOn() || !px) return; if (!force && Date.now() - aiSnapT < 1800000) return; const pre = aiGather().pre; if (!pre.length) return; aiSnapT = Date.now(); await fetch(px + "/ai/snap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), pre }) }); } catch (e) { } }
+async function aiMorFetch() { try { const px = getFdProxy(); if (!px || !syncOn()) return; const arr = await (await fetch(px + "/ai/hist?token=" + encodeURIComponent(syncTok()))).json(); if (!Array.isArray(arr) || !arr.length) return; const H = aiHist(), have = new Set(H.map(x => x.t)), add = arr.filter(x => x && x.t && !have.has(x.t)); if (!add.length) return; const merged = [...add.map(x => ({ ...x })), ...H].sort((p, q) => q.t - p.t).slice(0, 8); try { localStorage.setItem("radar-ai-hist", JSON.stringify(merged)); } catch (e) { } showToast(add.some(x => x.morning) ? "🤖 Análisis de la mañana guardado en tus ideas" : "🤖 Ideas de la IA sincronizadas desde otro dispositivo"); if (document.getElementById("view-ai").classList.contains("active")) aiShow(); } catch (e) { } }
+async function aiPutRemote(rec) { try { const px = getFdProxy(); if (!px || !syncOn()) return; await fetch(px + "/ai/put", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), rec }) }); } catch (e) { } }
+setInterval(() => { try { aiSnapPush(); aiMorFetch(); } catch (e) { } }, 600000);
+setTimeout(() => { try { aiMorInit(); aiSnapPush(); aiMorFetch(); } catch (e) { } }, 6000);
 function waSave() { try { alSyncSoon(); } catch (e) { } try { localStorage.setItem("radar-wa", JSON.stringify({ prov: document.getElementById("waProv").value, phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
 function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"), pv = document.getElementById("waProv"); if (pv) pv.value = c.prov || "callmebot"; if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
 function waSend(text) {
@@ -5446,22 +5472,26 @@ function alPush(title, body, skipWa) {
 }
 
 /* ===== IA: buscar oportunidades (pregame y en vivo) ===== */
-function aiGather() {
+function aiPlayerHist(m) { try { if (typeof prRes === "undefined" || !prRes || !prRes.length || typeof prMeta === "undefined" || !prMeta) return undefined; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(m.home_team), a = nm(m.away_team);
+    const r = prRes.filter(x => near(nm(x.team), h) || near(nm(x.team), a)).slice(0, 16).map(x => ({ jugador: x.name, equipo: x.team, estadistica: prMeta.mk, linea: prMeta.line, acierto_pct: Math.round(x.pct), media: Math.round(x.avg * 100) / 100, partidos: x.n })); return r.length ? r : undefined; } catch (e) { return undefined; } }
+function aiGather(mode) {
+  mode = mode || "eq";
   const now = Date.now(), pre = [], live = [], f2 = v => v == null ? null : Math.round(v * 100) / 100;
   let all = []; try { all = cpAll(); } catch (e) { }
   const mkts = (m, withEv) => CP_COLS.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1], r = cpPick(m.bookmakers, c[0], key); return r && r.price ? { mercado: CP_LABF[c[2]] || c[2], cuota: f2(r.price), prob_justa: withEv && r.fair ? f2(r.fair) : undefined, valor_pct: withEv && r.ev != null ? f2(r.ev * 100) : undefined } : null; }).filter(Boolean);
-  const extra = (m) => { const o = []; (m.mov_cor || []).forEach(z => { if (z[2]) o.push({ mercado: `${z[0] === "O" ? "Más" : "Menos"} de ${z[1]} córners`, cuota: f2(z[2]) }); }); (m.mov_car || []).forEach(z => { if (z[2]) o.push({ mercado: `${z[0] === "O" ? "Más" : "Menos"} de ${z[1]} tarjetas`, cuota: f2(z[2]) }); });
+  const extra = (m, pl) => { const o = []; if (!pl) { (m.mov_cor || []).forEach(z => { if (z[2]) o.push({ mercado: `${z[0] === "O" ? "Más" : "Menos"} de ${z[1]} córners`, cuota: f2(z[2]) }); }); (m.mov_car || []).forEach(z => { if (z[2]) o.push({ mercado: `${z[0] === "O" ? "Más" : "Menos"} de ${z[1]} tarjetas`, cuota: f2(z[2]) }); });
     (m.mov_fou || []).forEach(z => { if (z[2]) o.push({ mercado: `${z[0] === "O" ? "Más" : "Menos"} de ${z[1]} faltas (total del partido)`, cuota: f2(z[2]) }); });
-    try { const e = (typeof MOV_PP !== "undefined" && MOV_PP[m.id]) || null, LB = { totalShots: "tiros", shotsOnTarget: "tiros a puerta", foulsCommitted: "faltas cometidas", foulsSuffered: "faltas recibidas", saves: "paradas" };
-      if (e) Object.keys(LB).forEach(k => e.rows.filter(x => x[0] === k && x[2] && x[3] <= (k === "saves" ? 6 : 3) && x[4] >= 1.3 && x[4] <= 4).sort((a, b) => a[3] - b[3] || a[4] - b[4]).slice(0, k === "saves" || k === "foulsCommitted" ? 4 : 2).forEach(x => o.push({ mercado: `${x[2]} (${x[1]}): ${x[3]}+ ${LB[k]}`, cuota: f2(x[4]) }))); } catch (er) { } return o; };
+    }
+    if (pl) try { const e = (typeof MOV_PP !== "undefined" && MOV_PP[m.id]) || null, LB = { totalShots: "tiros", shotsOnTarget: "tiros a puerta", foulsCommitted: "faltas cometidas", foulsSuffered: "faltas recibidas", saves: "paradas" };
+      if (e) Object.keys(LB).forEach(k => e.rows.filter(x => x[0] === k && x[2] && x[3] <= (k === "saves" ? 6 : 3) && x[4] >= 1.3 && x[4] <= 4).sort((a, b) => a[3] - b[3] || a[4] - b[4]).slice(0, k === "saves" || k === "foulsCommitted" ? 6 : 4).forEach(x => o.push({ mercado: `${x[2]} (${x[1]}): ${x[3]}+ ${LB[k]}`, cuota: f2(x[4]) }))); } catch (er) { } return o; };
   all.filter(x => { const t = Date.parse(x.m.commence_time); return t > now - 5 * 60000 && t < now + 72 * 3600000 && !x.m.mov_live; }).forEach(x => {
-    const cells = mkts(x.m, true).concat(extra(x.m)); if (!cells.length) return;
-    const best = Math.max(-1, ...cells.map(c => c.valor_pct == null ? -1 : c.valor_pct)); if (best < 0 && !cells.some(c => c.valor_pct == null)) return;
+    const cells = mode === "jug" ? extra(x.m, true) : mkts(x.m, true).concat(extra(x.m)); if (!cells.length) return;
+    const best = mode === "jug" ? 0 : Math.max(-1, ...cells.map(c => c.valor_pct == null ? -1 : c.valor_pct)); if (mode !== "jug" && best < 0 && !cells.some(c => c.valor_pct == null)) return;
     let mt = null; try { mt = cpMetrics(x.m); } catch (e) { }
-    pre.push({ partido: `${x.m.home_team} vs ${x.m.away_team}`, liga: x.l.nm, hora: new Date(x.m.commence_time).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), _iso: x.m.commence_time, _h: x.m.home_team, _a: x.m.away_team, mercados_disponibles: cells.slice().sort((a, b) => (b.valor_pct ?? -99) - (a.valor_pct ?? -99)).slice(0, 18), media_goles_local_casa: mt ? f2(mt.hav) : undefined, media_goles_visitante_fuera: mt ? f2(mt.aav) : undefined, _best: best });
+    pre.push({ partido: `${x.m.home_team} vs ${x.m.away_team}`, liga: x.l.nm, hora: new Date(x.m.commence_time).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }), _iso: x.m.commence_time, _h: x.m.home_team, _a: x.m.away_team, mercados_disponibles: cells.slice().sort((a, b) => (b.valor_pct ?? -99) - (a.valor_pct ?? -99)).slice(0, mode === "jug" ? 30 : 18), historial_jugadores: mode === "jug" ? aiPlayerHist(x.m) : undefined, media_goles_local_casa: mt ? f2(mt.hav) : undefined, media_goles_visitante_fuera: mt ? f2(mt.aav) : undefined, _best: best });
   });
   pre.sort((a, b) => b._best - a._best); const preTop = pre.slice(0, 30);
-  const c = movGet(); if (c) c.data.filter(m => m.mov_live && m.mov_stats).slice(0, 20).forEach(m => {
+  const c = mode === "eq" ? movGet() : null; if (c) c.data.filter(m => m.mov_live && m.mov_stats).slice(0, 20).forEach(m => {
     const S = m.mov_stats, o = {}; MOV_SK.forEach(k => { if (S.h[k] != null) o[k] = [S.h[k], S.a[k]]; });
     const mk = mkts(m, false).concat(extra(m));
     if (!mk.length) return;
@@ -5470,10 +5500,20 @@ function aiGather() {
   return { pre: preTop, live };
 }
 function aiHist() { try { return JSON.parse(localStorage.getItem("radar-ai-hist") || "[]"); } catch (e) { return []; } }
-function aiBox(html) { let ov = document.getElementById("ai-ov"); if (!ov) { ov = document.createElement("div"); ov.id = "ai-ov"; ov.className = "plov"; ov.onclick = e => { if (e.target === ov) ov.style.display = "none"; }; document.body.appendChild(ov); }
-  ov.innerHTML = `<div class="plbox" style="max-width:640px; width:100%; max-height:92vh; overflow-y:auto;"><button class="ms-close" onclick="document.getElementById('ai-ov').style.display='none'">✕</button><div style="font-weight:800; font-size:17px; text-align:center; margin-bottom:4px;">🤖 Oportunidades según la IA</div>${html}</div>`; ov.style.display = "flex"; }
-function aiCard(o, bi, ii) { const conf = n => "●".repeat(Math.max(1, Math.min(5, n | 0))) + "○".repeat(5 - Math.max(1, Math.min(5, n | 0))), hq = (o.h || "").replace(/'/g, "\\'"), aq = (o.a || "").replace(/'/g, "\\'");
-  return `<div style="border:1px solid #232A33; border-radius:12px; padding:12px; margin-top:10px;"><div style="display:flex; justify-content:space-between; gap:8px; align-items:center;"><b>${o.partido}</b><span class="${/viv/i.test(o.tipo) ? "chip-live" : "chip-ft"}">${/viv/i.test(o.tipo) ? "EN VIVO" : "PREGAME"}</span></div><div style="margin:6px 0; font-size:15px;"><b style="color:#3ECF8E;">${o.mercado}</b>${o.cuota ? ` · cuota <b>${Number(o.cuota).toFixed(2)}</b>` : ""}</div><div class="muted" style="font-size:12.5px; line-height:1.5;">${o.motivo || ""}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;"><span title="Confianza">${conf(o.confianza)} <span class="muted">· ${o.momento || ""}</span></span>${o.h ? `<button class="small ghost" onclick="document.getElementById('ai-ov').style.display='none'; vsOpenMatch('${hq}','${aq}','${o.iso}',this)">Ver partido →</button>` : ""}</div><div style="display:flex; gap:6px; align-items:center; margin-top:8px; font-size:12px;"><span class="muted">Resultado${o.auto ? " (auto)" : ""}:</span>${[["w", "✅ Ganada", "#3ECF8E"], ["l", "❌ Perdida", "#E5484D"], ["v", "↩ Nula", "#9AA5B1"]].map(([k, t, c]) => `<button class="small ghost" style="${o.res === k ? "border-color:" + c + "; color:" + c + "; font-weight:700;" : ""}" onclick="aiMark(${bi},${ii},'${k}')">${t}</button>`).join("")}</div></div>`; }
+function aiBox(html) { const pg = document.getElementById("aiPage"); if (!pg) return; pg.innerHTML = `<div style="font-weight:800; font-size:18px; text-align:center; margin-bottom:4px;">🤖 Ideas de la IA</div>${html}`; const v = document.getElementById("view-ai"); if (v && !v.classList.contains("active")) { aiNoShow = true; switchView("ai"); aiNoShow = false; } }
+let aiNoShow = false;
+function aiCard(o, bi, ii) { const conf = n => "●".repeat(Math.max(1, Math.min(5, n | 0))) + "○".repeat(5 - Math.max(1, Math.min(5, n | 0))), hq = (o.h || "").replace(/'/g, "\\'"), aq = (o.a || "").replace(/'/g, "\\'"), esc = x => String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const F = o.facts || {}, det = [];
+  if (o.analisis) det.push(`<div style="font-weight:700; margin:10px 0 4px;">Análisis</div><div style="line-height:1.6;">${esc(o.analisis)}</div>`);
+  if ((o.datos_clave || []).length) det.push(`<div style="font-weight:700; margin:10px 0 4px;">Datos clave</div><ul style="margin:0; padding-left:18px; line-height:1.6;">${o.datos_clave.map(d => `<li>${esc(d)}</li>`).join("")}</ul>`);
+  if (o.riesgos) det.push(`<div style="font-weight:700; margin:10px 0 4px; color:#F0B429;">Qué podría salir mal</div><div style="line-height:1.6;">${esc(o.riesgos)}</div>`);
+  if (F.marcador != null || F.minuto != null) det.push(`<div style="font-weight:700; margin:10px 0 4px;">En el momento de la búsqueda</div><div>Marcador ${esc(F.marcador || "–")} · minuto ${esc(F.minuto == null ? "–" : F.minuto)}'</div>`);
+  if (F.stats && Object.keys(F.stats).length) { const NM = { xg: "xG", attacks: "Ataques", dangerous_attacks: "Ataques peligrosos", possession: "Posesión", shots: "Tiros", shots_on_target: "Tiros a puerta", shots_off_target: "Tiros fuera", key_passes: "Pases clave", goals: "Goles", corners: "Córners", yellow_cards: "Amarillas", red_cards: "Rojas", offsides: "Fueras de juego", saves: "Paradas", passing_accuracy: "Precisión de pase", crosses: "Centros", fouls: "Faltas" }; det.push(`<div style="font-weight:700; margin:10px 0 4px;">Estadísticas (local · visitante)</div><table style="width:100%; border-collapse:collapse; font-size:12.5px;">${Object.entries(F.stats).filter(([k]) => NM[k]).map(([k, v]) => `<tr style="border-top:1px solid #1A212B;"><td style="padding:4px 6px; text-align:right; width:30%;">${esc(v[0])}</td><td style="text-align:center;" class="muted">${NM[k]}</td><td style="padding:4px 6px; width:30%;">${esc(v[1])}</td></tr>`).join("")}</table>`); }
+  if (F.mediaL != null || F.mediaV != null) det.push(`<div style="font-weight:700; margin:10px 0 4px;">Medias de goles</div><div>Local en casa: <b>${esc(F.mediaL ?? "–")}</b> · Visitante fuera: <b>${esc(F.mediaV ?? "–")}</b></div>`);
+  if ((F.mercados || []).length) det.push(`<div style="font-weight:700; margin:10px 0 4px;">Mercados de Bet365 en este partido</div><table style="width:100%; border-collapse:collapse; font-size:12.5px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:3px 6px;">Mercado</th><th style="text-align:right;">Cuota</th><th style="text-align:right;">Prob. justa</th><th style="text-align:right; padding-right:6px;">Valor</th></tr>${F.mercados.map(m => `<tr style="border-top:1px solid #1A212B;${m.mercado === o.mercado ? " background:rgba(62,207,142,.10); font-weight:700;" : ""}"><td style="padding:4px 6px;">${esc(m.mercado)}</td><td style="text-align:right;">${esc(m.cuota)}</td><td style="text-align:right;">${m.prob_justa != null ? esc(m.prob_justa) : "–"}</td><td style="text-align:right; padding-right:6px;">${m.valor_pct != null ? (m.valor_pct >= 0 ? "+" : "") + esc(m.valor_pct) + "%" : "–"}</td></tr>`).join("")}</table>`);
+  if ((F.hist || []).length) det.push(`<div style="font-weight:700; margin:10px 0 4px;">Historial de jugadores (estadística: ${esc((F.hist[0] || {}).estadistica || "")}, línea ${esc((F.hist[0] || {}).linea || "")})</div><table style="width:100%; border-collapse:collapse; font-size:12.5px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:3px 6px;">Jugador</th><th>Equipo</th><th style="text-align:right;">Acierto</th><th style="text-align:right;">Media</th><th style="text-align:right; padding-right:6px;">Partidos</th></tr>${F.hist.map(h => `<tr style="border-top:1px solid #1A212B;"><td style="padding:4px 6px;">${esc(h.jugador)}</td><td>${esc(h.equipo)}</td><td style="text-align:right;">${esc(h.acierto_pct)}%</td><td style="text-align:right;">${esc(h.media)}</td><td style="text-align:right; padding-right:6px;">${esc(h.partidos)}</td></tr>`).join("")}</table>`);
+  if (F.liga || F.hora) det.push(`<div class="muted" style="margin-top:10px; font-size:12px;">${esc(F.liga || "")}${F.hora ? " · " + esc(F.hora) : ""}</div>`);
+  return `<div style="border:1px solid #232A33; border-radius:12px; padding:14px; margin-top:12px;"><div style="display:flex; justify-content:space-between; gap:8px; align-items:center;"><b style="font-size:15px;">${esc(o.partido)}</b><span class="${/viv/i.test(o.tipo) ? "chip-live" : "chip-ft"}">${/viv/i.test(o.tipo) ? "EN VIVO" : "PREGAME"}</span></div><div style="margin:6px 0; font-size:16px;"><b style="color:#3ECF8E;">${esc(o.mercado)}</b>${o.cuota ? ` · cuota <b>${Number(o.cuota).toFixed(2)}</b>` : ""}</div><div class="muted" style="font-size:13px; line-height:1.5;">${esc(o.motivo || "")}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:12px;"><span title="Confianza">${conf(o.confianza)} <span class="muted">· ${esc(o.momento || "")}</span></span>${o.h ? `<button class="small ghost" onclick="vsOpenMatch('${hq}','${aq}','${o.iso}',this)">Ver partido →</button>` : ""}</div>${det.length ? `<details style="margin-top:10px;"><summary style="cursor:pointer; font-size:13px; font-weight:700; color:#3ECF8E;">Ver análisis completo</summary><div style="font-size:13px; margin-top:4px;">${det.join("")}</div></details>` : ""}<div style="display:flex; gap:6px; align-items:center; margin-top:10px; font-size:12px; flex-wrap:wrap;"><span class="muted">Resultado${o.auto ? " (auto)" : ""}:</span>${[["w", "✅ Ganada", "#3ECF8E"], ["l", "❌ Perdida", "#E5484D"], ["v", "↩ Nula", "#9AA5B1"]].map(([k, t, c]) => `<button class="small ghost" style="${o.res === k ? "border-color:" + c + "; color:" + c + "; font-weight:700;" : ""}" onclick="aiMark(${bi},${ii},'${k}')">${t}</button>`).join("")}</div></div>`; }
 function aiMark(bi, ii, k) { const H = aiHist(); if (!H[bi] || !H[bi].items[ii]) return; const it = H[bi].items[ii]; it.res = it.res === k ? "" : k; try { localStorage.setItem("radar-ai-hist", JSON.stringify(H)); } catch (e) {} aiShow(); }
 function aiRules() { try { return localStorage.getItem("radar-ai-rules") || ""; } catch (e) { return ""; } }
 function aiStats() { const by = {}, tot = { n: 0, w: 0, p: 0 }; aiHist().forEach(r => r.items.forEach(o => { if (o.res !== "w" && o.res !== "l") return; const q = Number(o.cuota) || 0, pr = o.res === "w" ? (q ? q - 1 : 0) : -1;
@@ -5481,7 +5521,7 @@ function aiStats() { const by = {}, tot = { n: 0, w: 0, p: 0 }; aiHist().forEach
     tot.n++; if (o.res === "w") tot.w++; tot.p += pr; })); return { by, tot }; }
 function aiStatsText() { const { by, tot } = aiStats(); if (!tot.n) return ""; return `Total: ${tot.w}/${tot.n} acertadas, beneficio ${tot.p.toFixed(1)} unidades.\n` + Object.entries(by).filter(([k, b]) => b.n >= 2).sort((a, b) => b[1].n - a[1].n).slice(0, 12).map(([k, b]) => `${k}: ${b.w}/${b.n} acertadas, ${b.p >= 0 ? "+" : ""}${b.p.toFixed(1)} u`).join("\n"); }
 function aiPanel() { const st = aiStats(), t = st.tot, txt = t.n ? `${t.w} de ${t.n} acertadas · ${t.p >= 0 ? "+" : ""}${t.p.toFixed(1)} unidades` : "Marca cada idea como ganada o perdida y la IA aprenderá de tu historial.";
-  return `<details style="margin:6px 0;"><summary class="muted" style="cursor:pointer; font-size:12.5px;">⚙️ Mis reglas para la IA · ${txt}</summary><textarea id="aiRulesTx" rows="4" placeholder="Ej.: solo 1X2 y más/menos goles; cuota mínima 1.60; prefiero ligas nórdicas; máximo 3 ideas" style="width:100%; margin-top:8px;" oninput="try{localStorage.setItem('radar-ai-rules', this.value)}catch(e){}">${aiRules().replace(/</g, "&lt;")}</textarea></details>`; }
+  return `<details style="margin:6px 0;"><summary class="muted" style="cursor:pointer; font-size:12.5px;">⚙️ Mis reglas para la IA · ${txt}</summary><textarea id="aiRulesTx" rows="4" placeholder="Ej.: solo 1X2 y más/menos goles; cuota mínima 1.60; prefiero ligas nórdicas; máximo 3 ideas" style="width:100%; margin-top:8px;" oninput="try{localStorage.setItem('radar-ai-rules', this.value); alSyncSoon()}catch(e){}">${aiRules().replace(/</g, "&lt;")}</textarea></details>`; }
 
 /* ===== Auto-marcado de ideas de la IA con resultados de ESPN ===== */
 let aiGradeBusy = false; const aiResMemo = {};
@@ -5516,34 +5556,39 @@ async function aiAutoGrade(silent) {
     todo.forEach(([bi, ii, t, o]) => { const r = lists.find(z => near(z.h, nm(o.h)) && near(z.a, nm(o.a)) && Math.abs(z.t - t) < 36 * 3600000); if (!r) return; const g = aiParseGrade(o, r); if (g) { H[bi].items[ii].res = g; H[bi].items[ii].auto = 1; changed++; } else H[bi].items[ii].noauto = 1; });
     if (changed || todo.some(x => H[x[0]].items[x[1]].noauto)) { try { localStorage.setItem("radar-ai-hist", JSON.stringify(H)); } catch (e) { } }
   } catch (e) { } finally { aiGradeBusy = false; }
-  if (changed) { const ov = document.getElementById("ai-ov"); if (ov && ov.style.display !== "none") aiShow(); if (!silent) showToast(`🤖 ${changed} idea${changed > 1 ? "s" : ""} marcada${changed > 1 ? "s" : ""} automáticamente`); }
+  if (changed) { if (document.getElementById("view-ai").classList.contains("active")) aiShow(); if (!silent) showToast(`🤖 ${changed} idea${changed > 1 ? "s" : ""} marcada${changed > 1 ? "s" : ""} automáticamente`); }
 }
 setInterval(() => { try { if (aiHist().length) aiAutoGrade(true); } catch (e) { } }, 900000);
+let aiTab = "eq"; try { aiTab = localStorage.getItem("radar-ai-tab") === "jug" ? "jug" : "eq"; } catch (e) { }
+function aiSetTab(t) { aiTab = t; try { localStorage.setItem("radar-ai-tab", t); } catch (e) { } aiShow(); }
 function aiShow() { setTimeout(() => { try { aiAutoGrade(); } catch (e) { } }, 300);
-  const H = aiHist(), fmt = t => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-  const btns = `<div style="display:flex; gap:8px; justify-content:center; margin:10px 0; flex-wrap:wrap;"><button class="small" onclick="aiOpp(true)">🔄 Buscar de nuevo (~8 céntimos)</button>${H.length ? `<button class="small ghost" onclick="aiSendPhone()">📱 Enviar al móvil</button><button class="small ghost" onclick="if(confirm('¿Borrar las ideas guardadas?')){localStorage.removeItem('radar-ai-hist'); aiShow();}">Borrar</button>` : ""}</div>`;
-  if (!H.length) { aiBox(btns + aiPanel() + '<div class="muted" style="text-align:center; padding:12px;">Todavía no hay ideas guardadas. Pulsa «Buscar de nuevo».</div>'); return; }
-  const first = H[0], rest = H.slice(1);
-  aiBox(btns + aiPanel() + `<div class="muted" style="text-align:center; font-size:12px;">Última búsqueda: ${fmt(first.t)}</div><div class="muted" style="text-align:center; font-size:12.5px; margin:2px 0;">${first.resumen || ""}</div>${first.items.map((o, i) => aiCard(o, 0, i)).join("") || '<div class="muted" style="text-align:center; padding:18px;">En esa búsqueda la IA no vio nada que mereciera la pena.</div>'}${rest.length ? `<details style="margin-top:14px;"><summary class="muted" style="cursor:pointer; font-size:12.5px;">Búsquedas anteriores (${rest.length})</summary>${rest.map((r, bj) => `<div class="muted" style="margin-top:12px; font-size:12px;">${fmt(r.t)} · ${r.resumen || ""}</div>${r.items.map((o, i) => aiCard(o, bj + 1, i)).join("")}`).join("")}</details>` : ""}<div class="muted" style="font-size:11px; text-align:center; margin-top:12px; line-height:1.5;">Herramienta informativa. La IA puede equivocarse: contrasta siempre los datos antes de apostar. Las cuotas y el minuto pueden haber cambiado desde que se buscó.</div>`);
+  const H = aiHist(), fmt = t => new Date(t).toLocaleString("es-ES", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }), HV = H.map((r, i) => ({ r, i })).filter(x => (x.r.cat || "eq") === aiTab);
+  const tabs = `<div style="display:flex; gap:8px; justify-content:center; margin:12px 0 4px;">${[["eq", "⚽ Equipos (pregame y en vivo)"], ["jug", "🧤 Jugadores y porteros"]].map(([k, t]) => `<button class="${aiTab === k ? "" : "ghost"}" onclick="aiSetTab('${k}')">${t}</button>`).join("")}</div>`;
+  const btns = `<div style="display:flex; gap:8px; justify-content:center; margin:10px 0; flex-wrap:wrap;"><button class="small" onclick="aiOpp(true, aiTab)">🔄 ${aiTab === "jug" ? "Buscar jugadores y porteros" : "Buscar equipos"} (~10 céntimos)</button>${HV.length ? `<button class="small ghost" onclick="aiSendPhone()">📱 Enviar al móvil</button><button class="small ghost" onclick="if(confirm('¿Borrar las ideas guardadas de esta pestaña?')){localStorage.setItem('radar-ai-hist', JSON.stringify(aiHist().filter(r => (r.cat || 'eq') !== aiTab))); aiShow();}">Borrar</button>` : ""}</div>`;
+  const note = aiTab === "jug" ? '<div class="muted" style="text-align:center; font-size:12px; margin-bottom:6px;">Solo partidos que aún no han empezado. Para que la IA vea el historial de cada jugador (acierto y media), busca antes la liga en «Estadísticas de jugadores».</div>' : "";
+  if (!HV.length) { aiBox(tabs + btns + note + aiPanel() + '<div class="muted" style="text-align:center; padding:12px;">Todavía no hay ideas guardadas en esta pestaña. Pulsa el botón de buscar.</div>'); return; }
+  const first = HV[0], rest = HV.slice(1);
+  aiBox(tabs + btns + note + aiPanel() + `<div class="muted" style="text-align:center; font-size:12px;">Última búsqueda: ${fmt(first.r.t)}</div><div class="muted" style="text-align:center; font-size:12.5px; margin:2px 0;">${first.r.resumen || ""}</div>${first.r.items.map((o, k) => aiCard(o, first.i, k)).join("") || '<div class="muted" style="text-align:center; padding:18px;">En esa búsqueda la IA no vio nada que mereciera la pena.</div>'}${rest.length ? `<details style="margin-top:14px;"><summary class="muted" style="cursor:pointer; font-size:12.5px;">Búsquedas anteriores (${rest.length})</summary>${rest.map(x => `<div class="muted" style="margin-top:12px; font-size:12px;">${fmt(x.r.t)} · ${x.r.resumen || ""}</div>${x.r.items.map((o, k) => aiCard(o, x.i, k)).join("")}`).join("")}</details>` : ""}<div class="muted" style="font-size:11px; text-align:center; margin-top:12px; line-height:1.5;">Herramienta informativa. La IA puede equivocarse: contrasta siempre los datos antes de apostar. Las cuotas y el minuto pueden haber cambiado desde que se buscó.</div>`);
 }
-function aiSendPhone(rec) { const r = rec || aiHist()[0]; if (!r) return; const t = r.items.length ? r.items.map(o => `• ${o.partido}\n  ${o.mercado}${o.cuota ? " @" + Number(o.cuota).toFixed(2) : ""} (${/viv/i.test(o.tipo) ? "en vivo" : "pregame"}, ${o.momento || ""}, confianza ${o.confianza}/5)\n  ${o.motivo || ""}`).join("\n") : "La IA no ve nada que merezca la pena ahora mismo."; const ok = waSend(`🤖 Ideas de la IA\n${r.resumen || ""}\n${t}`); if (!rec) showToast(ok ? "📱 Enviado al WhatsApp" : "Configura el WhatsApp en ⚙️ primero"); }
-async function aiOpp(force) {
-  if (!force) { aiShow(); return; }
+function aiSendPhone(rec) { const r = rec || aiHist().find(x => (x.cat || "eq") === aiTab); if (!r) return; const t = r.items.length ? r.items.map(o => `• ${o.partido}\n  ${o.mercado}${o.cuota ? " @" + Number(o.cuota).toFixed(2) : ""} (${/viv/i.test(o.tipo) ? "en vivo" : "pregame"}, ${o.momento || ""}, confianza ${o.confianza}/5)\n  ${o.motivo || ""}`).join("\n") : "La IA no ve nada que merezca la pena ahora mismo."; const ok = waSend(`🤖 Ideas de la IA\n${r.resumen || ""}\n${t}`); if (!rec) showToast(ok ? "📱 Enviado al WhatsApp" : "Configura el WhatsApp en ⚙️ primero"); }
+async function aiOpp(force, mode) {
+  if (!force) { aiShow(); aiMorFetch(); return; }
+  mode = mode || aiTab || "eq";
   const box = aiBox;
   const key = getAnthropicKey(); if (!key) { box('<div class="muted" style="text-align:center; padding:16px;">Añade tu Anthropic API key en ⚙️ Configuración para usar la IA.</div>'); return; }
-  const D = aiGather(); if (!D.pre.length && !D.live.length) { box('<div class="muted" style="text-align:center; padding:16px;">No hay partidos con cuotas cargadas ahora mismo. Pulsa «Cuotas Bet365» para traer partidos y vuelve a probar.</div>'); return; }
+  const D = aiGather(mode); if (!D.pre.length && !D.live.length) { box(mode === "jug" ? '<div class="muted" style="text-align:center; padding:16px;">No hay mercados de jugadores o porteros cargados. Pulsa «Cuotas Bet365» (en Partidos y valor) para traer los partidos con sus mercados de jugadores y vuelve a probar. Solo hay de partidos que aún no han empezado.</div>' : '<div class="muted" style="text-align:center; padding:16px;">No hay partidos con cuotas cargadas ahora mismo. Pulsa «Cuotas Bet365» para traer partidos y vuelve a probar.</div>'); return; }
   box('<div class="muted" style="text-align:center; padding:24px;">Analizando ' + D.pre.length + ' partidos de pregame y ' + D.live.length + ' en vivo…</div>');
   const clean = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith("_") ? undefined : v));
-  const prompt = `Eres un analista de apuestas deportivas prudente. Tienes datos reales de cuotas de Bet365, probabilidad justa (quitando el margen de la casa), valor estimado (% de ventaja) y, en vivo, estadísticas del partido. Elige como máximo 8 oportunidades en total que de verdad merezcan la pena, mezclando pregame y en vivo si procede. Reglas: usa SOLO los datos dados, no inventes cifras. MUY IMPORTANTE: cada oportunidad debe ser UNO de los "mercados_disponibles" de ese partido, copiando el nombre del mercado y la cuota exactamente como vienen; si un mercado (por ejemplo tarjetas, amarillas, tiros o jugadores) NO está en esa lista, no lo propongas aunque las estadísticas lo sugieran; si nada convence, devuelve una lista vacía; prefiere valor claro y respaldado por estadísticas; en vivo explica qué dicen los números del partido (presión, tiros, córners, tarjetas) y si es buen momento ahora. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","oportunidades":[{"tipo":"pregame|vivo","partido":"exactamente como viene","mercado":"p. ej. Más de 2.5 goles","cuota":number,"motivo":"2 frases como máximo","confianza":1-5,"momento":"ahora|esperar|antes del partido"}]}${aiRules().trim() ? `\n\nREGLAS DEL USUARIO (obligatorias, tienen prioridad):\n${aiRules().trim().slice(0, 1200)}` : ""}${aiStatsText() ? `\n\nHISTORIAL REAL DE TUS IDEAS ANTERIORES (úsalo para priorizar lo que ha funcionado y evitar lo que no; con pocas muestras es ruido, no lo sobreinterpretes):\n${aiStatsText()}` : ""}\n\nPREGAME:\n${JSON.stringify(clean(D.pre))}\n\nEN VIVO:\n${JSON.stringify(clean(D.live))}`;
-  try { const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2200, messages: [{ role: "user", content: prompt }] }) });
+  const prompt = `${mode === "jug" ? `Eres un analista prudente de apuestas sobre JUGADORES y PORTEROS (tiros, tiros a puerta, faltas cometidas o recibidas, paradas). Tienes cuotas reales de Bet365 por jugador y, cuando existe, el historial real de cada jugador (porcentaje de partidos en que supera la línea y su media). Elige como máximo 8 oportunidades de PREGAME que de verdad merezcan la pena. Si de un jugador no hay historial en los datos, di claramente que no hay historial y pon confianza 2 como máximo. No inventes porcentajes ni medias.` : `Eres un analista de apuestas deportivas prudente. Tienes datos reales de cuotas de Bet365, probabilidad justa (quitando el margen de la casa), valor estimado (% de ventaja) y, en vivo, estadísticas del partido. Elige como máximo 8 oportunidades en total que de verdad merezcan la pena, mezclando pregame y en vivo si procede.`} Reglas: usa SOLO los datos dados, no inventes cifras. MUY IMPORTANTE: cada oportunidad debe ser UNO de los "mercados_disponibles" de ese partido, copiando el nombre del mercado y la cuota exactamente como vienen; si un mercado (por ejemplo tarjetas, amarillas, tiros o jugadores) NO está en esa lista, no lo propongas aunque las estadísticas lo sugieran; si nada convence, devuelve una lista vacía; prefiere valor claro y respaldado por estadísticas; en vivo explica qué dicen los números del partido (presión, tiros, córners, tarjetas) y si es buen momento ahora. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","oportunidades":[{"tipo":"pregame|vivo","partido":"exactamente como viene","mercado":"p. ej. Más de 2.5 goles","cuota":number,"motivo":"1 frase resumen","analisis":"explicación detallada de 5 a 8 frases con los números concretos que la respaldan (cuota, probabilidad justa, valor, medias de goles y, en vivo, estadísticas del partido)","datos_clave":["entre 3 y 6 datos concretos tomados de los datos dados"],"riesgos":"1 o 2 frases con lo que podría salir mal","confianza":1-5,"momento":"ahora|esperar|antes del partido"}]}${aiRules().trim() ? `\n\nREGLAS DEL USUARIO (obligatorias, tienen prioridad):\n${aiRules().trim().slice(0, 1200)}` : ""}${aiStatsText() ? `\n\nHISTORIAL REAL DE TUS IDEAS ANTERIORES (úsalo para priorizar lo que ha funcionado y evitar lo que no; con pocas muestras es ruido, no lo sobreinterpretes):\n${aiStatsText()}` : ""}\n\nPREGAME:\n${JSON.stringify(clean(D.pre))}\n\nEN VIVO:\n${JSON.stringify(clean(D.live))}`;
+  try { const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 4500, messages: [{ role: "user", content: prompt }] }) });
     if (!res.ok) { const t = await res.text(); throw new Error(res.status + " " + t.slice(0, 160)); }
     const j = await res.json(), txt = ((j.content || [])[0] || {}).text || "", m = /\{[\s\S]*\}/.exec(txt); if (!m) throw new Error("La IA no devolvió una lista legible."); const out = JSON.parse(m[0]), src = [...D.pre, ...D.live];
     const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase());
     let dropped = 0; const mn = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
     const items = (out.oportunidades || []).map(o => { const f = src.find(z => nm(z.partido) === nm(o.partido)) || src.find(z => nm(z.partido).includes(nm(o.partido)) || nm(o.partido).includes(nm(z.partido))); if (!f) { dropped++; return null; }
       const mk = (f.mercados_disponibles || []).find(z => mn(z.mercado) === mn(o.mercado)); if (!mk) { dropped++; return null; }
-      return { partido: f.partido, tipo: D.live.includes(f) ? "vivo" : "pregame", mercado: mk.mercado, cuota: mk.cuota, motivo: o.motivo, confianza: o.confianza, momento: o.momento, h: f._h, a: f._a, iso: f._iso }; }).filter(Boolean);
-    const rec = { t: Date.now(), resumen: (out.resumen || "") + (dropped ? ` (se descartaron ${dropped} idea${dropped > 1 ? "s" : ""} con mercados que Bet365 no ofrece en ese partido)` : ""), items }; try { localStorage.setItem("radar-ai-hist", JSON.stringify([rec, ...aiHist()].slice(0, 8))); } catch (e) {}
+      const live = D.live.includes(f); return { partido: f.partido, tipo: live ? "vivo" : "pregame", mercado: mk.mercado, cuota: mk.cuota, motivo: o.motivo, analisis: o.analisis, datos_clave: Array.isArray(o.datos_clave) ? o.datos_clave.slice(0, 8) : [], riesgos: o.riesgos, confianza: o.confianza, momento: o.momento, h: f._h, a: f._a, iso: f._iso, facts: { liga: f.liga, hora: f.hora, marcador: f.marcador, minuto: f.minuto, stats: f.estadisticas_local_visitante, mediaL: f.media_goles_local_casa, mediaV: f.media_goles_visitante_fuera, mercados: (f.mercados_disponibles || []).slice(0, 20), hist: f.historial_jugadores } }; }).filter(Boolean);
+    const rec = { t: Date.now(), resumen: (out.resumen || "") + (dropped ? ` (se descartaron ${dropped} idea${dropped > 1 ? "s" : ""} con mercados que Bet365 no ofrece en ese partido)` : ""), items, cat: mode }; try { localStorage.setItem("radar-ai-hist", JSON.stringify([rec, ...aiHist()].slice(0, 8))); } catch (e) {} aiPutRemote(rec);
     aiShow(); try { if (items.length) aiSendPhone(rec); } catch (e) {}
   } catch (e) { box(`<div class="muted" style="text-align:center; padding:16px;">No se pudo analizar: ${e.message}</div>`); }
 }
@@ -5555,19 +5600,24 @@ function alFire(a, msg) {
 }
 function alIn(v, mn, mx) { return (mn === "" || mn == null || (v != null && v >= +mn)) && (mx === "" || mx == null || (v != null && v <= +mx)); }
 function runAlarms(matches, sport) {
-  const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
   const lg = DD_LEAGUES.find(l => l.odds === sport); if (!lg) return;
-  const fired = getAlFired(), today = new Date().toISOString().slice(0, 10); let any = false;
-  matches.forEach(m => {
+  runAlarmsCore(matches.map(m => ({ m, l: lg })));
+}
+function runPreAll() { try { runAlarmsCore(cpAll()); } catch (e) { } }
+function runAlarmsCore(items) {
+  const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
+  const fired = getAlFired(), today = new Date().toISOString().slice(0, 10), nmz = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), nowT = Date.now(); let any = false;
+  items.forEach(({ m, l: lg }) => {
+    if (!m.bookmakers || Date.parse(m.commence_time) < nowT - 10 * 60000 || m.mov_live) return;
     const cells = CP_COLS.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; return { lab: c[2], r: cpPick(m.bookmakers, c[0], key) }; });
     alarms.forEach(a => {
-      if (a.matchId && a.matchId !== m.id) return;
-      if (a.leagues.length && !a.leagues.includes(lg.id)) return;
+      if (a.matchId && a.matchId !== m.id && a.matchLabel !== `${m.home_team} vs ${m.away_team}`) return;
+      if (!a.matchId && a.leagues.length && !a.leagues.includes(lg.id) && !alLgOK(a, null, m.mov_league)) return;
       cells.forEach(c => {
         if (!c.r || (a.sel !== "any" && a.sel !== c.lab)) return;
         const ev = c.r.ev != null ? c.r.ev * 100 : null, real = c.r.fair ? 1 / c.r.fair : null;
         if (!alIn(c.r.price, a.oMin, a.oMax) || !alIn(ev, a.eMin, a.eMax) || !alIn(real, a.rMin, a.rMax) || !alIn(c.r.diff, a.dMin, a.dMax)) return;
-        const k = `${a.id}|${m.id}|${c.lab}|${today}`; if (fired.has(k)) return; fired.add(k); any = true;
+        const k = `${a.id}|${nmz(m.home_team)}|${nmz(m.away_team)}|${c.lab}|${today}`; if (fired.has(k)) return; fired.add(k); any = true;
         alFire(a, `${m.home_team} vs ${m.away_team}<br/>Selección ${c.lab} a ${c.r.price.toFixed(2)}${ev != null ? ` · valor ${ev >= 0 ? "+" : ""}${ev.toFixed(1)}%` : ""}`);
       });
     });
@@ -5703,6 +5753,7 @@ async function liveWatchTick() {
 }
 function alWatchRender() { const el = document.getElementById("alWatch"); if (!el) return; liveWatchWanted(); const n = reqToday(); el.innerHTML = `Vigilancia en vivo: <b style="color:#3ECF8E;">${liveWatchState}</b>${liveWatchLast ? " · última comprobación " + liveWatchLast.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : ""} · peticiones de alarmas hoy: ${n}${n >= 80 ? ' <b style="color:#F0B429;">(cerca del límite del plan gratuito: 100/día)</b>' : ""}`; }
 setInterval(liveWatchTick, 60000);
+setInterval(() => { try { if (getAlarms().some(a => a.active && a.type === "pre")) runPreAll(); } catch (e) { } }, 120000);
 
 /* ===== Resultados de partidos de hoy en Pregame (ESPN) ===== */
 let cpRes = { t: 0, list: [], busy: false };
