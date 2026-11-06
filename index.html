@@ -5477,10 +5477,14 @@ function waSave() { try { alSyncSoon(); } catch (e) { } try { localStorage.setIt
 function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"), pv = document.getElementById("waProv"); if (pv) pv.value = c.prov || "callmebot"; if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
 function waSend(text) {
   const c = waCfg(); if (!c.phone || !c.key) return false;
-  const url = c.prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(c.phone)}&apikey=${encodeURIComponent(c.key)}&text=${encodeURIComponent(text)}` : `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(c.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`;
+  const url = c.prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(c.phone)}&apikey=${encodeURIComponent(c.key)}&text=${encodeURIComponent(text)}` : `https://api.callmebot.com/whatsapp.php?phone=%2B${encodeURIComponent(String(c.phone).replace(/^\+/, ""))}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`;
   try { fetch(url, { mode: "no-cors" }).catch(() => { }); return true; } catch (e) { return false; }
 }
-function waTest() { const m = document.getElementById("waMsg"), c = waCfg(); if (!c.phone || !c.key) { m.textContent = "Rellena el teléfono y la clave primero."; return; } waSend("✅ Radar de valor: aviso de prueba. Si lo lees, las alarmas te llegarán aquí."); m.textContent = "Enviado. Si no te llega en un minuto, revisa el teléfono (con prefijo, sin +) y la clave."; }
+async function waTest() { const m = document.getElementById("waMsg"), c = waCfg(); if (!c.phone || !c.key) { m.textContent = "Rellena el teléfono y la clave primero."; return; }
+  const txt = "✅ Radar de valor: aviso de prueba. Si lo lees, las alarmas te llegarán aquí.", px = getFdProxy();
+  if (px) { m.textContent = "Enviando…"; try { const r = await fetch(px + "/wa/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wa: { prov: c.prov || "callmebot", phone: c.phone, key: c.key }, text: txt }) }); const j = await r.json(); const esc = x => String(x || "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+      m.innerHTML = `Servicio: <b>${esc(j.prov)}</b> · Respuesta (${j.status}): <span style="color:${j.ok ? "#3ECF8E" : "#E5484D"};">${esc(j.body).slice(0, 400)}</span>${j.ok ? "" : "<br/>Si dice que la clave o el teléfono no son válidos, revisa que el teléfono sea el MISMO desde el que activaste CallMeBot y que la clave esté completa."}`; return; } catch (e) { } }
+  waSend(txt); m.textContent = "Enviado (sin comprobación). Para ver la respuesta real del servicio, pon la URL de tu Worker en ⚙️ y publica el worker.js nuevo."; }
 function waNotifAsk() { const m = document.getElementById("waMsg"); if (!("Notification" in window)) { m.textContent = "Este navegador no permite notificaciones."; return; } Notification.requestPermission().then(r => { m.textContent = r === "granted" ? "Avisos del navegador activados." : "No has dado permiso para las notificaciones."; if (r === "granted") try { new Notification("Radar de valor", { body: "Avisos activados." }); } catch (e) { } }); }
 function alPush(title, body, skipWa) {
   if (!skipWa) waSend(`⏰ ${title}\n${body}`);

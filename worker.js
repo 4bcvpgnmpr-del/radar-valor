@@ -42,6 +42,15 @@ export default {
       await env.ALARMS.put("db", JSON.stringify(db));
       return new Response(JSON.stringify({ ok: true, alarms: u.alarms.filter(a => a.active && a.type === "live").length }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
+    if (url.pathname === "/wa/test" && req.method === "POST") {
+      let b; try { b = await req.json(); } catch (e) { return new Response("JSON inválido", { status: 400, headers: cors }); }
+      const wa = b && b.wa; if (!wa || !wa.phone || !wa.key) return new Response("Datos inválidos", { status: 400, headers: cors });
+      const prov = wa.prov === "textmebot" ? "textmebot" : "callmebot", ph = String(wa.phone).replace(/^\+/, "").slice(0, 20), tx = String(b.text || "Prueba").slice(0, 300);
+      const u2 = prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(ph)}&apikey=${encodeURIComponent(String(wa.key).slice(0, 120))}&text=${encodeURIComponent(tx)}` : `https://api.callmebot.com/whatsapp.php?phone=%2B${encodeURIComponent(ph)}&text=${encodeURIComponent(tx)}&apikey=${encodeURIComponent(String(wa.key).slice(0, 120))}`;
+      let out = { prov, ok: false, status: 0, body: "" };
+      try { const r = await fetch(u2); const t = (await r.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(); out = { prov, ok: r.ok && !/error|invalid|not valid|incorrect|wrong/i.test(t), status: r.status, body: t.slice(0, 500) }; } catch (e) { out.body = String(e.message || e); }
+      return new Response(JSON.stringify(out), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
     if (url.pathname === "/alarms/presnap" && req.method === "POST") {
       if (!env.ALARMS) return new Response("sin KV", { status: 200, headers: cors });
       let b; try { b = await req.json(); } catch (e) { return new Response("JSON inválido", { status: 400, headers: cors }); }
@@ -101,7 +110,7 @@ async function fetchLive() {
 function inR(v, mn, mx) { return (mn === "" || mn == null || (v != null && v >= +mn)) && (mx === "" || mx == null || (v != null && v <= +mx)); }
 async function sendWa(wa, text) {
   const url = wa.prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(wa.phone)}&apikey=${encodeURIComponent(wa.key)}&text=${encodeURIComponent(text)}`
-    : `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(wa.phone)}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(wa.key)}`;
+    : `https://api.callmebot.com/whatsapp.php?phone=%2B${encodeURIComponent(String(wa.phone).replace(/^\+/, ""))}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(wa.key)}`;
   try { await fetch(url); } catch (e) { }
 }
 async function runAlarms(env) {
