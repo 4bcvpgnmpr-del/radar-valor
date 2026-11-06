@@ -37,7 +37,7 @@ export default {
       let b; try { b = await req.json(); } catch (e) { return new Response("JSON inválido", { status: 400, headers: cors }); }
       if (!b || typeof b.token !== "string" || b.token.length < 16 || !Array.isArray(b.alarms)) return new Response("Datos inválidos", { status: 400, headers: cors });
       const db = await dbGet(env), u = db.u[b.token] || { fired: {}, base: {} };
-      u.alarms = b.alarms.slice(0, 40); u.wa = b.wa && b.wa.phone && b.wa.key ? { prov: b.wa.prov || "callmebot", phone: String(b.wa.phone).slice(0, 20), key: String(b.wa.key).slice(0, 120) } : null; u.ts = Date.now(); const ai = b.ai && b.ai.key && b.ai.time ? { time: String(b.ai.time).slice(0, 5), key: String(b.ai.key).slice(0, 200), rules: String(b.ai.rules || "").slice(0, 1200), stats: String(b.ai.stats || "").slice(0, 1500), tz: String(b.ai.tz || "Europe/Madrid").slice(0, 60), last: (u.ai && u.ai.last) || "" } : null; u.ai = ai; db.u[b.token] = u;
+      u.alarms = b.alarms.slice(0, 40); u.wa = b.wa && b.wa.phone && b.wa.key ? { prov: b.wa.prov || "callmebot", phone: String(b.wa.phone).slice(0, 20), key: String(b.wa.key).slice(0, 120) } : null; u.ts = Date.now(); const ai = b.ai && b.ai.key && b.ai.time ? { time: String(b.ai.time).slice(0, 5), key: String(b.ai.key).slice(0, 200), rules: String(b.ai.rules || "").slice(0, 1200), stats: String(b.ai.stats || "").slice(0, 1500), tz: String(b.ai.tz || "Europe/Madrid").slice(0, 60), days: ["all", "wk", "wkcl"].includes(b.ai.days) ? b.ai.days : "all", last: (u.ai && u.ai.last) || "" } : null; u.ai = ai; db.u[b.token] = u;
       const ids = Object.keys(db.u); if (ids.length > 30) delete db.u[ids.sort((x, y) => (db.u[x].ts || 0) - (db.u[y].ts || 0))[0]];
       await env.ALARMS.put("db", JSON.stringify(db));
       return new Response(JSON.stringify({ ok: true, alarms: u.alarms.filter(a => a.active && a.type === "live").length }), { headers: { ...cors, "Content-Type": "application/json" } });
@@ -174,11 +174,12 @@ function localNow(tz) {
 async function runMorning(env) {
   if (!env.ALARMS) return;
   const db = await dbGet(env); let due = null;
-  for (const [tok, u] of Object.entries(db.u)) { if (!u.ai || !u.wa) continue; const ln = localNow(u.ai.tz), [hh, mm] = u.ai.time.split(":").map(Number); if (ln.date !== u.ai.last && ln.min >= hh * 60 + mm && ln.min < hh * 60 + mm + 180) { due = [tok, u, ln]; break; } }
+  for (const [tok, u] of Object.entries(db.u)) { if (!u.ai || !u.wa) continue; const ln = localNow(u.ai.tz), [hh, mm] = u.ai.time.split(":").map(Number); if (ln.date !== u.ai.last && ln.min >= hh * 60 + mm && ln.min < hh * 60 + mm + 180) { const dow = new Date(ln.date + "T12:00:00Z").getUTCDay(), wk = dow === 5 || dow === 6 || dow === 0; if ((u.ai.days || "all") === "all" || wk) { due = [tok, u, ln]; break; } if (u.ai.days === "wkcl") { due = [tok, u, ln, true]; break; } u.ai.last = ln.date; await env.ALARMS.put("db", JSON.stringify(db)); } }
   if (!due) return;
-  const [tok, u, ln] = due; u.ai.last = ln.date; await env.ALARMS.put("db", JSON.stringify(db));
+  const [tok, u, ln, needEu] = due; u.ai.last = ln.date; await env.ALARMS.put("db", JSON.stringify(db));
   let snap = null; try { snap = JSON.parse((await env.ALARMS.get("snap:" + tok)) || "null"); } catch (e) { }
   const now = Date.now(), pre = snap ? snap.pre.filter(x => Date.parse(x._iso) > now + 10 * 60000) : [];
+  if (needEu && !pre.some(x => /champions|europa|conference/i.test(x.liga || "") && Date.parse(x._iso) < now + 30 * 3600000)) return;
   if (!pre.length) { await sendWa(u.wa, "🤖 Análisis de la mañana: no tengo partidos cargados. Abre la app una vez para que guarde las cuotas y mañana lo haré."); return; }
   const clean = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith("_") ? undefined : v));
   const prompt = `Eres un analista de apuestas deportivas prudente. Tienes datos reales de cuotas de Bet365, probabilidad justa (quitando el margen de la casa), valor estimado (% de ventaja) y medias de goles. Elige entre 4 y 8 oportunidades de PREGAME (partidos que aún no han empezado) que de verdad merezcan la pena. Reglas: usa SOLO los datos dados, no inventes cifras. MUY IMPORTANTE: cada oportunidad debe ser UNO de los "mercados_disponibles" de ese partido, copiando el nombre del mercado y la cuota exactamente como vienen; si un mercado NO está en esa lista, no lo propongas; si nada convence, devuelve una lista vacía; prefiere valor claro y respaldado por estadísticas. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","oportunidades":[{"tipo":"pregame","partido":"exactamente como viene","mercado":"p. ej. Más de 2.5 goles","cuota":number,"motivo":"1 frase resumen","analisis":"explicación detallada de 5 a 8 frases con los números concretos que la respaldan","datos_clave":["entre 3 y 6 datos concretos de los datos dados"],"riesgos":"1 o 2 frases con lo que podría salir mal","confianza":1-5,"momento":"antes del partido"}]}${u.ai.rules ? `\n\nREGLAS DEL USUARIO (obligatorias, tienen prioridad):\n${u.ai.rules}` : ""}${u.ai.stats ? `\n\nHISTORIAL REAL DE TUS IDEAS ANTERIORES (con pocas muestras es ruido):\n${u.ai.stats}` : ""}\n\nPREGAME:\n${JSON.stringify(clean(pre))}`;
@@ -193,10 +194,33 @@ async function runMorning(env) {
     const age = Math.round((now - snap.t) / 3600000);
     await sendWa(u.wa, items.length ? `🤖 Ideas de la mañana (pregame)\n${rec.resumen}\n` + items.map(o => `• ${o.partido}\n  ${o.mercado} @${Number(o.cuota).toFixed(2)} (confianza ${o.confianza}/5)\n  ${o.motivo || ""}`).join("\n") + `\n\nCuotas guardadas hace ${age} h: confírmalas antes de apostar.` : "🤖 Análisis de la mañana: hoy la IA no ve nada que merezca la pena.");
   } catch (e) { await sendWa(u.wa, "🤖 No pude hacer el análisis de la mañana: " + (e.message || e)); }
+  try { await runCombos(env, tok, u, pre, clean, now); } catch (e) { await sendWa(u.wa, "🎯 No pude armar las combinadas: " + (e.message || e)); }
+}
+const COMB_META = { segura: ["🟢", "Segura"], media: ["🟡", "Media"], super: ["🔴", "Super combinada"] };
+const COMB_PROMPT = `Eres un analista prudente de apuestas. Con los partidos de PREGAME de abajo (datos reales de Bet365) arma EXACTAMENTE 3 combinadas:
+- "segura": 2 o 3 selecciones de probabilidad alta y cuota baja (cuota total aproximada entre 1.8 y 3.2). Prioriza acertar.
+- "media": 3 o 4 selecciones equilibradas (cuota total aproximada entre 4 y 9).
+- "super": 5 a 7 selecciones, cuota total muy alta (más de 15), pensada para apostar muy poco dinero.
+Reglas: usa SOLO los datos dados. Cada selección debe ser UNO de los "mercados_disponibles" de ese partido, copiando el nombre del partido y del mercado exactamente como vienen. No pongas dos selecciones del mismo partido en la misma combinada. No inventes cifras. Si no hay material para una combinada, déjala fuera. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","combinadas":[{"tipo":"segura|media|super","motivo":"2 frases: por qué esta combinada","selecciones":[{"partido":"exactamente como viene","mercado":"exactamente como viene","motivo":"1 frase corta"}]}]}`;
+async function runCombos(env, tok, u, pre, clean, now) {
+  if (pre.length < 2) return;
+  const prompt = COMB_PROMPT + (u.ai.rules ? `\n\nREGLAS DEL USUARIO (obligatorias, tienen prioridad):\n${u.ai.rules}` : "") + `\n\nPREGAME:\n${JSON.stringify(clean(pre))}`;
+  const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": u.ai.key, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 3500, messages: [{ role: "user", content: prompt }] }) });
+  if (!r.ok) throw new Error("Anthropic " + r.status);
+  const j = await r.json(), txt = ((j.content || [])[0] || {}).text || "", m = /\{[\s\S]*\}/.exec(txt); if (!m) throw new Error("respuesta ilegible");
+  const out = JSON.parse(m[0]), mn = x => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim(); let dropped = 0; const combos = [];
+  for (const c of out.combinadas || []) { const tipo = COMB_META[c.tipo] ? c.tipo : null; if (!tipo || combos.some(z => z.tipo === tipo)) continue; const used = new Set(), legs = [];
+    for (const o of c.selecciones || []) { const f = pre.find(z => mn(z.partido) === mn(o.partido)), mk = f && (f.mercados_disponibles || []).find(z => mn(z.mercado) === mn(o.mercado)); if (!mk || used.has(f.partido)) { dropped++; continue; } used.add(f.partido); legs.push({ partido: f.partido, mercado: mk.mercado, cuota: mk.cuota, prob: mk.prob_justa && mk.prob_justa > 1 ? 1 / mk.prob_justa : null, motivo: o.motivo || "", liga: f.liga, hora: f.hora, iso: f._iso }); }
+    if (legs.length < 2) continue; const total = legs.reduce((a, l) => a * l.cuota, 1), pr = legs.every(l => l.prob) ? legs.reduce((a, l) => a * l.prob, 1) : null;
+    combos.push({ tipo, motivo: c.motivo || "", selecciones: legs, cuota_total: Math.round(total * 100) / 100, prob: pr }); }
+  combos.sort((a, b) => ["segura", "media", "super"].indexOf(a.tipo) - ["segura", "media", "super"].indexOf(b.tipo));
+  const rec = { t: now + 1, resumen: (out.resumen || "") + (dropped ? ` (se descartaron ${dropped} selecciones)` : ""), items: [], combos, cat: "comb", morning: true };
+  await aiHistPut(env, tok, rec);
+  await sendWa(u.wa, combos.length ? `🎯 Combinadas del día\n${rec.resumen}\n` + combos.map(c => { const M = COMB_META[c.tipo]; return `\n${M[0]} ${M[1].toUpperCase()} · cuota total @${c.cuota_total.toFixed(2)}${c.prob ? " · prob. aprox. " + (c.prob * 100).toFixed(c.prob * 100 < 10 ? 1 : 0) + "%" : ""}\n` + c.selecciones.map(l => `• ${l.partido}\n  ${l.mercado} @${Number(l.cuota).toFixed(2)}`).join("\n"); }).join("\n") + "\n\nLas cuotas pueden haber cambiado. Apuesta solo lo que puedas perder." : "🎯 Combinadas del día: hoy la IA no ve material para armar combinadas.");
 }
 
 async function aiHistPut(env, tok, rec) {
   let h = []; try { h = JSON.parse((await env.ALARMS.get("hist:" + tok)) || "[]"); } catch (e) { }
-  if (h.some(x => x.t === rec.t)) return; h.unshift({ t: rec.t, resumen: String(rec.resumen || "").slice(0, 400), items: (rec.items || []).slice(0, 12), morning: !!rec.morning });
-  await env.ALARMS.put("hist:" + tok, JSON.stringify(h.slice(0, 8)));
+  if (h.some(x => x.t === rec.t)) return; h.unshift({ t: rec.t, resumen: String(rec.resumen || "").slice(0, 400), items: (rec.items || []).slice(0, 12), morning: !!rec.morning, cat: rec.cat === "comb" || rec.cat === "jug" ? rec.cat : undefined, combos: Array.isArray(rec.combos) ? rec.combos.slice(0, 3) : undefined });
+  await env.ALARMS.put("hist:" + tok, JSON.stringify(h.slice(0, 12)));
 }
