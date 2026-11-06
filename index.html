@@ -704,6 +704,7 @@
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
       <button class="side-btn" data-v="partidos" onclick="switchView('partidos')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l3 3M18 6l-3 3M6 18l3-3M18 18l-3-3"/></svg> Partidos y valor</button>
       <button class="side-btn" data-v="ai" onclick="switchView('ai')"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01M9 16h6"/></svg> Ideas de la IA</button>
+      <button class="side-btn" data-v="habit" onclick="switchView('habit')"><svg class="icon" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V7a2 2 0 012-2h9"/></svg> Mi rutina</button>
       <button class="side-btn" data-v="alarms" onclick="switchView('alarms')"><svg class="icon" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 004 0"/></svg> Alarmas</button>
       <button class="side-btn" data-v="jorn" onclick="switchView('jorn')"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg> Jornada</button>
 
@@ -1372,6 +1373,7 @@
     </div>
   </div>
 
+  <div id="view-habit" class="view"><div style="max-width:880px; margin:0 auto; padding:6px 4px 40px;" id="habPage"></div></div>
   <div id="view-ai" class="view"><div style="max-width:880px; margin:0 auto; padding:6px 4px 40px;" id="aiPage"></div></div>
 
   <div id="view-alarms" class="view">
@@ -1690,7 +1692,7 @@ const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con
 function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cómo se lee esta pantalla</summary><div class="hp">${HELP[k]}</div></details>` : ""; }
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
-const VIEW_TITLES = { ai:"Ideas de la IA", vsmatch:"Partido", plstats:"Estadísticas de jugadores", jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+const VIEW_TITLES = { habit:"Mi rutina", ai:"Ideas de la IA", vsmatch:"Partido", plstats:"Estadísticas de jugadores", jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
 function switchView(v) {
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
@@ -1700,6 +1702,7 @@ function switchView(v) {
   if (v === "stats") renderStats();
   if (v === "lineups") { renderFormationStats(); luRenderChips(); if (!document.querySelector("#lineup-picker .lv-row")) loadTodayForLineups(); }
   if (v === "alarms") renderAlarms();
+  if (v === "habit") habRender();
   if (v === "ai" && !aiNoShow) { aiShow(); aiMorFetch(); }
   if (v === "players") prInit();
   if (v === "cardsw") apInit();
@@ -5425,6 +5428,59 @@ function syncPrepare() {
 }
 let syncTimer = null;
 function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
+/* ===== Mi rutina: hábito, límites y objetivo diario ===== */
+const HAB_KEY = "radar-habit";
+const HAB_RULES = "1) Anoto la apuesta ANTES de hacerla.\n2) Máximo de apuestas por día: el que fijé arriba.\n3) Nunca subo la cantidad para recuperar una pérdida.\n4) Si cumplo la meta del día, cierro por hoy.\n5) Si llego al límite semanal, no apuesto hasta el lunes.";
+const HAB_CHECKS = [["rev", "Revisé el resumen y las combinadas de la mañana"], ["reg", "Anoté cada apuesta antes de hacerla"], ["lim", "Respeté mis límites de hoy"], ["cie", "Cerré el día marcando los resultados"]];
+function habGet() { let d = {}; try { d = JSON.parse(localStorage.getItem(HAB_KEY) || "{}"); } catch (e) { } d.cfg = Object.assign({ maxBets: 3, weekly: 0, goal: 0, lossDay: 0, rules: HAB_RULES, start: "", end: "" }, d.cfg || {}); d.bets = d.bets || []; d.checks = d.checks || {}; return d; }
+function habSave(d) { try { localStorage.setItem(HAB_KEY, JSON.stringify(d)); } catch (e) { } try { alSyncSoon(); } catch (e) { } }
+const habDay = t => { const d = t ? new Date(t) : new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+function habWeekStart(dateStr) { const d = new Date(dateStr + "T12:00:00"), k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return habDay(d); }
+const habPnl = b => b.res === "w" ? b.stake * (b.odds - 1) : b.res === "l" ? -b.stake : 0;
+const habEur = n => (n < 0 ? "-" : n > 0 ? "+" : "") + Math.abs(n).toFixed(2).replace(/\.00$/, "") + " €";
+function habStreak(d) { let n = 0; const t = new Date(); for (let i = 0; i < 400; i++) { const k = habDay(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i)), c = d.checks[k] || {}; if (HAB_CHECKS.every(x => c[x[0]])) n++; else if (i > 0) break; } return n; }
+function habRender() { const pg = document.getElementById("habPage"); if (!pg) return; const d = habGet(), c = d.cfg, today = habDay(), ws = habWeekStart(today), esc = x => String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const bt = d.bets.filter(b => b.date === today), bw = d.bets.filter(b => b.date >= ws), stakeW = bw.reduce((a, b) => a + b.stake, 0), stakeT = bt.reduce((a, b) => a + b.stake, 0), pnlT = bt.reduce((a, b) => a + habPnl(b), 0), pnlW = bw.reduce((a, b) => a + habPnl(b), 0);
+  const bar = (v, mx, col) => `<div style="height:8px; border-radius:6px; background:#1A212B; overflow:hidden; margin:4px 0;"><div style="height:100%; width:${Math.max(0, Math.min(100, mx ? v / mx * 100 : 0))}%; background:${col};"></div></div>`;
+  const msgs = []; if (!c.weekly) msgs.push(["#F0B429", "Define tu límite semanal abajo en «Mis límites». Sin él, la rutina no te puede proteger."]);
+  if (c.goal && pnlT >= c.goal) msgs.push(["#3ECF8E", "🎯 Meta de hoy cumplida. Lo sensato es cerrar el día aquí: apostar más no la hace más grande, solo arriesga lo ganado."]);
+  if (c.lossDay && pnlT <= -c.lossDay) msgs.push(["#E5484D", "⛔ Llegaste a tu pérdida máxima de hoy. Cierra el día. Recuperar es justo lo que no hay que hacer."]);
+  if (c.weekly && stakeW >= c.weekly) msgs.push(["#E5484D", "⛔ Alcanzaste tu límite semanal. Sin apuestas hasta el lunes."]);
+  else if (c.weekly && stakeW >= c.weekly * 0.8) msgs.push(["#F0B429", "Llevas más del 80 % de tu límite semanal."]);
+  if (c.maxBets && bt.length >= c.maxBets) msgs.push(["#F0B429", `Ya anotaste ${bt.length} de ${c.maxBets} apuestas permitidas hoy.`]);
+  const chk = d.checks[today] || {}, streak = habStreak(d);
+  const days = []; for (let i = 6; i >= 0; i--) { const t = new Date(); t.setDate(t.getDate() - i); const k = habDay(t), bs = d.bets.filter(b => b.date === k), cc = d.checks[k] || {}, ok = HAB_CHECKS.every(x => cc[x[0]]); days.push({ k, n: bs.length, p: bs.reduce((a, b) => a + habPnl(b), 0), ok, lab: t.toLocaleDateString("es-ES", { weekday: "short", day: "numeric" }) }); }
+  const okDays = days.filter(x => x.ok).length;
+  pg.innerHTML = `<div style="font-weight:800; font-size:18px; text-align:center; margin-bottom:8px;">🧭 Mi rutina</div>
+  ${msgs.map(m => `<div style="border:1px solid ${m[0]}66; border-left:4px solid ${m[0]}; border-radius:10px; padding:9px 12px; margin:8px 0; font-size:13px; line-height:1.5;">${m[1]}</div>`).join("")}
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px;"><b>Hoy</b><span class="muted">🔥 Racha de días cumplidos: <b>${streak}</b></span></div>
+    <div style="margin-top:6px; font-size:13px;">Apuestas: <b>${bt.length}</b>${c.maxBets ? " / " + c.maxBets : ""} · Apostado: <b>${stakeT.toFixed(2).replace(/\.00$/, "")} €</b> · Resultado: <b style="color:${pnlT > 0 ? "#3ECF8E" : pnlT < 0 ? "#E5484D" : "inherit"};">${habEur(pnlT)}</b></div>
+    ${c.goal ? `<div class="muted" style="margin-top:6px;">Meta del día: ${habEur(c.goal)}</div>${bar(Math.max(0, pnlT), c.goal, "#3ECF8E")}` : ""}
+    <div class="muted" style="margin-top:8px;">Semana (desde el lunes): apostado <b>${stakeW.toFixed(2).replace(/\.00$/, "")} €</b>${c.weekly ? " de " + c.weekly + " €" : ""} · resultado ${habEur(pnlW)}</div>${c.weekly ? bar(stakeW, c.weekly, stakeW >= c.weekly ? "#E5484D" : stakeW >= c.weekly * 0.8 ? "#F0B429" : "#5B8DEF") : ""}</div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>Rutina de hoy</b>${HAB_CHECKS.map(x => `<label class="pg-ck"><input type="checkbox" ${chk[x[0]] ? "checked" : ""} onchange="habCheck('${x[0]}', this.checked)" /> ${x[1]}</label>`).join("")}</div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>Anotar apuesta</b> <span class="muted">(antes de hacerla)</span>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"><input id="habDesc" type="text" placeholder="Partido y mercado" style="flex:2; min-width:160px;" /><input id="habStake" type="number" step="0.5" min="0" placeholder="Cantidad €" style="flex:1; min-width:90px;" /><input id="habOdds" type="number" step="0.01" min="1.01" placeholder="Cuota" style="flex:1; min-width:80px;" /><button class="small" onclick="habAdd()">Anotar</button></div><div id="habMsg" class="muted" style="margin-top:6px;"></div>
+    ${bt.length ? `<div style="margin-top:8px;">${bt.map(b => `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-top:1px solid #1A212B; flex-wrap:wrap;"><span>${esc(b.desc)}<div class="muted">${b.stake} € @${b.odds}${b.res ? " · " + habEur(habPnl(b)) : ""}</div></span><span style="display:flex; gap:4px;"><button class="small ${b.res === "w" ? "" : "ghost"}" onclick="habRes('${b.id}','w')">✓</button><button class="small ${b.res === "l" ? "" : "ghost"}" onclick="habRes('${b.id}','l')">✗</button><button class="small ${b.res === "v" ? "" : "ghost"}" onclick="habRes('${b.id}','v')" title="Nula / devuelta">=</button><button class="small ghost" onclick="habDel('${b.id}')">🗑</button></span></div>`).join("")}</div>` : ""}</div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>Mis reglas</b> <span class="muted">(escritas por ti; léelas antes de apostar)</span><textarea id="habRules" rows="6" style="width:100%; margin-top:6px;" onchange="habCfg()">${esc(c.rules)}</textarea></div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>Mis límites</b>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:8px;"><label class="muted">Máx. apuestas por día<input id="habMax" type="number" min="0" value="${c.maxBets || ""}" style="width:100%;" onchange="habCfg()" /></label><label class="muted">Límite semanal apostado (€)<input id="habWeekly" type="number" min="0" value="${c.weekly || ""}" style="width:100%;" onchange="habCfg()" /></label><label class="muted">Meta de beneficio por día (€)<input id="habGoal" type="number" min="0" step="0.5" value="${c.goal || ""}" style="width:100%;" onchange="habCfg()" /></label><label class="muted">Pérdida máxima por día (€)<input id="habLoss" type="number" min="0" step="0.5" value="${c.lossDay || ""}" style="width:100%;" onchange="habCfg()" /></label></div>
+    <div class="muted" style="margin-top:8px;">Avisos por WhatsApp (opcional, con la app cerrada): empezar el día a las <input id="habStart" type="time" value="${c.start || ""}" onchange="habCfg()" /> y cerrarlo a las <input id="habEnd" type="time" value="${c.end || ""}" onchange="habCfg()" /></div></div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>Últimos 7 días</b> <span class="muted">· rutina cumplida ${okDays}/7</span><table style="width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px;">${days.map(x => `<tr style="border-top:1px solid #1A212B;"><td style="padding:4px 0;">${x.lab}</td><td>${x.n} apuestas</td><td style="color:${x.p > 0 ? "#3ECF8E" : x.p < 0 ? "#E5484D" : "inherit"};">${habEur(x.p)}</td><td style="text-align:right;">${x.ok ? "✅ rutina" : "—"}</td></tr>`).join("")}</table><div class="muted" style="margin-top:6px;">Lo que importa primero es cumplir la rutina; el resultado viene después y tiene mucha varianza.</div></div>
+  <div class="muted" style="font-size:11px; text-align:center; line-height:1.5; margin-top:10px;">Herramienta de organización, solo informativa. No hay apuestas seguras. Apuesta solo lo que puedas perder. Si notas que el juego te controla, en España puedes llamar al 900 200 225 (Jugadores Anónimos / ayuda gratuita) o consultar jugarbien.es.</div>`; }
+function habCfg() { const d = habGet(), n = id => { const v = parseFloat((document.getElementById(id) || {}).value); return v > 0 ? v : 0; }; d.cfg.maxBets = Math.round(n("habMax")); d.cfg.weekly = n("habWeekly"); d.cfg.goal = n("habGoal"); d.cfg.lossDay = n("habLoss"); d.cfg.rules = document.getElementById("habRules").value; d.cfg.start = document.getElementById("habStart").value || ""; d.cfg.end = document.getElementById("habEnd").value || ""; habSave(d); habRender(); }
+function habCheck(k, v) { const d = habGet(), t = habDay(); d.checks[t] = d.checks[t] || {}; d.checks[t][k] = !!v; habSave(d); habRender(); }
+function habAdd() { const d = habGet(), c = d.cfg, today = habDay(), desc = document.getElementById("habDesc").value.trim(), stake = parseFloat(document.getElementById("habStake").value), odds = parseFloat(document.getElementById("habOdds").value), m = document.getElementById("habMsg");
+  if (!desc || !(stake > 0) || !(odds > 1)) { m.textContent = "Escribe el partido, la cantidad y la cuota."; return; }
+  const bt = d.bets.filter(b => b.date === today), ws = habWeekStart(today), stakeW = d.bets.filter(b => b.date >= ws).reduce((a, b) => a + b.stake, 0), pnlT = bt.reduce((a, b) => a + habPnl(b), 0), warn = [];
+  if (c.maxBets && bt.length >= c.maxBets) warn.push(`ya tienes ${bt.length} apuestas hoy (tu máximo es ${c.maxBets})`);
+  if (c.weekly && stakeW + stake > c.weekly) warn.push(`con esta superarías tu límite semanal de ${c.weekly} €`);
+  if (c.goal && pnlT >= c.goal) warn.push("ya cumpliste tu meta de hoy");
+  if (c.lossDay && pnlT <= -c.lossDay) warn.push("ya llegaste a tu pérdida máxima de hoy");
+  if (warn.length && !confirm("Ojo: " + warn.join("; ") + ".\n\n¿Seguro que quieres anotarla igual? Si no, cancela: tu yo de mañana te lo agradecerá.")) return;
+  d.bets.unshift({ id: "b" + Date.now(), t: Date.now(), date: today, desc, stake, odds, res: "", over: warn.length > 0 }); d.bets = d.bets.slice(0, 600); habSave(d); habRender(); }
+function habRes(id, k) { const d = habGet(), b = d.bets.find(x => x.id === id); if (!b) return; b.res = b.res === k ? "" : k; habSave(d); habRender(); }
+function habDel(id) { if (!confirm("¿Borrar esta apuesta?")) return; const d = habGet(); d.bets = d.bets.filter(x => x.id !== id); habSave(d); habRender(); }
+function habPayload() { const c = habGet().cfg; if (!c.start && !c.end) return null; let tz = "Europe/Madrid"; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz; } catch (e) { } return { start: c.start || "", end: c.end || "", tz, goal: c.goal || 0, weekly: c.weekly || 0, maxBets: c.maxBets || 0 }; }
 let preSnapT = 0, preSnapSig = "";
 async function preSnapPush(force) { try {
   const px = getFdProxy(); if (!px || !syncOn()) return; const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
@@ -5441,7 +5497,7 @@ async function preSnapPush(force) { try {
   await fetch(px + "/alarms/presnap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), items: items.slice(0, 150) }) });
 } catch (e) { } }
 async function alSync() { const px = getFdProxy(); if (!px) throw new Error("Falta la URL de tu Worker en ⚙️"); const wa = waCfg();
-  const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null, ai: aiMorPayload() }) });
+  const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null, ai: aiMorPayload(), habit: habPayload() }) });
   if (!r.ok) throw new Error("Worker " + r.status); const j = await r.json(); if (!j.ok) throw new Error(j.error || "El Worker rechazó los datos"); try { preSnapPush(true); } catch (e) { } return j; }
 async function syncActivate() {
   const m = document.getElementById("syncMsg"), say = t => { if (m) m.innerHTML = t; };

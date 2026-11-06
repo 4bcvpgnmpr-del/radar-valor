@@ -37,7 +37,7 @@ export default {
       let b; try { b = await req.json(); } catch (e) { return new Response("JSON inválido", { status: 400, headers: cors }); }
       if (!b || typeof b.token !== "string" || b.token.length < 16 || !Array.isArray(b.alarms)) return new Response("Datos inválidos", { status: 400, headers: cors });
       const db = await dbGet(env), u = db.u[b.token] || { fired: {}, base: {} };
-      u.alarms = b.alarms.slice(0, 40); u.wa = b.wa && b.wa.phone && b.wa.key ? { prov: b.wa.prov || "callmebot", phone: String(b.wa.phone).slice(0, 20), key: String(b.wa.key).slice(0, 120) } : null; u.ts = Date.now(); const ai = b.ai && b.ai.key && b.ai.time ? { time: String(b.ai.time).slice(0, 5), key: String(b.ai.key).slice(0, 200), rules: String(b.ai.rules || "").slice(0, 1200), stats: String(b.ai.stats || "").slice(0, 1500), tz: String(b.ai.tz || "Europe/Madrid").slice(0, 60), days: ["all", "wk", "wkcl"].includes(b.ai.days) ? b.ai.days : "all", last: (u.ai && u.ai.last) || "" } : null; u.ai = ai; db.u[b.token] = u;
+      u.alarms = b.alarms.slice(0, 40); u.wa = b.wa && b.wa.phone && b.wa.key ? { prov: b.wa.prov || "callmebot", phone: String(b.wa.phone).slice(0, 20), key: String(b.wa.key).slice(0, 120) } : null; u.ts = Date.now(); const ai = b.ai && b.ai.key && b.ai.time ? { time: String(b.ai.time).slice(0, 5), key: String(b.ai.key).slice(0, 200), rules: String(b.ai.rules || "").slice(0, 1200), stats: String(b.ai.stats || "").slice(0, 1500), tz: String(b.ai.tz || "Europe/Madrid").slice(0, 60), days: ["all", "wk", "wkcl"].includes(b.ai.days) ? b.ai.days : "all", last: (u.ai && u.ai.last) || "" } : null; u.ai = ai; { const h = b.habit; u.habit = h && (h.start || h.end) ? { start: String(h.start || "").slice(0, 5), end: String(h.end || "").slice(0, 5), tz: String(h.tz || "Europe/Madrid").slice(0, 60), goal: +h.goal || 0, weekly: +h.weekly || 0, maxBets: +h.maxBets || 0, ls: (u.habit && u.habit.ls) || "", le: (u.habit && u.habit.le) || "" } : null; } db.u[b.token] = u;
       const ids = Object.keys(db.u); if (ids.length > 30) delete db.u[ids.sort((x, y) => (db.u[x].ts || 0) - (db.u[y].ts || 0))[0]];
       await env.ALARMS.put("db", JSON.stringify(db));
       return new Response(JSON.stringify({ ok: true, alarms: u.alarms.filter(a => a.active && a.type === "live").length }), { headers: { ...cors, "Content-Type": "application/json" } });
@@ -93,7 +93,7 @@ export default {
     for (const [k, v] of Object.entries(cors)) h.set(k, v);
     return new Response(r.body, { status: r.status, headers: h });
   },
-  async scheduled(event, env, ctx) { ctx.waitUntil((async () => { try { await runAlarms(env); } catch (e) { } try { await runPre(env); } catch (e) { } await runMorning(env); })()); },
+  async scheduled(event, env, ctx) { ctx.waitUntil((async () => { try { await runAlarms(env); } catch (e) { } try { await runPre(env); } catch (e) { } try { await runHabit(env); } catch (e) { } await runMorning(env); })()); },
 };
 
 /* ===== Alarmas en vivo con la app cerrada (cron cada minuto + KV "ALARMS") ===== */
@@ -172,6 +172,16 @@ async function runPre(env) {
     }
     const fk = Object.keys(u.fired); if (fk.length > 300) { fk.sort((x, y) => u.fired[x] - u.fired[y]).slice(0, fk.length - 300).forEach(k => delete u.fired[k]); dirty = true; }
   }
+  if (dirty) await env.ALARMS.put("db", JSON.stringify(db));
+}
+
+/* ===== Recordatorios de la rutina (inicio y cierre del día) ===== */
+async function runHabit(env) {
+  if (!env.ALARMS) return; const db = await dbGet(env); let dirty = false;
+  for (const [tok, u] of Object.entries(db.u)) { const h = u.habit; if (!h || !u.wa) continue; const ln = localNow(h.tz);
+    const t = s => { const [a, b] = String(s || "").split(":").map(Number); return Number.isFinite(a) && Number.isFinite(b) ? a * 60 + b : null; }, ts = t(h.start), te = t(h.end);
+    if (ts != null && ln.date !== h.ls && ln.min >= ts && ln.min < ts + 60) { h.ls = ln.date; dirty = true; await sendWa(u.wa, `🧭 Rutina: empieza el día.\nRevisa el resumen y las combinadas, y recuerda tus reglas.${h.maxBets ? "\nMáximo hoy: " + h.maxBets + " apuestas." : ""}${h.weekly ? "\nLímite semanal: " + h.weekly + " €." : ""}${h.goal ? "\nMeta pequeña del día: " + h.goal + " €. Si la cumples, cierras." : ""}`); }
+    if (te != null && ln.date !== h.le && ln.min >= te && ln.min < te + 60) { h.le = ln.date; dirty = true; await sendWa(u.wa, "🧭 Rutina: cierra el día.\nMarca el resultado de cada apuesta y completa las casillas de hoy en la app."); } }
   if (dirty) await env.ALARMS.put("db", JSON.stringify(db));
 }
 
