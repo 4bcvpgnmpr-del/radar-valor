@@ -5419,14 +5419,30 @@ function syncOn() { try { return localStorage.getItem("radar-sync-on") === "1"; 
 function syncSupported(a) { return a && a.active && a.type === "live" && !(a.w && a.w.mode === "last"); }
 function syncPrepare() {
   let all = []; try { all = cpAll(); } catch (e) { }
-  return getAlarms().filter(a => a.active && a.type === "live").map(a => { const names = new Set((a.leagues || []).filter(l => String(l).startsWith("n:"))); (a.leagues || []).filter(l => !String(l).startsWith("n:")).forEach(id => { all.forEach(x => { if (x.l.id === id && x.m.mov_league) names.add("n:" + alLgNorm(x.m.mov_league)); }); const dd = DD_LEAGUES.find(l => l.id === id); if (dd) names.add("n:" + alLgNorm(dd.nm)); });
+  const preA = getAlarms().filter(a => a.active && a.type === "pre").map(a => ({ id: a.id, type: "pre", active: true, name: a.name, sel: a.sel, oMin: a.oMin, oMax: a.oMax, eMin: a.eMin, eMax: a.eMax, rMin: a.rMin, rMax: a.rMax, dMin: a.dMin, dMax: a.dMax }));
+  return preA.concat(getAlarms().filter(a => a.active && a.type === "live")).map(a => { if (a.type === "pre") return a; const names = new Set((a.leagues || []).filter(l => String(l).startsWith("n:"))); (a.leagues || []).filter(l => !String(l).startsWith("n:")).forEach(id => { all.forEach(x => { if (x.l.id === id && x.m.mov_league) names.add("n:" + alLgNorm(x.m.mov_league)); }); const dd = DD_LEAGUES.find(l => l.id === id); if (dd) names.add("n:" + alLgNorm(dd.nm)); });
     return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null, kick: !!a.kick }; });
 }
 let syncTimer = null;
 function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
+let preSnapT = 0, preSnapSig = "";
+async function preSnapPush(force) { try {
+  const px = getFdProxy(); if (!px || !syncOn()) return; const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
+  if (!force && Date.now() - preSnapT < 300000) return;
+  const nmz = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), nowT = Date.now(), items = [];
+  cpAll().forEach(({ m, l: lg }) => {
+    if (!m.bookmakers || m.mov_live) return; const t = Date.parse(m.commence_time); if (!(t > nowT - 600000) || t > nowT + 4 * 86400000) return;
+    const al = alarms.filter(a => { if (a.matchId && a.matchId !== m.id && a.matchLabel !== `${m.home_team} vs ${m.away_team}`) return false; if (!a.matchId && a.leagues && a.leagues.length && !a.leagues.includes(lg.id) && !alLgOK(a, null, m.mov_league)) return false; return true; }).map(a => a.id); if (!al.length) return;
+    const cells = CP_COLS.map(c => { const key = c[1] === "home" ? m.home_team : c[1] === "away" ? m.away_team : c[1]; const r = cpPick(m.bookmakers, c[0], key); return r ? { lab: c[2], price: r.price, ev: r.ev != null ? r.ev * 100 : null, real: r.fair ? 1 / r.fair : null, diff: r.diff != null ? r.diff : null } : null; }).filter(Boolean);
+    if (cells.length) items.push({ id: m.id, h: m.home_team, a: m.away_team, t, al, cells });
+  });
+  const sig = JSON.stringify(items.map(i => [i.id, i.cells.map(c => c.price)])); if (!force && sig === preSnapSig) { preSnapT = Date.now(); return; }
+  preSnapT = Date.now(); preSnapSig = sig;
+  await fetch(px + "/alarms/presnap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), items: items.slice(0, 150) }) });
+} catch (e) { } }
 async function alSync() { const px = getFdProxy(); if (!px) throw new Error("Falta la URL de tu Worker en ⚙️"); const wa = waCfg();
   const r = await fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: syncPrepare(), wa: wa.phone && wa.key ? wa : null, ai: aiMorPayload() }) });
-  if (!r.ok) throw new Error("Worker " + r.status); const j = await r.json(); if (!j.ok) throw new Error(j.error || "El Worker rechazó los datos"); return j; }
+  if (!r.ok) throw new Error("Worker " + r.status); const j = await r.json(); if (!j.ok) throw new Error(j.error || "El Worker rechazó los datos"); try { preSnapPush(true); } catch (e) { } return j; }
 async function syncActivate() {
   const m = document.getElementById("syncMsg"), say = t => { if (m) m.innerHTML = t; };
   const px = getFdProxy(); if (!px) { say("Primero pon la URL de tu Worker en ⚙️ (campo «Proxy football-data»)."); return; }
@@ -5437,7 +5453,7 @@ async function syncActivate() {
     if (!st.kv) { say('<span style="color:#E5484D;">El Worker no tiene el almacén <b>ALARMS</b> (KV). Hay que crearlo y enlazarlo (mira los pasos que te dio Claude).</span>'); return; }
     if (!st.moviodds) { say(`<span style="color:#E5484D;">El Worker no consigue leer los partidos en vivo de Bet365 (${st.error || "sin respuesta"}). Las alarmas con la app cerrada no funcionarán; sigue usando la app abierta.</span>`); try { localStorage.setItem("radar-sync-on", "0"); } catch (e) { } return; }
     try { localStorage.setItem("radar-sync-on", "1"); } catch (e) { }
-    say(`<span style="color:#3ECF8E;">✓ Activado.</span> El Worker ve ${st.live} partidos en vivo ahora. Alarmas en vivo activas: ${n.length} (${ok} se vigilan con la app cerrada${n.length > ok ? `; ${n.length - ok} de «últimos N minutos» solo funcionan con la app abierta` : ""}). Las alarmas de pregame siguen necesitando la app abierta.`);
+    say(`<span style="color:#3ECF8E;">✓ Activado.</span> El Worker ve ${st.live} partidos en vivo ahora. Alarmas en vivo activas: ${n.length} (${ok} se vigilan con la app cerrada${n.length > ok ? `; ${n.length - ok} de «últimos N minutos» solo funcionan con la app abierta` : ""}). Las alarmas de pregame también se vigilan con la app cerrada, con las últimas cuotas que la app guardó.`);
   } catch (e) { say(`<span style="color:#E5484D;">No se pudo: ${e.message}</span>`); }
 }
 function syncOff() { try { localStorage.setItem("radar-sync-on", "0"); } catch (e) { } const px = getFdProxy(); if (px) fetch(px + "/alarms/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: syncTok(), alarms: [], wa: null }) }).catch(() => { }); const m = document.getElementById("syncMsg"); if (m) m.textContent = "Desactivado. Las alarmas solo avisan con la app abierta."; }
@@ -5605,7 +5621,7 @@ function runAlarms(matches, sport) {
   const lg = DD_LEAGUES.find(l => l.odds === sport); if (!lg) return;
   runAlarmsCore(matches.map(m => ({ m, l: lg })));
 }
-function runPreAll() { try { runAlarmsCore(cpAll()); } catch (e) { } }
+function runPreAll() { try { runAlarmsCore(cpAll()); } catch (e) { } try { preSnapPush(false); } catch (e) { } }
 function runAlarmsCore(items) {
   const alarms = getAlarms().filter(a => a.active && a.type === "pre"); if (!alarms.length) return;
   const fired = getAlFired(), today = new Date().toISOString().slice(0, 10), nmz = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), nowT = Date.now(); let any = false;
