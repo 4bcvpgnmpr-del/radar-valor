@@ -3574,15 +3574,38 @@ function movRenderTail() {
 }
 function movSnapSoon() { try { aiSnapPush(); } catch (e) { } }
 document.addEventListener("visibilitychange", () => { if (!document.hidden && movTailDirty) { movTailDirty = false; movRenderTail(); } });
-async function movLoad0(silent) {
-  const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
-  if (!silent) say("Descargando cuotas de Bet365...");
-  try {
+/* Descarga y conversión de cuotas en un Web Worker (para que la app no se quede pillada) */
+let movWk = null;
+function movWorkSrc() { return `
+const MOV_PP = {}; const MOV_SK = ${JSON.stringify(MOV_SK)};
+${movStatsCompact.toString()}
+${movConvert.toString()}
+self.onmessage = async () => { try {
+  const [res, rs] = await Promise.all([fetch("https://moviodds.com/odds?sport=soccer"), fetch("https://moviodds.com/odds?sport=soccer&in_play=1&stats=1").catch(() => null)]);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const dj = await res.json();
+  try { if (rs && rs.ok) { const lj = await rs.json(), by = {}; (lj.matches || []).forEach(m => { by[m.id] = m; }); const have = new Set((dj.matches || []).map(m => m.id)); (dj.matches || []).forEach(m => { if (m.in_play && by[m.id]) { m.stats = by[m.id].stats; if (by[m.id].score) m.score = by[m.id].score; if (by[m.id].clock) m.clock = by[m.id].clock; } }); (lj.matches || []).forEach(m => { if (m.in_play && !have.has(m.id)) (dj.matches = dj.matches || []).push(m); }); } } catch (e) {}
+  const { out, st } = movConvert(dj); self.postMessage({ ok: true, out, st, pp: MOV_PP });
+} catch (e) { self.postMessage({ ok: false, error: String(e && e.message || e) }); } };`; }
+function movWork() { return new Promise((resolve, reject) => {
+  try { if (typeof Worker === "undefined" || typeof Blob === "undefined") return reject(new Error("sin worker")); if (movWk) { try { movWk.terminate(); } catch (e) { } }
+    const url = URL.createObjectURL(new Blob([movWorkSrc()], { type: "application/javascript" })), wk = movWk = new Worker(url), tm = setTimeout(() => { try { wk.terminate(); } catch (e) { } reject(new Error("tiempo agotado")); }, 60000);
+    wk.onmessage = e => { clearTimeout(tm); try { wk.terminate(); } catch (er) { } URL.revokeObjectURL(url); const d = e.data; if (!d || !d.ok) return reject(new Error((d && d.error) || "error")); Object.keys(MOV_PP).forEach(k => delete MOV_PP[k]); Object.assign(MOV_PP, d.pp || {}); resolve({ out: d.out, st: d.st }); };
+    wk.onerror = e => { clearTimeout(tm); URL.revokeObjectURL(url); reject(new Error("worker")); }; wk.postMessage(1);
+  } catch (e) { reject(e); } }); }
+async function movMain() {
     const [res, rs] = await Promise.all([fetch("https://moviodds.com/odds?sport=soccer"), fetch("https://moviodds.com/odds?sport=soccer&in_play=1&stats=1").catch(() => null)]);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const dj = await res.json();
     try { if (rs && rs.ok) { const lj = await rs.json(), by = {}; (lj.matches || []).forEach(m => { by[m.id] = m; }); const have = new Set((dj.matches || []).map(m => m.id)); (dj.matches || []).forEach(m => { if (m.in_play && by[m.id]) { m.stats = by[m.id].stats; if (by[m.id].score) m.score = by[m.id].score; if (by[m.id].clock) m.clock = by[m.id].clock; } }); (lj.matches || []).forEach(m => { if (m.in_play && !have.has(m.id)) (dj.matches = dj.matches || []).push(m); }); } } catch (e) {}
     const { out, st } = movConvert(dj);
+    return { out, st };
+}
+async function movLoad0(silent) {
+  const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
+  if (!silent) say("Descargando cuotas de Bet365...");
+  try {
+    const { out, st } = await movWork().catch(() => movMain());
     try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`);
   } catch (e) { say("No se pudo descargar Bet365: " + e.message); return false; }
