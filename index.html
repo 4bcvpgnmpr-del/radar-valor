@@ -4049,6 +4049,17 @@ async function plEvLoad(m) {
   } catch (e) { plEv[m.id].err = e.message; }
   if (plLiveSt.id === m.id && plLiveSt.tab === "ev") plLive();
 }
+let plPl = {};
+async function plPlLoad(m) {
+  if (plPl[m.id] && Date.now() - plPl[m.id].t < 40000) return; plPl[m.id] = { t: Date.now(), list: (plPl[m.id] || {}).list || null, err: null };
+  try { const f = await vsResolve(m.home_team, m.away_team, m.commence_time); if (!f) throw new Error("no encuentro este partido en ESPN");
+    const su = await espnGet(`${f.slug}/summary?event=${f.e.id}`), out = [];
+    (su.rosters || []).forEach(r => (r.roster || []).forEach(x => { const k = {}; (x.stats || []).forEach(z => { k[z.name] = +z.value || 0; }); if (!(x.starter || x.subbedIn || k.appearances > 0)) return;
+      out.push({ n: (x.athlete && (x.athlete.displayName || x.athlete.fullName)) || "?", t: r.homeAway === "home" ? "home" : "away", s: x.jersey || "", f: k.foulsCommitted || 0, fd: k.foulsSuffered || 0, tk: k.totalTackles || k.effectiveTackles || k.tackles || 0, yc: k.yellowCards || 0, sot: k.shotsOnTarget || 0, sh: k.totalShots || 0, sv: k.saves || 0, g: k.totalGoals || 0, xg: 0 }); }));
+    if (!out.length) throw new Error("ESPN no tiene estadísticas de jugadores de este partido"); plPl[m.id].list = out;
+  } catch (e) { plPl[m.id].err = e.message; }
+  if (plLiveSt.id === m.id && plLiveSt.tab !== "ev") plLive();
+}
 function plLive(id, tab, team) {
   if (id) plLiveSt.id = id; if (tab) plLiveSt.tab = tab; if (team) plLiveSt.team = team;
   const c = movGet(), m = c && c.data.find(x => x.id === plLiveSt.id); if (!m || !m.mov_stats) return;
@@ -4057,8 +4068,8 @@ function plLive(id, tab, team) {
   const hq = m.home_team.replace(/'/g, "\\'"), aq = m.away_team.replace(/'/g, "\\'");
   let body = "";
   if (k === "ev") { plEvLoad(m); const e = plEv[m.id] || {}; body = e.list ? (e.list.length ? e.list.map(x => `<div class="plrow" style="grid-template-columns:46px 26px 1fr;"><span class="muted">${x.min}</span><span>${x.ic}</span><span class="n">${x.tx}<i>${x.tm}</i></span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía no hay eventos.</div>') : e.err ? `<div class="muted" style="text-align:center; padding:16px;">${e.err}</div>` : '<div class="muted" style="text-align:center; padding:16px;">Cargando eventos…</div>'; }
-  else { const list = (S.pl || []).filter(x => T === "all" || x.t === T).slice().sort((a, b) => (b[k] || 0) - (a[k] || 0)).filter(x => (x[k] || 0) > 0), mx = Math.max(1, ...list.map(x => x[k] || 0));
-    body = list.length ? list.map(x => `<div class="plrow"><span class="n">${x.s ? "#" + x.s + " " : ""}${x.n}<i>${x.t === "home" ? m.home_team : m.away_team}</i></span><div class="bar"><b style="width:${(x[k] || 0) / mx * 100}%"></b></div><span class="v">${k === "xg" ? Number(x[k]).toFixed(2) : x[k]}</span></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía nadie tiene esta estadística.</div>'; }
+  else { const hasBet = !!(S.pl && S.pl.length); if (!hasBet) plPlLoad(m); const src = hasBet ? S.pl : ((plPl[m.id] || {}).list || []), why = !hasBet && !((plPl[m.id] || {}).list) ? ((plPl[m.id] || {}).err ? `Bet365 no da estadísticas por jugador en este partido y ${plPl[m.id].err}. Pasa mucho en ligas pequeñas; abajo tienes las de equipo.` : "Bet365 no da estadísticas por jugador en este partido. Buscando en ESPN…") : null; const list = src.filter(x => T === "all" || x.t === T).slice().sort((a, b) => (b[k] || 0) - (a[k] || 0)).filter(x => (x[k] || 0) > 0), mx = Math.max(1, ...list.map(x => x[k] || 0));
+    body = list.length ? list.map(x => `<div class="plrow"><span class="n">${x.s ? "#" + x.s + " " : ""}${x.n}<i>${x.t === "home" ? m.home_team : m.away_team}</i></span><div class="bar"><b style="width:${(x[k] || 0) / mx * 100}%"></b></div><span class="v">${k === "xg" ? Number(x[k]).toFixed(2) : x[k]}</span></div>`).join("") : why ? `<div class="muted" style="text-align:center; padding:16px; line-height:1.6;">${why}</div>` : '<div class="muted" style="text-align:center; padding:16px;">Todavía nadie tiene esta estadística.</div>'; if (!hasBet && !why) body = `<div class="muted" style="font-size:11px; text-align:center; margin-bottom:4px;">Datos de ESPN (Bet365 no da estadísticas por jugador en este partido)</div>` + body; }
   const bars = PL_TEAMROWS.map(([lab, key, sfx, d]) => { const a = S.h[key], b = S.a[key]; if (a == null || b == null) return ""; const mx = Math.max(a, b, 0.01); return `<div style="margin:9px 0;"><div style="display:flex; justify-content:space-between; font-size:12px; font-weight:700;"><span>${f1(a, d)}${sfx || ""}</span><span class="muted" style="font-weight:600; font-size:10.5px; letter-spacing:.4px; text-transform:uppercase;">${lab}</span><span>${f1(b, d)}${sfx || ""}</span></div><div style="display:flex; gap:4px; height:5px; margin-top:3px;"><div style="flex:1; background:#1A212B; border-radius:3px; display:flex; justify-content:flex-end;"><div style="width:${a / mx * 100}%; background:#3ECF8E; border-radius:3px;"></div></div><div style="flex:1; background:#1A212B; border-radius:3px;"><div style="width:${b / mx * 100}%; background:#6b7f74; border-radius:3px;"></div></div></div></div>`; }).join("");
   const sc = /(\d+)\s*[-:]\s*(\d+)/.exec(m.mov_score || "");
   ov.innerHTML = `<div class="plbox" style="max-width:600px; width:100%; max-height:92vh; overflow-y:auto;"><button class="ms-close" onclick="document.getElementById('pl-ov').style.display='none'">✕</button>
