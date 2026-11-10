@@ -5853,10 +5853,13 @@ function aiSelKeyDel(k) { aiSelRead(); aiSel.delete(k); aiShow(); }
 /* ===== Combinadas del día ===== */
 const COMB_META = { segura: ["🟢", "Segura", "#3ECF8E"], media: ["🟡", "Media", "#F0B429"], super: ["🔴", "Super combinada", "#E5484D"] };
 const COMB_PROMPT = `Eres un analista prudente de apuestas. Con los partidos de PREGAME de abajo (datos reales de Bet365) arma EXACTAMENTE 3 combinadas:
-- "segura": 2 o 3 selecciones de probabilidad alta y cuota baja (cuota total aproximada entre 1.8 y 3.2). Prioriza acertar.
-- "media": 3 o 4 selecciones equilibradas (cuota total aproximada entre 4 y 9).
-- "super": 5 a 7 selecciones, cuota total muy alta (más de 15), pensada para apostar muy poco dinero.
+- "segura": 2 o 3 selecciones de probabilidad alta (cuota total entre 1.8 y 3.5). Prioriza acertar: partidos con datos sólidos y favoritos claros en ligas conocidas.
+- "media": 3 o 4 selecciones equilibradas (cuota total entre 4 y 10).
+- "super": 5 a 8 selecciones, cuota total MÍNIMO 15 (apuesta de muy poco dinero). Para llegar ahí mezcla selecciones de cuota 1.5 a 2.5 con respaldo en los datos; no la llenes de cuotas minúsculas (1.03, 1.14…), que no suman cuota ni valor. La super debe tener siempre más cuota total que la media y que la segura. Si con los datos no puedes llegar a 15 con selecciones razonables, deja la super fuera.
+- Evita ligas juveniles (U19, U20, U21), reservas y ligas sin datos: prefiere partidos con medias de goles y probabilidad justa. Una selección con cuota inferior a 1.15 casi nunca merece entrar.
 Reglas: usa SOLO los datos dados. Cada selección debe ser UNO de los "mercados_disponibles" de ese partido, copiando el nombre del partido y del mercado exactamente como vienen. No pongas dos selecciones del mismo partido en la misma combinada. No inventes cifras. Si no hay material para una combinada, déjala fuera. Responde SOLO con JSON, sin texto alrededor: {"resumen":"1 frase","combinadas":[{"tipo":"segura|media|super","motivo":"2 frases: por qué esta combinada","selecciones":[{"partido":"exactamente como viene","mercado":"exactamente como viene","motivo":"1 frase corta"}]}]}`;
+const COMB_JUNK = /(\bU-?(1[5-9]|2[0-3])\b|youth|juvenil|reserves?|reservas|sub-?\d{2}|academy|\bb team\b)/i, COMB_RNG = { segura: [1.5, 3.6], media: [3.5, 10.5], super: [15, 1e9] };
+function combPool(pre) { return pre.filter(x => !COMB_JUNK.test(String(x.liga || "") + " " + String(x.partido || ""))); }
 function combBuild(out, pre) {
   const mn = x => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim(); let dropped = 0; const combos = [];
   (out.combinadas || []).forEach(c => { const tipo = ["segura", "media", "super"].includes(c.tipo) ? c.tipo : null; if (!tipo || combos.some(z => z.tipo === tipo)) return; const used = new Set(), legs = [];
@@ -5864,6 +5867,7 @@ function combBuild(out, pre) {
       legs.push({ partido: f.partido, mercado: mk.mercado, cuota: mk.cuota, prob: mk.prob_justa && mk.prob_justa > 1 ? 1 / mk.prob_justa : null, motivo: o.motivo || "", liga: f.liga, hora: f.hora, iso: f._iso }); });
     const min = tipo === "super" ? 4 : tipo === "media" ? 3 : 2; if (legs.length < Math.min(min, 2)) { dropped += legs.length; return; }
     const total = legs.reduce((a, l) => a * l.cuota, 1), pr = legs.every(l => l.prob) ? legs.reduce((a, l) => a * l.prob, 1) : null;
+    if (total < COMB_RNG[tipo][0] || total > COMB_RNG[tipo][1]) { dropped += legs.length; return; }
     combos.push({ tipo, motivo: c.motivo || "", selecciones: legs, cuota_total: Math.round(total * 100) / 100, prob: pr }); });
   combos.sort((a, b) => ["segura", "media", "super"].indexOf(a.tipo) - ["segura", "media", "super"].indexOf(b.tipo));
   return { combos, dropped };
@@ -5879,7 +5883,7 @@ function aiMarkCombo(bi, ci, k) { const H = aiHist(); if (!H[bi] || !(H[bi].comb
 function combText(r) { return `🎯 Combinadas del día\n${r.resumen || ""}\n` + (r.combos || []).map(c => { const M = COMB_META[c.tipo] || COMB_META.media; return `\n${M[0]} ${M[1].toUpperCase()} · cuota total @${Number(c.cuota_total).toFixed(2)}${c.prob ? " · prob. aprox. " + (c.prob * 100).toFixed(c.prob * 100 < 10 ? 1 : 0) + "%" : ""}\n` + c.selecciones.map(l => `• ${l.partido}\n  ${l.mercado} @${Number(l.cuota).toFixed(2)}`).join("\n"); }).join("\n") + "\n\nLas cuotas pueden haber cambiado. Apuesta solo lo que puedas perder."; }
 async function aiComboOpp() {
   const box = aiBox, key = getAnthropicKey(); if (!key) { box('<div class="muted" style="text-align:center; padding:16px;">Añade tu Anthropic API key en ⚙️ Configuración para usar la IA.</div>'); return; }
-  const D = aiGather("eq"); if (D.pre.length < 2) { box('<div class="muted" style="text-align:center; padding:16px;">Hacen falta al menos 2 partidos con cuotas cargadas. Pulsa «Cuotas Bet365» (en Partidos y valor) y vuelve a probar.</div>'); return; }
+  const D = aiGather("eq"); D.pre = combPool(D.pre); if (D.pre.length < 2) { box('<div class="muted" style="text-align:center; padding:16px;">Hacen falta al menos 2 partidos con cuotas cargadas. Pulsa «Cuotas Bet365» (en Partidos y valor) y vuelve a probar.</div>'); return; }
   box('<div class="muted" style="text-align:center; padding:24px;">Armando las combinadas con ' + D.pre.length + ' partidos…</div>');
   const clean = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith("_") ? undefined : v));
   const prompt = COMB_PROMPT + aiFavsText("eq") + (aiRules().trim() ? `\n\nREGLAS DEL USUARIO (obligatorias, tienen prioridad):\n${aiRules().trim()}` : "") + `\n\nPREGAME:\n${JSON.stringify(clean(D.pre))}`;
