@@ -5861,17 +5861,19 @@ Reglas: usa SOLO los datos dados. Cada selección debe ser UNO de los "mercados_
 const COMB_JUNK = /(\bU-?(1[5-9]|2[0-3])\b|youth|juvenil|reserves?|reservas|sub-?\d{2}|academy|\bb team\b)/i, COMB_RNG = { segura: [1.5, 3.6], media: [3.5, 10.5], super: [15, 1e9] };
 function combPool(pre) { return pre.filter(x => !COMB_JUNK.test(String(x.liga || "") + " " + String(x.partido || ""))); }
 function combBuild(out, pre) {
-  const mn = x => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim(); let dropped = 0; const combos = [];
+  const mn = x => String(x || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim(); let dropped = 0; const combos = [], bad = [];
   (out.combinadas || []).forEach(c => { const tipo = ["segura", "media", "super"].includes(c.tipo) ? c.tipo : null; if (!tipo || combos.some(z => z.tipo === tipo)) return; const used = new Set(), legs = [];
     (c.selecciones || []).forEach(o => { const f = pre.find(z => mn(z.partido) === mn(o.partido)); const mk = f && (f.mercados_disponibles || []).find(z => mn(z.mercado) === mn(o.mercado)); if (!mk || used.has(f.partido)) { dropped++; return; } used.add(f.partido);
       legs.push({ partido: f.partido, mercado: mk.mercado, cuota: mk.cuota, prob: mk.prob_justa && mk.prob_justa > 1 ? 1 / mk.prob_justa : null, motivo: o.motivo || "", liga: f.liga, hora: f.hora, iso: f._iso }); });
     const min = tipo === "super" ? 4 : tipo === "media" ? 3 : 2; if (legs.length < Math.min(min, 2)) { dropped += legs.length; return; }
     const total = legs.reduce((a, l) => a * l.cuota, 1), pr = legs.every(l => l.prob) ? legs.reduce((a, l) => a * l.prob, 1) : null;
-    if (total < COMB_RNG[tipo][0] || total > COMB_RNG[tipo][1]) { dropped += legs.length; return; }
+    if (total < COMB_RNG[tipo][0] || total > COMB_RNG[tipo][1]) { dropped += legs.length; bad.push({ tipo, total: Math.round(total * 100) / 100 }); return; }
     combos.push({ tipo, motivo: c.motivo || "", selecciones: legs, cuota_total: Math.round(total * 100) / 100, prob: pr }); });
   combos.sort((a, b) => ["segura", "media", "super"].indexOf(a.tipo) - ["segura", "media", "super"].indexOf(b.tipo));
-  return { combos, dropped };
+  return { combos, dropped, bad };
 }
+const COMB_NAMES = { segura: "segura", media: "media", super: "super" };
+function combFixPrompt(base, pool, bad, missing) { return base + `\n\nPREGAME:\n${JSON.stringify(pool)}\n\nTU INTENTO ANTERIOR NO SIRVIÓ para: ${missing.join(", ")}. ` + missing.map(t => { const b = bad.find(x => x.tipo === t); const r = COMB_RNG[t]; return b ? `la ${t} salió con cuota total ${b.total}, fuera del rango ${r[0]}–${r[1] > 1e8 ? "sin tope" : r[1]}` : `la ${t} no se pudo armar con mercados disponibles`; }).join("; ") + `. Vuelve a armar SOLO esas combinadas (${missing.join(", ")}) cumpliendo el rango de cuota total: ajusta el número de selecciones y elige otras si hace falta. Mismo formato JSON.`; }
 function combCard(c, bi, ci) { const M = COMB_META[c.tipo] || COMB_META.media, esc = x => String(x == null ? "" : x).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const res = c.res === "w" ? "#3ECF8E" : c.res === "l" ? "#E5484D" : "";
   return `<div style="border:1px solid ${M[2]}55; border-left:4px solid ${M[2]}; border-radius:12px; padding:12px 14px; margin:12px 0;">
@@ -5890,8 +5892,10 @@ async function aiComboOpp() {
   const WEB = aiWebOn(), WEBH = WEB ? `BÚSQUEDA EN INTERNET: antes de responder, usa la herramienta de búsqueda para comprobar las novedades de las últimas 48 horas de los partidos con más opciones (lesiones, sancionados, dudas, alineación probable, rotaciones, motivación, descanso). Prioriza fuentes fiables (web del club, prensa deportiva reconocida). Si un jugador está de baja o es duda, NO lo propongas. Si lo que encuentras contradice los datos de la app, dilo. No inventes: si no encuentras nada fiable, escribe "sin novedades encontradas". Tu respuesta final debe seguir siendo SOLO el JSON pedido.\n\n` : "";
   try { const { res, web: webOk, why } = await aiCall(key, WEBH + prompt, WEB, 6); if (WEB && !webOk) showToast("La búsqueda en internet no está disponible en tu cuenta de Anthropic; he analizado sin ella.");
     if (!res.ok) { const t = await res.text(); throw new Error(res.status + " " + t.slice(0, 160)); }
-    const j = await res.json(), txt = aiTextOf(j), m = true; const out = aiJson(txt), { combos, dropped } = combBuild(out, D.pre);
-    const rec = { t: Date.now(), resumen: (out.resumen || "") + (dropped ? ` (se descartaron ${dropped} selecciones con mercados que Bet365 no ofrece)` : ""), items: [], combos, cat: "comb" };
+    const j = await res.json(), txt = aiTextOf(j), m = true; const out = aiJson(txt); let { combos, dropped, bad } = combBuild(out, D.pre), miss = ["segura", "media", "super"].filter(t => !combos.some(c => c.tipo === t)), note = "";
+    if (miss.length && D.pre.length >= 3) { box('<div class="muted" style="text-align:center; padding:24px;">Ajustando las combinadas que no cumplían su rango de cuota…</div>'); try { const pool = JSON.parse(JSON.stringify(D.pre, (k, v) => k.startsWith("_") ? undefined : v)); const r2 = await aiCall(key, combFixPrompt(COMB_PROMPT + aiFavsText("eq"), pool, bad, miss), false, 0); if (r2.res.ok) { const o2 = aiJson(aiTextOf(await r2.res.json())), b2 = combBuild(o2, D.pre); b2.combos.filter(c => miss.includes(c.tipo)).forEach(c => combos.push(c)); dropped += b2.dropped; bad = b2.bad; combos.sort((a, b) => ["segura", "media", "super"].indexOf(a.tipo) - ["segura", "media", "super"].indexOf(b.tipo)); miss = ["segura", "media", "super"].filter(t => !combos.some(c => c.tipo === t)); } } catch (e) { } }
+    if (miss.length) note = " No se pudo armar la " + miss.join(" ni la ") + " con un rango de cuota razonable con los partidos de hoy.";
+    const rec = { t: Date.now(), resumen: (out.resumen || "") + (dropped ? ` (se descartaron ${dropped} selecciones que no cumplían: mercado no ofrecido por Bet365 o cuota total fuera de rango)` : "") + note, items: [], combos, cat: "comb" };
     try { localStorage.setItem("radar-ai-hist", JSON.stringify([rec, ...aiHist()].slice(0, 12))); } catch (e) { } aiPutRemote(rec); aiShow(); try { if (combos.length) aiSendPhone(rec); } catch (e) { }
   } catch (e) { box(`<div class="muted" style="text-align:center; padding:16px;">No se pudo armar: ${e.message}</div>`); } }
 const JUG_STATS = [["shotsOnTarget", "Remates a puerta"], ["totalShots", "Tiros"], ["foulsCommitted", "Faltas cometidas"], ["foulsSuffered", "Faltas recibidas"], ["saves", "Paradas (porteros)"], ["tackles", "Entradas"]];
