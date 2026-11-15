@@ -366,6 +366,7 @@
   #view-coupon .cod2 .cb { flex-wrap:wrap; justify-content:center; row-gap:1px; }
   #view-coupon .cst { grid-template-columns:12px auto; gap:4px 6px; font-size:11px; }
   #view-coupon .cst b { font-size:12px; white-space:nowrap; }
+  #view-coupon .cst.tn { grid-template-columns:auto auto; gap:4px 10px; } #view-coupon .cst.tn span { white-space:nowrap; }
   .thp { gap:5px; max-width:100%; }
   .wrap:has(#view-coupon.active) { max-width:1480px; }
   @media (max-width:1100px) { #view-coupon .pg-main { overflow-x:auto; } #view-coupon .cptable { min-width:900px; } }
@@ -6219,7 +6220,7 @@ function renderCoupon() {
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
       (!cp.stat.g ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) +
-      (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + (!cp.stat.t ? "" : `<td><div class="cst">${mt && mt.pc ? [["+1.5", "p15"], ["+2.5", "p25"], ["BTTS", "pbt"], ["+0.5 HT", "ph05"]].map(([l, k]) => `<span>${l}</span><b>${mt.pc[k] != null ? Math.round(mt.pc[k]) + "%" : "–"}</b>`).join("") : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
+      (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + (!cp.stat.t ? "" : `<td><div class="cst tn">${mt && mt.pc ? [["+1.5", "p15"], ["+2.5", "p25"], ["BTTS", "pbt"], ["+0.5 HT", "ph05"]].map(([l, k]) => `<span>${l}</span><b>${mt.pc[k] != null ? Math.round(mt.pc[k]) + "%" : "–"}</b>`).join("") : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
       `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}<td></td><td></td></tr>`;
   });
   el.innerHTML = html + "</tbody></table>"; cpResEnsure();
