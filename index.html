@@ -4968,12 +4968,22 @@ function cpAll0() {
   return movAugment(out);
 }
 
+const CP_TRK = [["p05", "Más de 0.5 goles"], ["p15", "Más de 1.5 goles"], ["p25", "Más de 2.5 goles"], ["p35", "Más de 3.5 goles"], ["u15", "Menos de 1.5 goles"], ["u25", "Menos de 2.5 goles"], ["u35", "Menos de 3.5 goles"], ["ph05", "Más de 0.5 goles · 1ª parte"], ["ph15", "Más de 1.5 goles · 1ª parte"], ["uh15", "Menos de 1.5 goles · 1ª parte"], ["pbt", "Ambos marcan: Sí"], ["pbn", "Ambos marcan: No"]];
+const CP_SV = Object.fromEntries(CP_TRK.map(([k]) => [k, t => t.pc ? t.pc[k] : null]));
+let cpIdxMemo = {};
+function cpTeamIdx(l) { const rows = hbData[l]; if (!rows || !rows.length) return null; const c = cpIdxMemo[l]; if (c && c.n === rows.length) return c.T; const T = {};
+  rows.slice().sort((a, b) => a[0] - b[0]).forEach(r => { const hh = r[7] ? [r[7][0], r[7][1]] : null; (T[r[1]] = T[r[1]] || []).push({ g: r[3], c: r[4], ht: hh }); (T[r[2]] = T[r[2]] || []).push({ g: r[4], c: r[3], ht: hh ? [hh[1], hh[0]] : null }); }); cpIdxMemo[l] = { n: rows.length, T }; return T; }
+function cpPcts(l, home, away) { const T = cpTeamIdx(l); if (!T) return null; const N = cp.nTr || 10;
+  const one = tn => { const a = (T[tn] || []).slice(-N); if (a.length < 5) return null; const ht = a.filter(m => m.ht), f = (fn, arr) => arr.length >= 4 ? arr.filter(fn).length * 100 / arr.length : null, tot = m => m.g + m.c, hq = m => m.ht[0] + m.ht[1];
+    const o = { p05: f(m => tot(m) > 0.5, a), p15: f(m => tot(m) > 1.5, a), p25: f(m => tot(m) > 2.5, a), p35: f(m => tot(m) > 3.5, a), ph05: f(m => hq(m) > 0.5, ht), ph15: f(m => hq(m) > 1.5, ht), pbt: f(m => m.g > 0 && m.c > 0, a) };
+    o.u15 = o.p15 == null ? null : 100 - o.p15; o.u25 = o.p25 == null ? null : 100 - o.p25; o.u35 = o.p35 == null ? null : 100 - o.p35; o.uh15 = o.ph15 == null ? null : 100 - o.ph15; o.pbn = o.pbt == null ? null : 100 - o.pbt; return o; };
+  const h = one(home), a = one(away); if (!h || !a) return null; const pc = { N }; CP_TRK.forEach(([k]) => { pc[k] = h[k] != null && a[k] != null ? (h[k] + a[k]) / 2 : null; }); return pc; }
 function cpMetrics(m) {
   cpMetrics.c = cpMetrics.c || {}; const k = m.home_team + "|" + m.away_team; if (k in cpMetrics.c) return cpMetrics.c[k];
   let r = null;
   try {
     const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
-    for (const l of Object.keys(hbData)) { const names = [...new Set(hbData[l].flatMap(z => [z[1], z[2]]))], h = msFind(m.home_team, names), a = msFind(m.away_team, names); if (h && a && h !== a && same(h, m.home_team) && same(a, m.away_team)) { r = hbNowMetrics(l, h, a); break; } }
+    for (const l of Object.keys(hbData)) { const names = [...new Set(hbData[l].flatMap(z => [z[1], z[2]]))], h = msFind(m.home_team, names), a = msFind(m.away_team, names); if (h && a && h !== a && same(h, m.home_team) && same(a, m.away_team)) { r = hbNowMetrics(l, h, a); if (r) { try { r.pc = cpPcts(l, h, a); } catch (e) { } } break; } }
   } catch (e) {}
   return (cpMetrics.c[k] = r);
 }
@@ -5020,13 +5030,27 @@ function cpFillPresets(sel) {
   el.value = sel || "";
 }
 function cpSavePreset() {
-  const n = (prompt("Nombre del preset:") || "").trim(); if (!n) return;
-  const p = cpGetPresets(); p[n] = { ...cp, page: 0, dayOff: null };
+  const n = (prompt("Nombre del preset:") || "").trim(); if (!n) return; const d = (prompt("Descripción (opcional):") || "").trim();
+  const p = cpGetPresets(); p[n] = { ...cp, page: 0, dayOff: null, desc: d };
   try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {}
   cpFillPresets(n); showToast(`Preset "${n}" guardado`);
 }
+const CP_PRESETS = {
+  "OMG": { desc: "Goles: más de 2.5 en ≥55 % de los partidos recientes de ambos equipos y gol en la 1ª parte en ≥70 %.", cols: ["+2.5", "-2.5", "+0.5 HT", "BTTS+"], srng: { p25: [55, null], ph05: [70, null] } },
+  "OMG + ambos marcan": { desc: "Como OMG y además ambos marcan en ≥55 % de sus partidos.", cols: ["+2.5", "+0.5 HT", "BTTS+"], srng: { p25: [55, null], ph05: [70, null], pbt: [55, null] } },
+  "Trend Over": { desc: "Tendencia de goles altos: más 1.5 ≥80 %, más 2.5 ≥55 %, más 3.5 ≥45 %, más 0.5 y 1.5 en la 1ª parte ≥70 % y ≥40 %.", cols: ["+1.5", "+2.5", "+0.5 HT", "+1.5 HT"], srng: { p15: [80, null], p25: [55, null], p35: [45, null], ph05: [70, null], ph15: [40, null] } },
+  "Trend Under": { desc: "Tendencia de pocos goles: menos 1.5 ≥45 %, menos 2.5 ≥55 %, menos 3.5 ≥80 % y menos 1.5 en la 1ª parte ≥70 %.", cols: ["-1.5", "-2.5", "-1.5 HT", "BTTS-"], srng: { u15: [45, null], u25: [55, null], u35: [80, null], uh15: [70, null] } },
+  "Value Near 2.00": { desc: "Partidos con alguna cuota de goles/ambos marcan/1ª parte entre 1.80 y 2.10.", cols: ["+2.5", "-2.5", "BTTS+", "BTTS-", "+1.5 HT", "-1.5 HT"], minO: "1.8", maxO: "2.1" },
+  "Over 1.5 FT y Over 0.5 HT": { desc: "Más 1.5 final y más 0.5 en la 1ª parte con cuota de la casa entre 1.40 y 1.55.", cols: ["+1.5", "+0.5 HT"], rng: { "+1.5|c": [1.4, 1.55], "+0.5 HT|c": [1.4, 1.55] } },
+  "Double Value (final)": { desc: "Algún mercado de 1X2 o goles con valor ≥5 % y probabilidad real ≥80 %.", cols: ["1", "X", "2", "+1.5", "-1.5", "+2.5", "-2.5"], anyV: 5, anyP: 80 },
+  "Double Value (1ª parte)": { desc: "Algún mercado de goles de la 1ª parte con valor ≥5 % y probabilidad real ≥80 %.", cols: ["+0.5 HT", "-0.5 HT", "+1.5 HT", "-1.5 HT"], anyV: 5, anyP: 80 },
+  "Valor en ambos marcan": { desc: "Ambos marcan (Sí/No) con valor ≥5 % y probabilidad real ≥55 %.", cols: ["BTTS+", "BTTS-"], anyV: 5, anyP: 55 }
+};
 let cpPresetName = "";
-function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...p, page: 0 }; cpPresetName = n; cpWriteDom(); renderCoupon(); }
+const CP_BASE = () => ({ q: "", onlyValue: false, onlyFavs: false, minO: "", maxO: "", rng: {}, srng: {}, anyV: 0, anyP: 0, rw: 0, ru: 0, leagues: [], page: 0 });
+function cpLoadPreset(n) { if (!n) return; const p = cpGetPresets()[n]; if (!p) return; cp = { ...cp, ...CP_BASE(), ...p, page: 0 }; cpPresetName = n; cpWriteDom(); renderCoupon(); }
+function cpLoadApp(n) { const p = CP_PRESETS[n]; if (!p) return; cp = { ...cp, ...CP_BASE(), cols: p.cols.slice(), stat: { g: true, r: false, p: true, t: true }, minO: p.minO || "", maxO: p.maxO || "", rng: JSON.parse(JSON.stringify(p.rng || {})), srng: JSON.parse(JSON.stringify(p.srng || {})), anyV: p.anyV || 0, anyP: p.anyP || 0 }; cpPresetName = n; cpWriteDom(); renderCoupon(); }
+function cpClearPreset() { cp = { ...cp, ...CP_BASE() }; cpPresetName = ""; cpWriteDom(); renderCoupon(); }
 function cpDeletePreset() { const n = document.getElementById("cpPreset").value; if (!n) return; const p = cpGetPresets(); delete p[n]; try { localStorage.setItem("radar-presets", JSON.stringify(p)); } catch (e) {} cpFillPresets(""); }
 
 function cpSet(k, v) { cp[k] = v; cp.page = 0; try { cpWriteDom(); } catch (e) {} renderCoupon(); }
@@ -5036,7 +5060,7 @@ function cpTogCol(c) { const i = cp.cols.indexOf(c); if (i >= 0) cp.cols.splice(
 function cpNotes() {
   const a = document.getElementById("cpPresetNote"), b = document.getElementById("cpFilterNote"); if (!a || !b) return;
   a.textContent = cpPresetName ? "Preset: " + cpPresetName : "No has cargado un preset";
-  const f = []; if (cp.q) f.push("Equipo: " + cp.q); if (cp.onlyValue) f.push("Solo valor"); if (cp.onlyFavs) f.push("Solo favoritos"); if (cp.minO) f.push("Cuota ≥ " + cp.minO); if (cp.maxO) f.push("Cuota ≤ " + cp.maxO); { const n = Object.keys(cp.rng || {}).length + Object.keys(cp.srng || {}).length; if (n) f.push(n + " rango(s)"); } if (cp.rw > 0) f.push("Racha G ≥ " + cp.rw); if (cp.ru > 0) f.push("Racha I ≥ " + cp.ru); if (cp.leagues.length) f.push(cp.leagues.length + " liga(s)"); if (cp.book && cp.book !== "auto") f.push("Casa: " + cp.book);
+  const f = []; if (cp.q) f.push("Equipo: " + cp.q); if (cp.onlyValue) f.push("Solo valor"); if (cp.onlyFavs) f.push("Solo favoritos"); if (cp.minO) f.push("Cuota ≥ " + cp.minO); if (cp.maxO) f.push("Cuota ≤ " + cp.maxO); { const n = Object.keys(cp.rng || {}).length + Object.keys(cp.srng || {}).length; if (n) f.push(n + " rango(s)"); } if (cp.anyV) f.push("Valor ≥ " + cp.anyV + " %"); if (cp.anyP) f.push("Prob. ≥ " + cp.anyP + " %"); if (cp.rw > 0) f.push("Racha G ≥ " + cp.rw); if (cp.ru > 0) f.push("Racha I ≥ " + cp.ru); if (cp.leagues.length) f.push(cp.leagues.length + " liga(s)"); if (cp.book && cp.book !== "auto") f.push("Casa: " + cp.book);
   b.textContent = f.length ? f.join(" · ") : "No has añadido ningún filtro";
 }
 function cpPop(kind) {
@@ -5051,7 +5075,7 @@ function cpPop(kind) {
   } else if (kind === "mk") {
     h = CP_COLS.map(c => ck(cp.cols.includes(c[2]), `cpTogCol('${c[2]}')`, CP_LABF[c[2]])).join("");
   } else if (kind === "st") {
-    h = ck(cp.stat.g, "cp.stat.g=this.checked; renderCoupon()", "Goles promedio (L / V / T)") + ck(cp.stat.r, "cp.stat.r=this.checked; renderCoupon()", "Rachas (G / I)") + ck(cp.stat.p, "cp.stat.p=this.checked; renderCoupon()", "Posición en la liga (al lado del equipo)");
+    h = ck(cp.stat.g, "cp.stat.g=this.checked; renderCoupon()", "Goles promedio (L / V / T)") + ck(cp.stat.r, "cp.stat.r=this.checked; renderCoupon()", "Rachas (G / I)") + ck(cp.stat.t, "cp.stat.t=this.checked; renderCoupon()", "Tendencias % (más 1.5 / 2.5, ambos marcan, 1ª parte)") + ck(cp.stat.p, "cp.stat.p=this.checked; renderCoupon()", "Posición en la liga (al lado del equipo)");
   } else if (kind === "rc") {
     h = `<div class="muted" style="font-size:12px; margin-bottom:8px;">Muestra solo partidos donde algún equipo lleve al menos esta racha (0 = sin filtro). Necesita historial cargado.</div><div class="pm-row"><span>Ganados seguidos ≥</span><input type="number" min="0" max="20" value="${cp.rw}" oninput="cpSet('rw', parseInt(this.value) || 0)" /></div><div class="pm-row"><span>Sin perder seguidos ≥</span><input type="number" min="0" max="30" value="${cp.ru}" oninput="cpSet('ru', parseInt(this.value) || 0)" /></div>`;
   } else if (kind === "bk") {
@@ -5061,8 +5085,10 @@ function cpPop(kind) {
   } else if (kind === "sort") {
     h = [["time", "Por hora"], ["ev", "Mayor valor (EV)"], ["name", "Por equipo"]].map(([v, l]) => `<label class="pg-ck"><input type="radio" name="cpso" ${cp.sort === v ? "checked" : ""} onchange="cpSet('sort','${v}')" /> ${l}</label>`).join("");
   } else if (kind === "preset") {
-    const p = Object.keys(cpGetPresets());
-    h = (p.length ? p.map(n => `<div class="pm-row"><span style="cursor:pointer; color:#1EC8A5;" onclick="cpLoadPreset(this.dataset.n); cpPopClose()" data-n="${n.replace(/"/g, "&quot;")}">${n}</span><button class="small ghost" data-n="${n.replace(/"/g, "&quot;")}" onclick="document.getElementById('cpPreset').value=this.dataset.n; cpDeletePreset(); cpPop('preset')">Borrar</button></div>`).join("") : '<div class="muted" style="font-size:12px;">Aún no tienes presets.</div>') + `<button class="small" style="margin-top:12px;" onclick="cpSavePreset(); cpPop('preset'); cpNotes()">+ Guardar filtros actuales como preset</button>`;
+    const q = x => String(x).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"), mine = cpGetPresets(), P = Object.keys(mine);
+    h = `<div class="pg-h" style="margin-bottom:6px;">Presets de la app</div>` + Object.keys(CP_PRESETS).map(n => `<div class="pm-row" style="align-items:flex-start;"><div style="cursor:pointer;" data-n="${q(n)}" onclick="cpLoadApp(this.dataset.n); cpPopClose()"><b style="color:#1EC8A5;">${q(n)}</b><div class="muted" style="font-size:12px; line-height:1.45;">${q(CP_PRESETS[n].desc)}</div></div></div>`).join("")
+      + `<div class="pg-h" style="margin:14px 0 6px;">Tus presets</div>` + (P.length ? P.map(n => `<div class="pm-row" style="align-items:flex-start;"><div style="cursor:pointer;" data-n="${q(n)}" onclick="cpLoadPreset(this.dataset.n); cpPopClose()"><b style="color:#1EC8A5;">${q(n)}</b>${mine[n].desc ? `<div class="muted" style="font-size:12px;">${q(mine[n].desc)}</div>` : ""}</div><span style="display:flex; gap:4px;"><button class="small ghost" data-n="${q(n)}" onclick="cpLoadPreset(this.dataset.n); cpFlt('mk')">Modificar</button><button class="small ghost" data-n="${q(n)}" onclick="document.getElementById('cpPreset').value=this.dataset.n; cpDeletePreset(); cpPop('preset')">Borrar</button></span></div>`).join("") : '<div class="muted" style="font-size:12px;">Aún no tienes presets propios.</div>')
+      + `<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;"><button class="small" onclick="cpSavePreset(); cpPop('preset'); cpNotes()">+ Guardar filtros actuales como preset</button>${cpPresetName ? `<button class="small ghost" onclick="cpClearPreset(); cpPopClose()">Quitar preset</button>` : ""}</div>`;
   } else if (kind === "flt") { cpFlt(cpFltTab); return;
   }
   document.getElementById("cpMB").innerHTML = h;
@@ -5075,7 +5101,7 @@ function cpRngTxt(r) { return r ? (r[0] != null ? r[0] : "") + " – " + (r[1] !
 function cpFlt(tab) {
   cpFltTab = tab; cpRp = null;
   document.getElementById("cpMT").textContent = "Añade/Cambia filtros";
-  const tabs = [["mk", "Filtros de mercado"], ["st", "Estadísticas"], ["rc", "Rachas"], ["vr", "Filtros varios"]].map(([k, l]) => `<span class="pf-chip ${k === tab ? "on" : ""}" onclick="cpFlt('${k}')">${l}</span>`).join("");
+  const tabs = [["mk", "Filtros de mercado"], ["st", "Estadísticas"], ["tr", "Tendencias %"], ["rc", "Rachas"], ["vr", "Filtros varios"]].map(([k, l]) => `<span class="pf-chip ${k === tab ? "on" : ""}" onclick="cpFlt('${k}')">${l}</span>`).join("");
   const cell = (store, key) => { const r = cp[store][key]; return `<td><span class="rg ${r ? "on" : ""}" onclick="cpRpOpen('${store}','${key}')">${r ? cpRngTxt(r) : "⊕"}</span></td>`; };
   let body = "";
   if (tab === "mk") {
@@ -5083,13 +5109,15 @@ function cpFlt(tab) {
     body = `<table class="rgt"><thead><tr><th style="text-align:left;">Mercado</th><th>Rango de cuota real</th><th>Rango de cuotas</th><th>Rango de valor %</th></tr></thead><tbody>${CP_COLS.map(c => `<tr><td style="text-align:left;"><div class="muted" style="font-size:12px;">${NM[c[2]][0]}</div><b>${NM[c[2]][1]}</b></td>${cell("rng", c[2] + "|r")}${cell("rng", c[2] + "|c")}${cell("rng", c[2] + "|v")}</tr>`).join("")}</tbody></table>`;
   } else if (tab === "st") {
     body = `<table class="rgt"><thead><tr><th style="text-align:left;">Estadística</th><th>Rango</th></tr></thead><tbody>${[["gl", "Goles prom. del local"], ["gv", "Goles prom. del visitante"], ["gt", "Goles prom. total (media)"]].map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="muted" style="font-size:11px; margin-top:8px;">Usa el historial cargado en Backtesting; los partidos sin datos se ocultan al filtrar.</div>`;
+  } else if (tab === "tr") {
+    body = `<div class="pm-row" style="margin-bottom:8px;"><span>Mirar los últimos</span><select onchange="cp.nTr = parseInt(this.value); cpMetrics.c = {}; cpFlt('tr'); renderCoupon()">${[5, 8, 10, 15, 20].map(n => `<option value="${n}" ${(cp.nTr || 10) === n ? "selected" : ""}>${n}</option>`).join("")}</select><span>partidos de cada equipo</span></div><table class="rgt"><thead><tr><th style="text-align:left;">% de partidos en que se cumplió (media de los dos equipos)</th><th>Rango %</th></tr></thead><tbody>${CP_TRK.map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="muted" style="font-size:12px; margin-top:8px;">Usa el historial importado en Backtesting (la 1ª parte necesita que el CSV traiga el descanso). Los partidos sin datos se ocultan al filtrar.</div>`;
   } else if (tab === "rc") {
     body = `<table class="rgt"><thead><tr><th style="text-align:left;">Racha</th><th>Rango</th></tr></thead><tbody>${[["wl", "Ganados seguidos · local"], ["wv", "Ganados seguidos · visitante"], ["ul", "Sin perder seguidos · local"], ["uv", "Sin perder seguidos · visitante"]].map(([k, l]) => `<tr><td style="text-align:left;"><b>${l}</b></td>${cell("srng", k)}</tr>`).join("")}</tbody></table><div class="pm-row" style="margin-top:10px;"><span>Cualquier equipo con ≥ G</span><input type="number" min="0" value="${cp.rw}" oninput="cpSet('rw', parseInt(this.value) || 0)" /></div><div class="pm-row"><span>Cualquier equipo con ≥ I</span><input type="number" min="0" value="${cp.ru}" oninput="cpSet('ru', parseInt(this.value) || 0)" /></div>`;
   } else {
     const ck = (on, fn, lab) => `<label class="pg-ck"><input type="checkbox" ${on ? "checked" : ""} onchange="${fn}" /> ${lab}</label>`;
-    body = `<input type="text" placeholder="Buscar equipo..." value="${cp.q.replace(/"/g, "&quot;")}" style="width:100%; margin-bottom:8px;" oninput="cpSet('q', this.value.toLowerCase().trim())" />` + ck(cp.onlyValue, "cpSet('onlyValue', this.checked)", "Solo con valor (≥ 2 %)") + ck(cp.onlyFavs, "cpSet('onlyFavs', this.checked)", "Solo favoritos ⭐") + `<div class="pm-row"><span>Cualquier cuota mín.</span><input type="number" step="0.05" value="${cp.minO}" oninput="cpSet('minO', this.value)" /></div><div class="pm-row"><span>Cualquier cuota máx.</span><input type="number" step="0.05" value="${cp.maxO}" oninput="cpSet('maxO', this.value)" /></div>`;
+    body = `<input type="text" placeholder="Buscar equipo..." value="${cp.q.replace(/"/g, "&quot;")}" style="width:100%; margin-bottom:8px;" oninput="cpSet('q', this.value.toLowerCase().trim())" />` + ck(cp.onlyValue, "cpSet('onlyValue', this.checked)", "Solo con valor (≥ 2 %)") + ck(cp.onlyFavs, "cpSet('onlyFavs', this.checked)", "Solo favoritos ⭐") + `<div class="pm-row"><span>Algún mercado con valor ≥</span><input type="number" step="1" min="0" value="${cp.anyV || ""}" oninput="cpSet('anyV', parseFloat(this.value) || 0)" /><span>%</span></div><div class="pm-row"><span>…y probabilidad real ≥</span><input type="number" step="1" min="0" max="100" value="${cp.anyP || ""}" oninput="cpSet('anyP', parseFloat(this.value) || 0)" /><span>%</span></div><div class="pm-row"><span>Cualquier cuota mín.</span><input type="number" step="0.05" value="${cp.minO}" oninput="cpSet('minO', this.value)" /></div><div class="pm-row"><span>Cualquier cuota máx.</span><input type="number" step="0.05" value="${cp.maxO}" oninput="cpSet('maxO', this.value)" /></div>`;
   }
-  document.getElementById("cpMB").innerHTML = `<div class="pm-chips" style="margin-bottom:12px;">${tabs}</div>${body}<div style="margin-top:14px; display:flex; justify-content:space-between;"><button class="small ghost" onclick="cp.q=''; cp.onlyValue=false; cp.onlyFavs=false; cp.minO=''; cp.maxO=''; cp.rw=0; cp.ru=0; cp.rng={}; cp.srng={}; cp.leagues=[]; cp.book='auto'; cpWriteDom(); renderCoupon(); cpFlt(cpFltTab)">Quitar todos</button></div><div id="cpRp" class="cp-rp" style="display:none;"></div>`;
+  document.getElementById("cpMB").innerHTML = `<div class="pm-chips" style="margin-bottom:12px;">${tabs}</div>${body}<div style="margin-top:14px; display:flex; justify-content:space-between;"><button class="small ghost" onclick="cp.q=''; cp.onlyValue=false; cp.onlyFavs=false; cp.minO=''; cp.maxO=''; cp.rw=0; cp.ru=0; cp.rng={}; cp.srng={}; cp.anyV=0; cp.anyP=0; cp.leagues=[]; cp.book='auto'; cpWriteDom(); renderCoupon(); cpFlt(cpFltTab)">Quitar todos</button></div><div id="cpRp" class="cp-rp" style="display:none;"></div>`;
   document.querySelector(".cp-mbox").classList.add("wide");
   document.getElementById("cp-modal").classList.add("on");
 }
@@ -6166,8 +6194,9 @@ function renderCoupon() {
   if (cp.onlyFavs) rows = rows.filter(r => favs.has(r.m.home_team) || favs.has(r.m.away_team));
   { const inR = (v, r) => v != null && (r[0] == null || v >= r[0]) && (r[1] == null || v <= r[1]);
     Object.keys(cp.rng || {}).forEach(k => { const [lab, kd] = k.split("|"), r = cp.rng[k]; rows = rows.filter(x => { const c = x.cells.find(z => z.lab === lab); if (!c || !c.r) return false; const v = kd === "r" ? (c.r.fair ? 1 / c.r.fair : null) : kd === "c" ? c.r.price : (c.r.ev != null ? c.r.ev * 100 : null); return inR(v, r); }); });
-    const SV = { gl: t => t.hav, gv: t => t.aav, gt: t => (t.hav + t.aav) / 2, wl: t => t.hw, wv: t => t.aw, ul: t => t.hu, uv: t => t.au };
+    const SV = Object.assign({ gl: t => t.hav, gv: t => t.aav, gt: t => (t.hav + t.aav) / 2, wl: t => t.hw, wv: t => t.aw, ul: t => t.hu, uv: t => t.au }, CP_SV);
     Object.keys(cp.srng || {}).forEach(k => { const r = cp.srng[k]; rows = rows.filter(x => { const t = cpMetrics(x.m); return t && inR(SV[k](t), r); }); }); }
+  if (cp.anyV || cp.anyP) rows = rows.filter(r => r.cells.some(c => c.r && (!cp.anyV || (c.r.ev != null && c.r.ev * 100 >= cp.anyV)) && (!cp.anyP || (c.r.fair && c.r.fair * 100 >= cp.anyP))));
   if (cp.rw > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hw, t.aw) >= cp.rw; });
   if (cp.ru > 0) rows = rows.filter(r => { const t = cpMetrics(r.m); return t && Math.max(t.hu, t.au) >= cp.ru; });
   const mn = parseFloat(cp.minO), mx = parseFloat(cp.maxO);
@@ -6179,10 +6208,10 @@ function renderCoupon() {
   document.getElementById("cpCount").innerHTML = `Mostrando <b>${rows.length}</b> partidos en <b>${leaguesN}</b> ligas<br><span style="font-size:11px;">(de un total de ${base.length} partidos · <b style="color:#1EC8A5;">B</b> = cuota justa estimada, debajo la cuota de la casa y su % de valor)</span>`;
   if (!rows.length) { el.innerHTML = '<div class="muted" style="padding:20px; text-align:center;">Ningún partido con estos filtros.</div>'; document.getElementById("cpPages").innerHTML = ""; return; }
   const vis = rows.slice(cp.page * CP_PAGE, (cp.page + 1) * CP_PAGE), nc = vis[0].cells.length;
-  let day = "", html = `<table class="cptable"><thead><tr><th class="c-m">Liga · Hora · Partido</th>${vis[0].cells.map(c => `<th title="${CP_LABF[c.lab] || c.lab}"><span class="thp">${CP_LAB[c.lab] || c.lab}<i onclick="cpColOff('${c.lab}')" title="Quitar columna">✕</i></span></th>`).join("")}${cp.stat.g ? `<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)"><span class="thp">Goles prom.<i onclick="cpStatOff('g')">✕</i></span></th>` : ""}${cp.stat.r ? `<th title="G = partidos ganados seguidos, I = partidos sin perder seguidos"><span class="thp">Rachas<i onclick="cpStatOff('r')">✕</i></span></th>` : ""}</tr></thead><tbody>`;
+  let day = "", html = `<table class="cptable"><thead><tr><th class="c-m">Liga · Hora · Partido</th>${vis[0].cells.map(c => `<th title="${CP_LABF[c.lab] || c.lab}"><span class="thp">${CP_LAB[c.lab] || c.lab}<i onclick="cpColOff('${c.lab}')" title="Quitar columna">✕</i></span></th>`).join("")}${cp.stat.g ? `<th title="Media de goles por partido de cada equipo (L local, V visitante, T total)"><span class="thp">Goles prom.<i onclick="cpStatOff('g')">✕</i></span></th>` : ""}${cp.stat.r ? `<th title="G = partidos ganados seguidos, I = partidos sin perder seguidos"><span class="thp">Rachas<i onclick="cpStatOff('r')">✕</i></span></th>` : ""}${cp.stat.t ? `<th title="% de los últimos partidos de cada equipo (media de los dos) en que se cumplió cada mercado"><span class="thp">Tendencias %<i onclick="cpStatOff('t')">✕</i></span></th>` : ""}</tr></thead><tbody>`;
   vis.forEach(r => {
     const d = new Date(r.m.commence_time), dk = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-    if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0)}">${dk}</td></tr>`; }
+    if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0) + (cp.stat.t ? 1 : 0)}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
     const cs = cpState(r.m, hm), mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
     const nT = mt ? (hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
@@ -6190,7 +6219,7 @@ function renderCoupon() {
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
       (!cp.stat.g ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hav.toFixed(1)}</b><span>V</span><b>${mt.aav.toFixed(1)}</b><span>T</span><b>${((mt.hav + mt.aav) / 2).toFixed(1)}</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) +
-      (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
+      (!cp.stat.r ? "" : `<td><div class="cst">${mt ? `<span>L</span><b>${mt.hw}G · ${mt.hu}I</b><span>V</span><b>${mt.aw}G · ${mt.au}I</b>` : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + (!cp.stat.t ? "" : `<td><div class="cst">${mt && mt.pc ? [["+1.5", "p15"], ["+2.5", "p25"], ["BTTS", "pbt"], ["+0.5 HT", "ph05"]].map(([l, k]) => `<span>${l}</span><b>${mt.pc[k] != null ? Math.round(mt.pc[k]) + "%" : "–"}</b>`).join("") : `<span class="muted" style="grid-column:1/3;">–</span>`}</div></td>`) + `</tr>` +
       `<tr class="cpx" style="display:none;"><td class="muted" style="font-size:11px; text-align:left;">Cuotas por casa</td>${r.cells.map(c => !c.r || !c.r.all ? "<td></td>" : `<td>${[...c.r.all].sort((a, b) => b.price - a.price).map((x, i) => `<div style="font-size:11px; ${i === 0 ? "color:#3ECF8E; font-weight:700;" : "color:#9AA5B1;"}">${x.price.toFixed(2)} <span style="font-size:9px; opacity:.7;">${x.b.replace("_eu", "")}</span></div>`).join("")}</td>`).join("")}<td></td><td></td></tr>`;
   });
   el.innerHTML = html + "</tbody></table>"; cpResEnsure();
