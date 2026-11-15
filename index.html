@@ -2376,8 +2376,8 @@ function hmTeams() {
   const out = [];
   Object.keys(hbData).forEach(lg => {
     const rows = hbData[lg].slice().sort((a, b) => a[0] - b[0]); if (!rows.length) return; const last = rows[rows.length - 1][0], T = {};
-    rows.forEach(r => { const hh = r[7] ? [r[7][0], r[7][1]] : null; (T[r[1]] = T[r[1]] || []).push({ d: r[0], g: r[3], c: r[4], ht: hh }); (T[r[2]] = T[r[2]] || []).push({ d: r[0], g: r[4], c: r[3], ht: hh ? [hh[1], hh[0]] : null }); });
-    Object.keys(T).forEach(tn => { const arr = T[tn]; if (arr[arr.length - 1].d < last - 35) return; const st = {}; HM_DEFS.forEach(df => { let k = 0, prev = null; for (let i = arr.length - 1; i >= 0; i--) { const m = arr[i]; if (prev != null && prev - m.d > 100) break; if (df.ht && !m.ht) break; if (!(df.ht ? df.f(m.ht[0], m.ht[1]) : df.f(m.g, m.c))) break; k++; prev = m.d; } st[df.id] = k; }); out.push({ lg, t: tn, st }); });
+    rows.forEach(r => { const hh = r[7] ? [r[7][0], r[7][1]] : null; (T[r[1]] = T[r[1]] || []).push({ d: r[0], g: r[3], c: r[4], ht: hh, o: r[2] }); (T[r[2]] = T[r[2]] || []).push({ d: r[0], g: r[4], c: r[3], ht: hh ? [hh[1], hh[0]] : null, o: r[1] }); });
+    Object.keys(T).forEach(tn => { const arr = T[tn]; if (arr[arr.length - 1].d < last - 35) return; const st = {}; HM_DEFS.forEach(df => { let k = 0, prev = null; for (let i = arr.length - 1; i >= 0; i--) { const m = arr[i]; if (prev != null && prev - m.d > 100) break; if (df.ht && !m.ht) break; if (!(df.ht ? df.f(m.ht[0], m.ht[1]) : df.f(m.g, m.c))) break; k++; prev = m.d; } st[df.id] = k; }); out.push({ lg, t: tn, st, last: arr[arr.length - 1] }); });
   });
   hmCache = { sig, v: out }; return out;
 }
@@ -2398,6 +2398,8 @@ function hmGo(ids) { cp.leagues = ids.slice(); cp.dayOff = 0; cp.page = 0; switc
 function hmSetTab(t) { hmTab = t; hmRenderStreaks(); }
 function hmTog(id) { const i = hmSel.indexOf(id); if (i >= 0) hmSel.splice(i, 1); else hmSel.push(id); hmSave(); hmRenderStreaks(); }
 function hmPickTeam(t) { const e = document.getElementById("cpSearch"); if (e) e.value = t; cp.dayOff = null; cp.leagues = []; cp.q = t.toLowerCase(); switchView("coupon"); }
+let playInfo = {};
+function hmWho(x, play) { const q = s => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;"), i = play && playInfo[x.lg + "|" + x.t]; if (i) return `<small style="color:var(--primary,#1EC8A5);">Hoy ${q(i.hr)} · ${i.local ? "en casa" : "fuera"} vs ${q(i.opp)}${i.lg ? " (" + q(i.lg) + ")" : ""}</small>`; const l = x.last; return l ? `<small>Último: ${l.g}-${l.c} vs ${q(l.o)}</small>` : ""; }
 function hmRenderStreaks() {
   const tabs = document.getElementById("hmTabs"); if (!tabs) return;
   tabs.innerHTML = Object.keys(HM_CATS).map(c => { const n = hmSel.filter(id => (HM_DEFS.find(d => d.id === id) || {}).cat === c).length; return `<div class="hm-tab ${hmTab === c ? "on" : ""}" onclick="hmSetTab('${c}')">${HM_CATS[c]} (${n})</div>`; }).join("");
@@ -2406,15 +2408,15 @@ function hmRenderStreaks() {
   if (!Object.keys(hbData).length) { grid.innerHTML = `<div class="muted" style="grid-column:1/-1; text-align:center; padding:24px; font-size:13px;">Aún no hay historial. Importa los CSV en <b>Backtesting</b> (botón "Importar CSV") y aquí aparecerán las rachas de cada equipo.</div>`; note.textContent = ""; return; }
   const today = document.getElementById("hmToday").checked; let play = null;
   if (today) {
-    play = new Set(); const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
+    play = new Set(); playInfo = {}; const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
     const base = hmTodayBase(), names = {}; Object.keys(hbData).forEach(l => { names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]; });
-    base.forEach(x => { for (const l of Object.keys(names)) { const h = msFind(x.m.home_team, names[l]), a = msFind(x.m.away_team, names[l]); if (h && a && h !== a && same(h, x.m.home_team) && same(a, x.m.away_team)) { play.add(l + "|" + h); play.add(l + "|" + a); break; } } });
+    base.forEach(x => { for (const l of Object.keys(names)) { const h = msFind(x.m.home_team, names[l]), a = msFind(x.m.away_team, names[l]); if (h && a && h !== a && same(h, x.m.home_team) && same(a, x.m.away_team)) { play.add(l + "|" + h); play.add(l + "|" + a); const hr = new Date(x.m.commence_time).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }); playInfo[l + "|" + h] = { opp: x.m.away_team, hr, lg: x.m.mov_league || "", local: true }; playInfo[l + "|" + a] = { opp: x.m.home_team, hr, lg: x.m.mov_league || "", local: false }; break; } } });
   }
   let fell = false; if (play && !play.size) { play = null; fell = true; }
   const T = hmTeams(), defs = hmSel.map(id => HM_DEFS.find(d => d.id === id)).filter(Boolean);
   grid.innerHTML = defs.map(d => {
     const top = T.filter(x => (!play || play.has(x.lg + "|" + x.t)) && x.st[d.id] > 0).sort((a, b) => b.st[d.id] - a.st[d.id] || a.t.localeCompare(b.t)).slice(0, 5);
-    return `<div class="hm-card"><h4>${d.title}</h4>${top.map((x, i) => `<div class="hm-row ${play ? "play" : ""}" onclick="hmPickTeam('${x.t.replace(/'/g, "\\'")}')" title="Ver sus partidos"><span class="muted">${i + 1}.</span><span class="t">${x.t}<small>${x.lg}</small></span><span class="k">${x.st[d.id]}</span><span class="fl">${hmFlag(x.lg)}</span></div>`).join("") || `<div class="muted" style="text-align:center; padding:14px 0; font-size:12px;">${play ? "Ningún equipo que juegue hoy tiene esta racha." : "Sin datos."}</div>`}</div>`;
+    return `<div class="hm-card"><h4>${d.title}</h4>${top.map((x, i) => `<div class="hm-row ${play ? "play" : ""}" onclick="hmPickTeam('${x.t.replace(/'/g, "\\'")}')" title="Ver sus partidos"><span class="muted">${i + 1}.</span><span class="t">${x.t}<small>${x.lg}</small>${hmWho(x, play)}</span><span class="k">${x.st[d.id]}</span><span class="fl">${hmFlag(x.lg)}</span></div>`).join("") || `<div class="muted" style="text-align:center; padding:14px 0; font-size:12px;">${play ? "Ningún equipo que juegue hoy tiene esta racha." : "Sin datos."}</div>`}</div>`;
   }).join("") || `<div class="muted" style="grid-column:1/-1; text-align:center; padding:20px;">Elige arriba qué rachas quieres ver.</div>`;
   note.textContent = (fell ? "Hoy no coincide ningún partido con tu historial, así que se muestran todos los equipos activos. " : "") + `Rachas calculadas con tu historial de partidos${play ? " (solo equipos con partido hoy y coincidencia de nombre con las cuotas)" : " (equipos activos en las últimas 5 semanas de cada liga)"}.`;
 }
