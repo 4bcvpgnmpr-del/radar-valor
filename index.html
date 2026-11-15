@@ -5798,13 +5798,24 @@ async function aiLoadHist(pre, msg) { prCacheLoad(); prInit();
     n++; if (msg) msg(n, todo.length); });
   if (todo.length) prCacheSave(); }
 const AI_LV = {};
-async function aiLiveFetch(items) { await prPool(items.filter(x => x._mid), 3, async x => { try { const f = await vsResolve(x._h, x._a, x._iso); if (!f || !f.e) { AI_LV[x._mid] = { t: Date.now(), none: true }; return; }
+const AI_LB = {};
+async function aiLiveBsd(items) {
+  let k = ""; try { k = localStorage.getItem("radar-bsd-key") || ""; } catch (e) { } if (!k) return;
+  try { const lv = await bsdGet("events/live/?limit=200"), L = lv.results || [], nz = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), nr = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a));
+    await prPool(items.filter(x => x._mid), 3, async x => { const le = L.find(e => nr(nz(e.home_team), nz(x._h)) && nr(nz(e.away_team), nz(x._a))); if (!le) { delete AI_LB[x._mid]; return; }
+      const r = { marcador: (le.home_score != null ? le.home_score : "?") + "-" + (le.away_score != null ? le.away_score : "?"), minuto: le.current_minute };
+      try { const [sx, ix] = await Promise.all([bsdGet(`events/${le.id}/stats/`), bsdGet(`events/${le.id}/incidents/`)]); const h = sx.stats && sx.stats.home, a = sx.stats && sx.stats.away; if (h && a) { r.local = {}; r.visitante = {}; [["posesion", "ball_possession"], ["tiros", "total_shots"], ["tiros_a_puerta", "shots_on_target"], ["corners", "corner_kicks"], ["faltas", "fouls"], ["amarillas", "yellow_cards"], ["rojas", "red_cards"], ["fueras_de_juego", "offsides"], ["xg", "expected_goals"]].forEach(([lb, kk]) => { let u = h[kk], w = a[kk]; if (u && typeof u === "object") u = u.value; if (w && typeof w === "object") w = w.value; if (u != null) r.local[lb] = u; if (w != null) r.visitante[lb] = w; }); }
+        r.incidentes = (Array.isArray(ix) ? ix : ix.results || ix.incidents || []).filter(i => /goal|card|penalty/.test(i.type)).slice(0, 25); } catch (e) { }
+      AI_LB[x._mid] = r; }); } catch (e) { }
+}
+async function aiLiveFetch(items) { try { await aiLiveBsd(items); } catch (e) { } await aiLiveFetch0(items); }
+async function aiLiveFetch0(items) { await prPool(items.filter(x => x._mid), 3, async x => { try { const f = await vsResolve(x._h, x._a, x._iso); if (!f || !f.e) { AI_LV[x._mid] = { t: Date.now(), none: true }; return; }
     const su = await espnGet(`${f.slug}/summary?event=${f.e.id}`), o = prCompact(su), H = String(f.hc.team.id), A = String(f.ac.team.id), tn = id => id === H ? f.hc.team.displayName : f.ac.team.displayName;
     AI_LV[x._mid] = { t: Date.now(), H, A, hn: f.hc.team.displayName, an: f.ac.team.displayName, o, tn }; } catch (e) { AI_LV[x._mid] = { t: Date.now(), none: true }; } }); }
-function aiLivePub(mid) { const L = AI_LV[mid]; if (!L || L.none || !L.o) return undefined; const o = L.o, ts = o.ts || {}, pick = id => { const z = ts[id] || {}, r = {}; ["totalShots", "shotsOnTarget", "wonCorners", "foulsCommitted", "yellowCards", "redCards", "saves", "possessionPct", "offsides"].forEach(k => { if (z[k] != null) r[k] = z[k]; }); return r; };
+function aiLivePub(mid) { const B = AI_LB[mid], L = AI_LV[mid]; if (B && (!L || L.none || !L.o)) return { datos_bsd_en_vivo: B }; if (!L || L.none || !L.o) return undefined; const o = L.o, ts = o.ts || {}, pick = id => { const z = ts[id] || {}, r = {}; ["totalShots", "shotsOnTarget", "wonCorners", "foulsCommitted", "yellowCards", "redCards", "saves", "possessionPct", "offsides"].forEach(k => { if (z[k] != null) r[k] = z[k]; }); return r; };
   const top = (k, n) => (o.pl || []).filter(p => (p.k[k] || 0) > 0).sort((a, b) => b.k[k] - a.k[k]).slice(0, n).map(p => ({ jugador: p.n, equipo: L.tn(p.t), valor: p.k[k] }));
   const res = { estadisticas_espn_local: pick(L.H), estadisticas_espn_visitante: pick(L.A), jugadores_en_vivo: { tiros: top("totalShots", 6), tiros_a_puerta: top("shotsOnTarget", 5), faltas_cometidas: top("foulsCommitted", 5), faltas_recibidas: top("foulsDrawn", 5), paradas: top("saves", 3), amarillas: top("yellowCards", 4) } };
-  Object.keys(res.jugadores_en_vivo).forEach(k => { if (!res.jugadores_en_vivo[k].length) delete res.jugadores_en_vivo[k]; }); return res; }
+  Object.keys(res.jugadores_en_vivo).forEach(k => { if (!res.jugadores_en_vivo[k].length) delete res.jugadores_en_vivo[k]; }); if (B) res.datos_bsd_en_vivo = B; return res; }
 async function aiCall(key, prompt, web, uses) {
   const hd = { "Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body = { model: "claude-sonnet-4-6", max_tokens: 8000, messages: [{ role: "user", content: prompt }] };
   if (web) { const b2 = Object.assign({}, body, { tools: [{ type: "web_search_20250305", name: "web_search", max_uses: uses || 6 }] }); const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: hd, body: JSON.stringify(b2) }); if (r.ok) return { res: r, web: true }; const t = await r.text(); if (!(r.status === 400 || r.status === 403 || r.status === 404)) throw new Error(r.status + " " + t.slice(0, 160)); const r2 = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: hd, body: JSON.stringify(body) }); return { res: r2, web: false, why: r.status + " " + t.slice(0, 120) }; }
