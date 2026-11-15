@@ -3536,7 +3536,7 @@ function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; con
 const MOV_PP = {};
 function movConvert(d) {
   Object.keys(MOV_PP).forEach(k => delete MOV_PP[k]);
-  const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0 };
+  const now = Date.now(), out = [], st = { n: 0, h2h: 0, tot: 0, btts: 0, live: 0, tht: 0, hg: {} };
   (d.matches || []).forEach(x => {
     if (!x.home || !x.away) return;
     const live = !!x.in_play, t = Date.parse(x.kickoff_utc); if (isNaN(t)) return;
@@ -3545,11 +3545,12 @@ function movConvert(d) {
     const ft = qs.filter(q => /^Full ?Time Result$/i.test(q.group_name || "")), oc = [];
     [[x.home, x.home], ["Draw", "Draw"], [x.away, x.away]].forEach(([lab, nm]) => { const q = ft.find(z => (z.label || "").trim() === lab); if (q) oc.push({ name: nm, price: q.odds_dec }); });
     if (oc.length === 3) { mk.push({ key: "h2h", outcomes: oc }); st.h2h++; }
-    const teamG = g => [x.home, x.away].some(t => t && String(g).toLowerCase().includes(String(t).toLowerCase())), isHT = g => /(1st|first)\s*half|half\s*time\s*goals|\bHT\b/i.test(g);
+    const teamG = g => [x.home, x.away].some(t => t && String(g).toLowerCase().includes(String(t).toLowerCase())), isHT = g => /(1st|first)\s*half|half[\s-]*time|\b(HT|1H)\b/i.test(g);
     const to = qs.filter(q => { const g = q.group_name || ""; return !teamG(g) && !isHT(g) && (/Goals Over\/Under/i.test(g) || (live && / Goals$/i.test(g))) && (q.line || q.handicap); }), tout = [];
     to.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) tout.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) tout.push({ name: "Under", price: q.odds_dec, point: pt }); });
     if (tout.length >= 2) { mk.push({ key: "totals", outcomes: tout }); st.tot++; }
     { const th = [], toh = qs.filter(q => { const g = q.group_name || ""; return !teamG(g) && isHT(g) && /goals|over|total/i.test(g) && !/both|result|corner|card/i.test(g) && (q.line || q.handicap); }); toh.forEach(q => { const sd = String(q.side || q.label || "").toLowerCase(), pt = parseFloat(q.line || q.handicap); if (isNaN(pt)) return; if (sd.startsWith("over")) th.push({ name: "Over", price: q.odds_dec, point: pt }); else if (sd.startsWith("under")) th.push({ name: "Under", price: q.odds_dec, point: pt }); }); if (th.length >= 2) { mk.push({ key: "totals_ht", outcomes: th }); st.tht = (st.tht || 0) + 1; } }
+    if (!live) qs.forEach(q => { const g = String(q.group_name || ""); if (/half|1st|first|\bHT\b/i.test(g) && !/both|corner|card|foul|result|handicap|double|odd|even|exact|team to|to score|clean|win/i.test(g)) st.hg[g] = (st.hg[g] || 0) + 1; });
     const bt = qs.filter(q => /Both Teams/i.test(q.group_name || "") && /^(yes|no)$/i.test((q.label || "").trim())).map(q => ({ name: /^yes$/i.test(q.label.trim()) ? "Yes" : "No", price: q.odds_dec }));
     if (bt.length === 2) { mk.push({ key: "btts", outcomes: bt }); st.btts++; }
     if (!mk.length && !live) return;
@@ -3608,7 +3609,7 @@ async function movLoad0(silent) {
   try {
     const { out, st } = await movWork().catch(() => movMain());
     try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
-    say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan).`);
+    say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan, ${st.tht || 0} con más/menos de 1ª parte).` + ((st.tht || 0) === 0 ? " Bet365 no trae aquí el más/menos de la 1ª parte" + (st.hg && Object.keys(st.hg).length ? " (mercados de 1ª parte vistos: " + Object.keys(st.hg).sort((a, b) => st.hg[b] - st.hg[a]).slice(0, 4).join(" · ") + ")" : "") + "." : ""));
   } catch (e) { say("No se pudo descargar Bet365: " + e.message); return false; }
   movRenderTail();
   return true;
@@ -5332,7 +5333,13 @@ function msGoOdds() { closeMatchSheet(); document.getElementById("teamSearch").v
 function closeMatchSheet() { document.getElementById("match-overlay").style.display = "none"; document.body.style.overflow = ""; }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeMatchSheet(); });
 const MS_ALIAS = { "wolverhampton wanderers": "wolves", "brighton and hove albion": "brighton", "tottenham hotspur": "tottenham", "newcastle united": "newcastle", "west ham united": "west ham", "leicester city": "leicester", "athletic bilbao": "athletic club", "real betis": "betis", "rb leipzig": "rb leipzig", "bayer leverkusen": "bayer leverkusen", "inter milan": "inter", "ac milan": "milan", "paris saint germain": "paris saint germain" };
-function msNorm(n) { let x = lvNorm(n); x = MS_ALIAS[x] || x; return x.replace(/\b(united|city|wanderers|hotspur|albion|real|club)\b/g, "").replace(/\s+/g, " ").trim(); }
+function msNorm(n) {
+  const raw = String(n == null ? "" : n).toLowerCase(); let x = lvNorm(n), tg = "";
+  if (/\(\s*w\s*\)|\b(women|womens|femenino|femenina|feminin|feminine|ladies|frauen|dames|femminile)\b|\sw\s*$/.test(raw)) { tg += "w"; x = x.replace(/\b(women|womens|femenino|femenina|feminin|feminine|ladies|frauen|dames|femminile)\b/g, "").replace(/\s+w\s*$/, ""); }
+  { const a = /\bu-?(1[5-9]|2[0-3])\b/.exec(raw); if (a) { tg += "u" + a[1]; x = x.replace(/\bu(1[5-9]|2[0-3])\b/g, ""); } }
+  if (/\b(reserves?|reservas|ii)\b/.test(raw)) { tg += "r"; x = x.replace(/\b(reserves?|reservas|ii)\b/g, ""); }
+  x = x.replace(/\s+/g, " ").trim(); x = MS_ALIAS[x] || x; x = x.replace(/\b(united|city|wanderers|hotspur|albion|real|club)\b/g, "").replace(/\s+/g, " ").trim();
+  return tg && x ? x.charAt(0) + "~" + tg + "~" + x.slice(1) : x; }
 function msFind(name, teams) {
   const n = msNorm(name); if (!n) return null;
   let t = teams.find(x => msNorm(x) === n) || teams.find(x => { const m = msNorm(x); return m && (m.includes(n) || n.includes(m)); });
