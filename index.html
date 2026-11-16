@@ -1334,7 +1334,7 @@
     </div>
     <div class="ex-sel" id="exGameSel" style="display:none;">
       <select id="exMatch" onchange="exPickMatch(this.value)" style="max-width:340px;"><option value="">Partidos próximos...</option></select>
-      <select id="exHome" onchange="renderExplore()"></select><span class="muted">vs</span><select id="exAway" onchange="renderExplore()"></select>
+      <select id="exHome" onchange="renderExplore()" style="display:none;"></select><select id="exAway" onchange="renderExplore()" style="display:none;"></select>
     </div>
     <div class="ex-hero" id="exHero"><div id="exHeroTxt"></div>
       <div class="ex-ctl">
@@ -5335,7 +5335,7 @@ async function exLoadUpcoming() {
 function exPickMatch(i, auto) {
   const m = exUpList[parseInt(i)]; if (!m) return; if (!auto) exAutoMatch = false;
   const hs = document.getElementById("exHome"), as = document.getElementById("exAway"), names = o => [...o.options].map(x => x.value);
-  const H = msFind(m.h, names(hs)), A = msFind(m.a, names(as)); if (H) hs.value = H; if (A) as.value = A; document.getElementById("exMatch").value = String(i); renderExplore();
+  let H = msFind(m.h, names(hs)), A = msFind(m.a, names(as)); if (!H) { hs.add(new Option(m.h, m.h)); H = m.h; } if (!A) { as.add(new Option(m.a, m.a)); A = m.a; } hs.value = H; as.value = A; document.getElementById("exMatch").value = String(i); renderExplore();
 }
 function exMarkets() {
   const mk = (l, f, ht) => ({ l, f, ht });
