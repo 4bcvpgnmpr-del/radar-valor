@@ -4924,7 +4924,7 @@ async function loadFavoritesCalendar() {
 
 const FD_CODES = { "39": "PL", "140": "PD", "135": "SA", "78": "BL1", "2": "CL", "61": "FL1", "88": "DED", "94": "PPL", "40": "ELC", "71": "BSA", "1": "WC", "4": "EC" };
 async function fdResults(league, season) {
-  const code = FD_CODES[String(league)]; if (!code) throw new Error("liga no disponible en football-data.org");
+  const code = FD_CODES[String(league)]; if (!code) throw new Error("liga no disponible en football-data.org (id de liga: " + league + ")");
   const res = await fetch(`${fdBase()}/v4/competitions/${code}/matches?season=${season}&status=FINISHED`, { headers: fdHeaders() });
   if (res.status === 429) throw new Error("football-data.org: límite de 10 peticiones por minuto, espera un momento");
   if (res.status === 403) throw new Error("football-data.org: tu plan gratuito no incluye esta liga o temporada");
@@ -5474,17 +5474,29 @@ function msStats(rows) {
 }
 function msForm(rows) { const last = rows.slice(-5), pts = last.reduce((s2, r) => s2 + (r.gf > r.ga ? 3 : r.gf === r.ga ? 1 : 0), 0); return { last, ppg: last.length ? pts / last.length : null }; }
 function msDots(last) { return last.length ? last.map(r => { const k = r.gf > r.ga ? ["V", "#3ECF8E"] : r.gf < r.ga ? ["D", "#E5484D"] : ["E", "#F0B429"]; return `<span class="ms-dot" style="background:${k[1]}" title="vs ${r.opp} ${r.gf}-${r.ga}">${k[0]}</span>`; }).join("") : '<span class="muted">–</span>'; }
+
+function bsdOn() { let k = ""; try { k = localStorage.getItem("radar-bsd-key") || ""; } catch (e) { } return !!(k || (typeof getFdProxy === "function" && getFdProxy())); }
+async function msBsdLeague(home, away) {
+  let b = null; for (const dd of [0, 1, -1, 2]) { b = await vsBsd({ hn: home, an: away, date: new Date(Date.now() + dd * 864e5).toISOString() }).catch(() => null); if (b && b.ev) break; }
+  if (!b || !b.ev) throw new Error("BSD no tiene este partido");
+  const ev = b.ev, lid = ev.league_id != null ? ev.league_id : (ev.league && ev.league.id), sid = ev.season_id != null ? ev.season_id : (ev.season && ev.season.id); if (lid == null) throw new Error("BSD no dio la liga del partido");
+  const ck = `radar-bsd-lg-${lid}-${sid}`; try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.t < 6 * 36e5 && c.f.length) return c.f; } catch (e) { }
+  let url = `events/?league_id=${lid}${sid != null ? "&season_id=" + sid : ""}&status=finished&limit=200`, out = [];
+  for (let i = 0; i < 8 && url; i++) { const j = await bsdGet(url); (j.results || []).forEach(e => { const hg = e.home_score, ag = e.away_score; if (hg == null || ag == null || !e.home_team || !e.away_team) return; const ht = e.home_score_ht != null ? [e.home_score_ht, e.away_score_ht] : e.halftime_score ? [e.halftime_score.home, e.halftime_score.away] : e.ht_score ? [e.ht_score.home, e.ht_score.away] : [null, null]; out.push({ d: String(e.date || e.start_time || e.event_date || e.kickoff || ""), h: e.home_team, a: e.away_team, hg: Number(hg), ag: Number(ag), hh: ht[0] != null ? Number(ht[0]) : null, ha: ht[1] != null ? Number(ht[1]) : null }); }); url = j.next ? j.next.replace(/^.*\/api\/v2\//, "") : null; }
+  if (!out.length) throw new Error("BSD no tiene partidos terminados de esta liga"); out.sort((x, y) => x.d.localeCompare(y.d)); try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f: out })); } catch (e) { } return out;
+}
 async function openMatchSheet(home, away, leagueId, leagueName) {
   const ov = document.getElementById("match-overlay"), body = document.getElementById("ms-body");
   ov.style.display = "flex"; document.body.style.overflow = "hidden";
   msCtx = home; msCtx2 = { home, away, leagueId };
   const head = `<div class="ms-title">${home} <span style="color:#3ECF8E">vs</span> ${away}</div><div class="ms-sub">${leagueName || ""} · <a href="#" style="color:#3ECF8E;" onclick="msGoOdds(); return false;">Ver cuotas y valor →</a> · <a href="#" style="color:#3ECF8E;" onclick="msGoExplore(); return false;">Explorar mercados →</a></div>`;
   if (String(leagueId).startsWith("mov")) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Esta liga solo tiene cuotas de Bet365; no hay ficha con estadísticas.</div>`; return; }
-  if (!getFootballKey() && !getFdKey()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
+  if (!getFootballKey() && !getFdKey() && !bsdOn()) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Añade tu API-Football key en ⚙️ Configuración para ver la ficha del partido.</div>`; return; }
   const season = document.getElementById("trSeason").value || 2024;
   body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">Cargando datos de la temporada ${season}...</div>`;
   let data;
-  try { data = await msLeagueData(leagueId, season); } catch (e) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">No se pudieron cargar los datos: ${e.message}</div>`; return; }
+  let bsdErr = ""; if (bsdOn()) { try { data = await msBsdLeague(home, away); } catch (e) { bsdErr = e.message; } }
+  if (!data) try { data = await msLeagueData(leagueId, season); } catch (e) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">No se pudieron cargar los datos. ${bsdErr ? "BSD: " + bsdErr + ". " : ""}Otras fuentes: ${e.message}</div>`; return; }
   const teams = [...new Set(data.flatMap(f => [f.h, f.a]))], H = msFind(home, teams), A = msFind(away, teams);
   if (!H || !A) { body.innerHTML = head + `<div class="muted" style="text-align:center; padding:30px;">No encontré a ${!H ? home : away} en los datos de ${leagueName || "la liga"} de la temporada ${season}. Con el plan gratuito solo hay temporadas hasta 2024 y algunos equipos pueden no estar.</div>`; return; }
   const table = {}; teams.forEach(t => table[t] = { pts: 0, gd: 0, gf: 0 });
