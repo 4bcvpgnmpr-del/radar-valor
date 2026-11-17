@@ -3532,7 +3532,8 @@ function movInject(m) {
   } catch (e) {} return m;
 }
 let movMemo = { raw: null, v: null };
-function movGet() { try { const raw = localStorage.getItem(MOV_KEY) || "null"; if (raw === movMemo.raw) return movMemo.v; const c = JSON.parse(raw), v = c && c.data ? c : null; movMemo = { raw, v }; return v; } catch (e) { return null; } }
+function movGet() { try { const raw = localStorage.getItem(MOV_KEY) || "null"; let v; if (raw === movMemo.raw) v = movMemo.v; else { const c = JSON.parse(raw); v = c && c.data ? c : null; movMemo = { raw, v }; }
+  if (v) { const now = Date.now(), old = now - (v.timestamp || 0) > 20 * 60000; v.data.forEach(m => { if (m.mov_live && (old || now - Date.parse(m.commence_time) > 3.5 * 3600000)) { m.mov_live = false; m.mov_ended = true; } }); } return v; } catch (e) { return null; } }
 const MOV_SK = ["xg", "attacks", "dangerous_attacks", "possession", "shots", "shots_on_target", "shots_off_target", "key_passes", "goals", "corners", "yellow_cards", "red_cards", "offsides", "saves", "passing_accuracy", "crosses", "fouls"];
 function movStatsCompact(st) { if (!st || !st.home || !st.away) return null; const f = o => { const r = {}; MOV_SK.forEach(k => { if (o[k] != null) r[k] = o[k]; }); return r; }; const pl = (st.players || []).map(x => ({ n: x.name, t: x.team, s: x.shirt, g: x.goals || 0, sh: x.shots || 0, sot: x.shots_on_target || 0, xg: x.xg || 0, yc: x.yellow_cards || 0, rc: x.red_cards || 0, f: x.fouls || 0, fd: x.fouls_drawn || 0, tk: x.tackles || 0, as: x.assists || 0, sv: x.saves || 0 })).filter(x => x.g || x.sh || x.sot || x.xg || x.yc || x.rc || x.f || x.fd || x.tk || x.as || x.sv); return { h: f(st.home), a: f(st.away), t: st.updated_at || null, pl }; }
 const MOV_PP = {};
