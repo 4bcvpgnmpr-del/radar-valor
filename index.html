@@ -3611,7 +3611,7 @@ async function movLoad0(silent) {
   if (!silent) say("Descargando cuotas de Bet365...");
   try {
     const { out, st } = await movWork().catch(() => movMain());
-    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; }
+    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; } try { localStorage.setItem("radar-mov-pp", JSON.stringify({ t: Date.now(), pp: MOV_PP })); } catch (e) { try { localStorage.removeItem("radar-mov-pp"); } catch (e2) { } }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan, ${st.tht || 0} con más/menos de 1ª parte).` + ((st.tht || 0) === 0 ? " Bet365 no trae aquí el más/menos de la 1ª parte" + (st.hg && Object.keys(st.hg).length ? " (mercados de 1ª parte vistos: " + Object.keys(st.hg).sort((a, b) => st.hg[b] - st.hg[a]).slice(0, 4).join(" · ") + ")" : "") + "." : ""));
   } catch (e) { say("No se pudo descargar Bet365: " + e.message); return false; }
   movRenderTail();
@@ -5881,7 +5881,15 @@ function aiPhLookup(mid, stat, thr, pname, team) { const e = AI_PH[mid]; if (!e)
   return undefined; }
 function aiPlayerHist(m) { try { if (typeof prRes === "undefined" || !prRes || !prRes.length || typeof prMeta === "undefined" || !prMeta) return undefined; const nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), near = (a, b) => a && b && (a === b || a.includes(b) || b.includes(a)), h = nm(m.home_team), a = nm(m.away_team);
     const r = prRes.filter(x => near(nm(x.team), h) || near(nm(x.team), a)).slice(0, 16).map(x => ({ jugador: x.name, equipo: x.team, estadistica: prMeta.mk, linea: prMeta.line, acierto_pct: Math.round(x.pct), media: Math.round(x.avg * 100) / 100, partidos: x.n })); return r.length ? r : undefined; } catch (e) { return undefined; } }
+function movPPRestore() { try { if (Object.keys(MOV_PP).length) return; const r = JSON.parse(localStorage.getItem("radar-mov-pp") || "null"); if (r && r.pp && Date.now() - r.t < 36 * 36e5) Object.assign(MOV_PP, r.pp); } catch (e) { } }
+function aiJugDiag() { const c = movGet(), W = aiWinRange(), now = Date.now(), OD = aiOdds(); if (!c) return "No hay cuotas de Bet365 cargadas. Pulsa «Cuotas Bet365» (en Partidos y valor) y vuelve a probar.";
+  const age = Math.round((now - c.timestamp) / 3600000); let inWin = 0, withPP = 0; try { cpAll().forEach(x => { const t = Date.parse(x.m.commence_time); if (t >= W.a && t <= W.b && !x.m.mov_live) { inWin++; if (MOV_PP[x.m.id]) withPP++; } }); } catch (e) { }
+  if (!Object.keys(MOV_PP).length) return `Los mercados de jugadores no están en memoria (la última carga de Bet365 fue hace ${age} h y se pierden al recargar la página). Pulsa «Cuotas Bet365» y vuelve a probar.`;
+  if (!inWin) return `No hay partidos que empiecen en el horario elegido (arriba, «Partidos de pregame»). Prueba con «Próximos 3 días». La última carga de Bet365 fue hace ${age} h${age >= 6 ? ", puede estar desfasada: pulsa «Cuotas Bet365»" : ""}.`;
+  if (!withPP) return `Hay ${inWin} partidos en el horario, pero ninguno con mercados de jugadores en Bet365 (suele pasar solo en ligas grandes y partidos cercanos).`;
+  return `Hay ${withPP} partidos con mercados de jugadores, pero el rango de cuotas${OD.min || OD.max ? " (" + (OD.min || "sin") + "–" + (OD.max || "sin") + ")" : ""} o las estadísticas elegidas los dejan sin ninguna opción. Amplía el rango o quita el filtro de estadísticas.`; }
 function aiGather(mode, only) {
+  if (mode === "jug" || only) movPPRestore();
   mode = mode || "eq";
   const now = Date.now(), pre = [], live = [], f2 = v => v == null ? null : Math.round(v * 100) / 100;
   let all = []; try { all = cpAll(); } catch (e) { }
@@ -6115,7 +6123,7 @@ async function aiOpp(force, mode, only) {
   let D = aiGather(mode, only);
   if (((mode === "jug" || only) && D.pre.length) || D.live.length) { try { await aiLoadHist((mode === "jug" || only ? D.pre : []).concat(D.live), (n, t) => box(`<div class="muted" style="text-align:center; padding:24px;">Cargando el historial de los jugadores… partido ${n} de ${t}<br/><span style="font-size:12px;">La primera vez tarda; después queda guardado.</span></div>`)); D = aiGather(mode, only); } catch (e) { } }
   if (D.live.length) { try { box(`<div class="muted" style="text-align:center; padding:24px;">Leyendo el partido en directo…</div>`); await aiLiveFetch(D.live); D = aiGather(mode, only); } catch (e) { } }
-  if (!D.pre.length && !D.live.length) { box(mode === "jug" ? '<div class="muted" style="text-align:center; padding:16px;">No hay mercados de jugadores o porteros cargados. Pulsa «Cuotas Bet365» (en Partidos y valor) para traer los partidos con sus mercados de jugadores y vuelve a probar. Solo hay de partidos que aún no han empezado.</div>' : '<div class="muted" style="text-align:center; padding:16px;">No hay partidos con cuotas cargadas ahora mismo. Pulsa «Cuotas Bet365» para traer partidos y vuelve a probar.</div>'); return; }
+  if (!D.pre.length && !D.live.length) { box(mode === "jug" ? '<div class="muted" style="text-align:center; padding:16px;">' + aiJugDiag() + '</div>' : '<div class="muted" style="text-align:center; padding:16px;">No hay partidos con cuotas cargadas ahora mismo. Pulsa «Cuotas Bet365» para traer partidos y vuelve a probar.</div>'); return; }
   let dg = ""; try { if (mode === "jug" || only) { const E = D.pre.map(x => AI_PH[x._mid]).filter(Boolean), ok = E.filter(e => e.teams && e.teams.some(t => t.pl.length)).length, why = {}; E.forEach(e => { if (e.why) why[e.why] = (why[e.why] || 0) + 1; else if (!e.teams.some(t => t.pl.length)) why["ESPN sin estadísticas por jugador"] = (why["ESPN sin estadísticas por jugador"] || 0) + 1; }); const bo = E.filter(e => e.bsd && !e.bsd.error).length, be = [...new Set(E.filter(e => e.bsd && e.bsd.error).map(e => e.bsd.error))].join("; "); dg = `<br/><span style="font-size:12px;">BSD: ${bo} de ${D.pre.length} partidos${be ? " (" + be + ")" : ""}<br/>Historial de jugadores: ${ok} de ${D.pre.length} partidos con datos${Object.keys(why).length ? " · sin datos: " + Object.keys(why).map(k => why[k] + "× " + k).join("; ") : ""}</span>`; } } catch (e) { }
   box('<div class="muted" style="text-align:center; padding:24px;">Analizando ' + D.pre.length + ' partidos de pregame y ' + D.live.length + ' en vivo…' + dg + '</div>');
   const clean = o => JSON.parse(JSON.stringify(o, (k, v) => k.startsWith("_") ? undefined : v));
