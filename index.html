@@ -3508,6 +3508,17 @@ function hbNowMetrics(l, home, away) {
 
 /* ===== Cuotas Bet365 gratis (MoviOdds) para los Picks ===== */
 const MOV_KEY = "radar-valor-mov-cache";
+
+function movSaveFit(out, st) {
+  const tryPut = d => { try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: d, timestamp: Date.now(), st })); return true; } catch (e) { return false; } };
+  const drop = pre => { try { Object.keys(localStorage).filter(k => k.startsWith(pre)).forEach(k => localStorage.removeItem(k)); } catch (e) { } };
+  if (tryPut(out)) return { ok: true, n: out.length };
+  ["radar-mov-pp", "radar-bsd-lg-", "radar-bsd-pl", "radar-photo-cache2", "radar-pl-cache", "radar-live-snap", "radar-ai-hist"].forEach(pre => { drop(pre); });
+  if (tryPut(out)) return { ok: true, n: out.length, cleaned: true };
+  const now = Date.now(), srt = out.slice().sort((x, y) => Date.parse(x.commence_time) - Date.parse(y.commence_time)).filter(m => Date.parse(m.commence_time) > now - 5 * 36e5);
+  for (const lim of [1200, 800, 500, 300, 150]) { const d = srt.slice(0, lim); if (tryPut(d)) return { ok: true, n: d.length, cut: d.length < out.length }; }
+  return { ok: false };
+}
 function movKeyGet() { try { return localStorage.getItem("radar-mov-key") || ""; } catch (e) { return ""; } }
 function movKQ() { const k = movKeyGet(); return k ? "&key=" + encodeURIComponent(k) : ""; }
 
@@ -3616,7 +3627,7 @@ async function movLoad0(silent) {
   if (!silent) say("Descargando cuotas de Bet365...");
   try {
     const { out, st } = await movWork().catch(() => movMain());
-    try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: out, timestamp: Date.now(), st })); } catch (e) { say("No cabe en el almacenamiento del navegador."); return; } try { localStorage.setItem("radar-mov-pp", JSON.stringify({ t: Date.now(), pp: MOV_PP })); } catch (e) { try { localStorage.removeItem("radar-mov-pp"); } catch (e2) { } }
+    { const sv = movSaveFit(out, st); if (!sv.ok) { say("No cabe en el almacenamiento del navegador ni borrando cachés. Prueba a vaciar los datos del sitio en el navegador."); return; } if (sv.cut) say("Bet365: guardados " + sv.n + " partidos (los más cercanos) porque el navegador no tiene sitio para todos."); } try { localStorage.setItem("radar-mov-pp", JSON.stringify({ t: Date.now(), pp: MOV_PP })); } catch (e) { try { localStorage.removeItem("radar-mov-pp"); } catch (e2) { } }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan, ${st.tht || 0} con más/menos de 1ª parte).` + ((st.tht || 0) === 0 ? " Bet365 no trae aquí el más/menos de la 1ª parte" + (st.hg && Object.keys(st.hg).length ? " (mercados de 1ª parte vistos: " + Object.keys(st.hg).sort((a, b) => st.hg[b] - st.hg[a]).slice(0, 4).join(" · ") + ")" : "") + "." : ""));
   } catch (e) { say(/401/.test(e.message) ? (movKeyGet() ? "MoviOdds rechaza tu clave (401). Revísala en ⚙️ Configuración o créala de nuevo en moviodds.com/account." : "MoviOdds ya exige una clave gratuita. Créala en moviodds.com/account (entras con tu email) y pégala en ⚙️ Configuración → «Clave de MoviOdds».") : "No se pudo descargar Bet365: " + e.message); return false; }
   movRenderTail();
