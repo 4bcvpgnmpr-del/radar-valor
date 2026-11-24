@@ -3609,7 +3609,8 @@ function movConvert(d) {
   return { out, st };
 }
 let movBusy = null;
-async function movLoad(silent) { if (movBusy) return movBusy; movBusy = movLoad0(silent).finally(() => { movBusy = null; }); return movBusy; }
+let movBusyAt = 0;
+async function movLoad(silent) { if (movBusy && Date.now() - movBusyAt > 200000) movBusy = null; if (movBusy) { if (!silent) { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = "Ya hay una descarga de Bet365 en marcha (" + Math.round((Date.now() - movBusyAt) / 1000) + " s). El tablero completo pesa mucho; espera a que termine."; }); } return movBusy; } movBusyAt = Date.now(); movBusy = movLoad0(silent).finally(() => { movBusy = null; }); return movBusy; }
 let movTailT = null, movTailDirty = false;
 function movRenderTail() {
   if (document.hidden) { movTailDirty = true; return; } clearTimeout(movTailT);
@@ -3636,7 +3637,7 @@ self.onmessage = async (ev) => { try { const KQ = ev.data && ev.data.k ? "&key="
 } catch (e) { self.postMessage({ ok: false, error: String(e && e.message || e) }); } };`; }
 function movWork() { return new Promise((resolve, reject) => {
   try { if (typeof Worker === "undefined" || typeof Blob === "undefined") return reject(new Error("sin worker")); if (movWk) { try { movWk.terminate(); } catch (e) { } }
-    const url = URL.createObjectURL(new Blob([movWorkSrc()], { type: "application/javascript" })), wk = movWk = new Worker(url), tm = setTimeout(() => { try { wk.terminate(); } catch (e) { } reject(new Error("tiempo agotado")); }, 60000);
+    const url = URL.createObjectURL(new Blob([movWorkSrc()], { type: "application/javascript" })), wk = movWk = new Worker(url), tm = setTimeout(() => { try { wk.terminate(); } catch (e) { } reject(new Error("tiempo agotado")); }, 150000);
     wk.onmessage = e => { clearTimeout(tm); try { wk.terminate(); } catch (er) { } URL.revokeObjectURL(url); const d = e.data; if (!d || !d.ok) return reject(new Error((d && d.error) || "error")); Object.keys(MOV_PP).forEach(k => delete MOV_PP[k]); Object.assign(MOV_PP, d.pp || {}); resolve({ out: d.out, st: d.st }); };
     wk.onerror = e => { clearTimeout(tm); URL.revokeObjectURL(url); reject(new Error("worker")); }; wk.postMessage({ k: movKeyGet() });
   } catch (e) { reject(e); } }); }
@@ -3652,15 +3653,15 @@ async function movLoad0(silent) {
   const say = t => { ["movMsg", "status"].forEach(id => { const e = document.getElementById(id); if (e && (id === "movMsg" || !silent)) e.textContent = t; }); };
   if (!silent) say("Descargando cuotas de Bet365...");
   try {
-    const { out, st } = await movWork().catch(() => movMain());
+    const { out, st } = await movWork().catch(e => { if (/tiempo agotado|401|clave/i.test(e.message)) throw e; return movMain(); });
     { const sv = movSaveFit(out, st); if (!sv.ok) { say("No cabe en el almacenamiento del navegador ni borrando cachés. Prueba a vaciar los datos del sitio en el navegador."); return; } if (sv.cut) say("Bet365: guardados " + sv.n + " partidos (los más cercanos) porque el navegador no tiene sitio para todos."); } try { localStorage.setItem("radar-mov-pp", JSON.stringify({ t: Date.now(), pp: MOV_PP })); } catch (e) { try { localStorage.removeItem("radar-mov-pp"); } catch (e2) { } }
     say(`Bet365: ${st.n} partidos (${st.live} en vivo · ${st.h2h} con 1X2, ${st.tot} con más/menos, ${st.btts} con ambos marcan, ${st.tht || 0} con más/menos de 1ª parte).` + ((st.tht || 0) === 0 ? " Bet365 no trae aquí el más/menos de la 1ª parte" + (st.hg && Object.keys(st.hg).length ? " (mercados de 1ª parte vistos: " + Object.keys(st.hg).sort((a, b) => st.hg[b] - st.hg[a]).slice(0, 4).join(" · ") + ")" : "") + "." : ""));
-  } catch (e) { say(/401/.test(e.message) ? (movKeyGet() ? "MoviOdds rechaza tu clave (401). Revísala en ⚙️ Configuración o créala de nuevo en moviodds.com/account." : "MoviOdds ya exige una clave gratuita. Créala en moviodds.com/account (entras con tu email) y pégala en ⚙️ Configuración → «Clave de MoviOdds».") : "No se pudo descargar Bet365: " + e.message); return false; }
+  } catch (e) { say(/tiempo agotado/.test(e.message) ? "La descarga de Bet365 tardó más de 2 minutos y se cortó. Revisa tu conexión y vuelve a pulsar «Cuotas Bet365»." : /401/.test(e.message) ? (movKeyGet() ? "MoviOdds rechaza tu clave (401). Revísala en ⚙️ Configuración o créala de nuevo en moviodds.com/account." : "MoviOdds ya exige una clave gratuita. Créala en moviodds.com/account (entras con tu email) y pégala en ⚙️ Configuración → «Clave de MoviOdds».") : "No se pudo descargar Bet365: " + e.message); return false; }
   movRenderTail();
   return true;
 }
 let movTimer = null;
-function movAutoSet(on) { try { localStorage.setItem("radar-mov-auto", on ? "1" : "0"); } catch (e) {} clearInterval(movTimer); if (on) { movLoad(true); movTimer = setInterval(() => movLoad(true), 120000); } }
+function movAutoSet(on) { try { localStorage.setItem("radar-mov-auto", on ? "1" : "0"); } catch (e) {} clearInterval(movTimer); if (on) { movLoad(true); movTimer = setInterval(() => movLoad(true), 600000); } }
 function movAutoInit() { let on = false; try { on = localStorage.getItem("radar-mov-auto") === "1"; } catch (e) {} document.querySelectorAll(".movAuto").forEach(c => { c.checked = on; }); if (on) movAutoSet(true); }
 
 const MOV_CTY = { "England": "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "Scotland": "🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Wales": "🏴󠁧󠁢󠁷󠁬󠁳󠁿", "Spain": "ES", "Italy": "IT", "Germany": "DE", "France": "FR", "Netherlands": "NL", "Portugal": "PT", "Belgium": "BE", "Norway": "NO", "Sweden": "SE", "Denmark": "DK", "Finland": "FI", "Iceland": "IS", "Ireland": "IE", "Northern Ireland": "GB", "Switzerland": "CH", "Austria": "AT", "Poland": "PL", "Czech Republic": "CZ", "Slovakia": "SK", "Hungary": "HU", "Romania": "RO", "Bulgaria": "BG", "Greece": "GR", "Turkey": "TR", "Croatia": "HR", "Serbia": "RS", "Slovenia": "SI", "Ukraine": "UA", "Russia": "RU", "Belarus": "BY", "Albania": "AL", "Israel": "IL", "Cyprus": "CY", "Brazil": "BR", "Argentina": "AR", "Chile": "CL", "Colombia": "CO", "Uruguay": "UY", "Paraguay": "PY", "Peru": "PE", "Ecuador": "EC", "Bolivia": "BO", "Venezuela": "VE", "Mexico": "MX", "USA": "US", "Canada": "CA", "Costa Rica": "CR", "Honduras": "HN", "Guatemala": "GT", "El Salvador": "SV", "Nicaragua": "NI", "Panama": "PA", "Japan": "JP", "South Korea": "KR", "China": "CN", "Australia": "AU", "New Zealand": "NZ", "Indonesia": "ID", "India": "IN", "Thailand": "TH", "Saudi Arabia": "SA", "Qatar": "QA", "UAE": "AE", "Egypt": "EG", "Morocco": "MA", "Algeria": "DZ", "Tunisia": "TN", "South Africa": "ZA", "UEFA": "EU", "AFC": "🌏", "CAF": "🌍", "Copa": "🌎", "Aruba": "AW", "Saint Kitts & Nevis": "KN" };
