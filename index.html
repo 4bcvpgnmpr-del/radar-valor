@@ -1981,7 +1981,7 @@ async function loadAllLeagues() {
     const l = todo[i]; st.textContent = `Cargando ${l.nm} (${i + 1}/${todo.length})...`;
     try {
       const res = await fetch(`https://api.the-odds-api.com/v4/sports/${l.odds}/odds/?apiKey=${key}&regions=uk,eu&markets=${FEATURED_MARKETS}&oddsFormat=decimal`);
-      if (res.status === 401 || res.status === 429) { st.textContent = `Error ${res.status}: revisa tu key o tu cuota. Se detiene la carga.`; fail++; break; }
+      if (res.status === 401 || res.status === 429) { let det = ""; try { const j = await res.clone().json(); det = j.error_code || j.message || ""; } catch (e) { } st.textContent = det === "OUT_OF_USAGE_CREDITS" || /usage quota|credits/i.test(det) ? "The Odds API: te has quedado sin créditos este mes (cada liga cuesta uno). Se renuevan a principio de mes. Mientras tanto usa «Cuotas Bet365», que trae más ligas y no gasta esos créditos." : det === "INVALID_KEY" || /invalid/i.test(det) ? "The Odds API: la clave no es válida. Revísala en ⚙️ Configuración (campo «Odds API key»)." : `Error ${res.status} de The Odds API (${det || "sin detalle"}): clave inválida o créditos agotados. Se detiene la carga. «Cuotas Bet365» no usa esa clave.`; fail++; break; }
       if (!res.ok) { fail++; continue; }
       left = res.headers.get("x-requests-remaining") || left;
       const data = await res.json();
