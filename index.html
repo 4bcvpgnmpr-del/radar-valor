@@ -5857,7 +5857,13 @@ setInterval(() => { try { aiSnapPush(); aiMorFetch(); } catch (e) { } }, 600000)
 setTimeout(() => { try { aiMorInit(); aiSnapPush(); aiMorFetch(); } catch (e) { } }, 6000);
 function waSave() { try { alSyncSoon(); } catch (e) { } try { localStorage.setItem("radar-wa", JSON.stringify({ prov: document.getElementById("waProv").value, phone: document.getElementById("waPhone").value.trim().replace(/[^\d]/g, ""), key: document.getElementById("waKey").value.trim() })); } catch (e) { } }
 function waInit() { const c = waCfg(), p = document.getElementById("waPhone"), k = document.getElementById("waKey"), pv = document.getElementById("waProv"); if (pv) pv.value = c.prov || "callmebot"; if (p) p.value = c.phone || ""; if (k) k.value = c.key || ""; }
+let waQ = [], waT = null;
 function waSend(text) {
+  const c = waCfg(); if (!c.phone || !c.key) return false; waQ.push(text);
+  if (!waT) waT = setTimeout(() => { waT = null; const q = waQ; waQ = []; const parts = []; let cur = ""; q.forEach(t => { if (cur && cur.length + t.length + 2 > 900) { parts.push(cur); cur = ""; } cur += (cur ? "\n\n" : "") + t; }); if (cur) parts.push(cur); const send = parts.slice(0, 3); if (parts.length > 3) send[2] += `\n\n…y ${parts.length - 3} avisos más (míralos en la app, pestaña Alarmas).`; send.forEach((t, i) => setTimeout(() => waSend0(t), i * 2500)); }, 4000);
+  return true;
+}
+function waSend0(text) {
   const c = waCfg(); if (!c.phone || !c.key) return false;
   const url = c.prov === "textmebot" ? `https://api.textmebot.com/send.php?recipient=%2B${encodeURIComponent(c.phone)}&apikey=${encodeURIComponent(c.key)}&text=${encodeURIComponent(text)}` : `https://api.callmebot.com/whatsapp.php?phone=%2B${encodeURIComponent(String(c.phone).replace(/^\+/, ""))}&text=${encodeURIComponent(text)}&apikey=${encodeURIComponent(c.key)}`;
   try { fetch(url, { mode: "no-cors" }).catch(() => { }); return true; } catch (e) { return false; }
