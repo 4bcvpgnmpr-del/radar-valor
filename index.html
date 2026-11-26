@@ -7,8 +7,10 @@
 <link rel="manifest" href="./manifest.json" />
 <meta name="theme-color" content="#0B0E11" />
 <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+  .side-search { width:100%; margin:2px 0 8px; padding:8px 10px; font-size:13px; border-radius:8px; }
   * { box-sizing: border-box; }
   body { margin:0; font-family:'IBM Plex Sans',sans-serif; background:#0B0E11; color:#E6E9ED; }
   .app-shell { display:flex; min-height:100vh; }
@@ -151,7 +153,7 @@
     .sidebar-nav { flex-direction:row; }
     .sidebar-footer { display:none; }
     .sidebar { position:sticky; top:0; z-index:50; padding:8px 10px; gap:6px; -webkit-overflow-scrolling:touch; scrollbar-width:none; } .sidebar::-webkit-scrollbar { display:none; }
-    .sidebar .wordmark h1, .sidebar-section { display:none; } .sidebar .wordmark { margin-right:4px; flex-shrink:0; }
+    .sidebar .wordmark h1, .sidebar-section, .side-search { display:none; } .sidebar .wordmark { margin-right:4px; flex-shrink:0; }
     .sidebar-nav { overflow-x:visible; overflow-y:visible; } .side-btn { white-space:nowrap; flex-shrink:0; padding:8px 12px; font-size:13px; }
     header { padding-left:10px; padding-right:10px; }
   }
@@ -700,6 +702,7 @@
   <div class="sidebar">
     <div class="wordmark"><div class="radar-logo"><span class="ring"></span></div><h1 style="font-size:16px;">Radar de valor</h1></div>
     <div class="sidebar-nav">
+      <input id="sideSearch" class="side-search" type="search" placeholder="🔍 Buscar pantalla…" oninput="sideFilter(this.value)" autocomplete="off" />
       <div class="sidebar-section">Hoy</div>
       <button class="side-btn active" data-v="home" onclick="switchView('home')"><svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg> Inicio</button>
       <button class="side-btn" data-v="live" onclick="switchView('live')"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="9"/></svg> En vivo</button>
@@ -1709,7 +1712,14 @@ function helpHtml(k) { return HELP[k] ? `<details class="help"><summary>ⓘ Cóm
 function helpInit() { document.querySelectorAll("[data-help]").forEach(e => { if (!e.dataset.done) { e.innerHTML = helpHtml(e.dataset.help); e.dataset.done = "1"; } }); }
 helpInit();
 const VIEW_TITLES = { bets:"Mis apuestas", habit:"Mi rutina", ai:"Ideas de la IA", vsmatch:"Partido", plstats:"Estadísticas de jugadores", jorn:"Radar de la jornada", ligas:"Ligas", tteam:"Rachas de equipos", vsteam:"Equipo", vsplayer:"Jugador", pstreak:"Tendencias de jugadores", refs:"Árbitros", cardsw:"Jugadores apercibidos", players:"Jugadores (props)", home:"Inicio", partidos:"Partidos y valor", coupon:"Pregame", daydash:"Dashboard del día", trends:"Tendencias de equipos", alarms:"Alarmas", profile:"Perfil", explore:"Explorar mercados", live:"En vivo", lineups:"Formaciones", historial:"Historial y CLV", stats:"Backtesting", arbitrage:"Arbitraje", calendar:"Calendario favoritos", widgets:"Estadísticas de liga" };
+function sideFilter(q) {
+  q = String(q || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); const nav = document.querySelector(".sidebar-nav"); if (!nav) return; let sec = null, any = false;
+  [...nav.children].forEach(el => { if (el.classList.contains("sidebar-section")) { if (sec) sec.style.display = any || !q ? "" : "none"; sec = el; any = false; return; }
+    if (!el.classList.contains("side-btn")) return; const t = el.textContent.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""), ok = !q || t.includes(q); el.style.display = ok ? "" : "none"; if (ok) any = true; });
+  if (sec) sec.style.display = any || !q ? "" : "none";
+}
 function switchView(v) {
+  try { if (v && v !== "title") localStorage.setItem("radar-last-view", v); } catch (e) { }
   const vt = document.getElementById("view-title"); if (vt) vt.textContent = VIEW_TITLES[v] || "";
   document.querySelectorAll(".view").forEach(el => el.classList.toggle("active", el.id === `view-${v}`));
   document.querySelectorAll(".side-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
@@ -2002,7 +2012,9 @@ async function loadAllLeagues() {
 }
 window.addEventListener("load", () => {
   try { movAutoInit(); } catch (e) {}
+  let lv = ""; try { lv = localStorage.getItem("radar-last-view") || ""; } catch (e) { }
   try { cp.dayOff = 0; document.getElementById("hmToday").checked = true; switchView("home"); } catch (e) {}
+  try { if (lv && lv !== "home" && document.getElementById("view-" + lv)) switchView(lv); } catch (e) { }
   try { const c = movGet(); if (!c || Date.now() - c.timestamp > 10 * 60000) movLoad(true); else { renderCoupon(); hmRender(); } } catch (e) {}
 });
 window.addEventListener("offline", () => showToast("📡 Sin conexión. Se mostrarán los últimos datos guardados."));
@@ -5113,6 +5125,7 @@ function fillLeagueSelects() {
     el.innerHTML = DD_LEAGUES.map(l => `<option value="${l[k]}">${l.fl} ${l.nm}</option>`).join("");
     if (DD_LEAGUES.some(l => l[k] === cur)) el.value = cur;
   });
+  try { const t = document.getElementById("trLeague"); if (t && !t.querySelector("optgroup")) { const have = new Set(DD_LEAGUES.map(l => FD_ESPN[l.id]).filter(Boolean)); let o = ""; ESPN_EXTRA.forEach(g => { const it = g[1].filter(x => !have.has(x[0])); if (it.length) o += `<optgroup label="${g[0]}">${it.map(x => `<option value="espn:${x[0]}">${x[1]}</option>`).join("")}</optgroup>`; }); t.insertAdjacentHTML("beforeend", o); } } catch (e) { }
   try { prInit(); const w = document.getElementById("widgetLeague"); if (w && !w.querySelector("optgroup")) { const have = new Set(Object.values(FD_ESPN)); w.insertAdjacentHTML("beforeend", `<optgroup label="Más ligas">${[...document.querySelectorAll("#plLeague option")].filter(o => !have.has(o.value)).map(o => `<option value="espn:${o.value}">${o.textContent}</option>`).join("")}</optgroup>`); } } catch (e) { }
 }
 function renderDdChips() {
