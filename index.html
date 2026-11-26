@@ -1692,19 +1692,27 @@ const ROW_REGISTRY = {};
 let rowCounter = 0;
 const teamBadgeCache = new Map();
 
+let badgeActive = 0; const badgeWait = [], teamBadgeP = new Map();
+function badgeSlot() { return new Promise(res => { const go = () => { if (badgeActive < 4) { badgeActive++; res(); } else badgeWait.push(go); }; go(); }); }
+function badgeFree() { badgeActive--; const n = badgeWait.shift(); if (n) n(); }
 async function getTeamBadge(name) {
   if (teamBadgeCache.has(name)) return teamBadgeCache.get(name);
-  try {
-    const res = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(name)}`);
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-    const badge = data.teams && data.teams[0] ? data.teams[0].strTeamBadge : null;
-    teamBadgeCache.set(name, badge);
-    return badge;
-  } catch (e) {
-    teamBadgeCache.set(name, null);
-    return null;
-  }
+  if (teamBadgeP.has(name)) return teamBadgeP.get(name);
+  const pr = (async () => {
+    await badgeSlot();
+    try {
+      const res = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(name)}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const badge = data.teams && data.teams[0] ? data.teams[0].strTeamBadge : null;
+      teamBadgeCache.set(name, badge);
+      return badge;
+    } catch (e) {
+      teamBadgeCache.set(name, null);
+      return null;
+    } finally { badgeFree(); teamBadgeP.delete(name); }
+  })();
+  teamBadgeP.set(name, pr); return pr;
 }
 
 const HELP = {"partidos": "<b>Qué es:</b> los próximos partidos de la liga con las cuotas de varias casas. Los números sobre cada liga son los partidos con cuotas cargadas (o, en gris, los programados esta semana).\n<ul><li><b>Cuota justa / probabilidad justa:</b> es el promedio de lo que creen las casas, quitando su margen de beneficio. Es la mejor estimación de la probabilidad real.</li>\n<li><b>Valor (EV):</b> cuánto ganarías de media por cada unidad si la probabilidad justa es correcta. Se calcula cuota × probabilidad justa − 1.</li>\n<li><b>Colores:</b> verde = valor (EV de +2% o más). Rojo = EV de +15% o más: casi siempre es un <b>posible error</b> de una casa o un dato desfasado, compruébalo antes de fiarte.</li>\n<li>Toca un partido para abrir su ficha con todos los mercados, el modelo de probabilidades y Bet365.</li></ul>", "model": "<b>Modelo:</b> probabilidad calculada con los resultados históricos (ataque, defensa y ventaja de local de cada equipo). <b>Cuota justa:</b> la cuota que corresponde a esa probabilidad (1 ÷ prob.): si te pagan más, el modelo ve valor.\n<ul><li><b>Mercado (justa):</b> la probabilidad que implican las casas, sin margen.</li>\n<li><b>Diferencia:</b> modelo − mercado en puntos porcentuales. Verde = el modelo lo ve más probable que el mercado.</li>\n<li><b>Mejor cuota:</b> la más alta entre todas las casas. <b>Edge prudente:</b> ventaja usando 50% modelo y 50% mercado (el mercado suele acertar más).</li>\n<li><b>Ojo:</b> diferencias enormes (más de 15-20 puntos) suelen ser datos mal emparejados o cuotas erróneas, no oportunidades. El modelo no sabe de lesiones ni alineaciones.</li></ul>", "coupon": "<b>Qué es:</b> comparador de cuotas (\"Pregame\") por casa para los próximos partidos, mercado a mercado.\n<ul><li>Cada columna es una casa; la mejor cuota de cada fila va resaltada.</li><li>El porcentaje junto a la cuota es el valor (EV) frente a la probabilidad justa del mercado.</li><li>Usa los filtros de liga, día y mercado para acotar. Las cuotas se actualizan al pulsar el botón (gasta créditos de The Odds API).</li></ul>", "daydash": "<b>Qué es:</b> los partidos de la liga en los próximos 3 días con las estadísticas de cada equipo esta temporada.<ul><li><b>GF / GC:</b> goles a favor y en contra por partido. <b>+2.5 / Ambos:</b> % de sus partidos con más de 2.5 goles y con ambos marcando.</li><li><b>Últimos 5:</b> G ganó, E empató, P perdió.</li><li><b>Goles esperados:</b> referencia rápida (lo que marca uno más lo que encaja el otro). No es una probabilidad: para eso usa el modelo en la ficha del partido.</li><li>Los datos salen de football-data.org (gratis). No hay tarjetas por equipo (necesitan el plan de pago de API-Football).</li></ul>", "live": "<b>Qué es:</b> partidos que se están jugando ahora, con marcador y minuto. Pulsa <b>Actualizar en vivo</b>, o activa Auto para refrescar cada 90 s.\n<ul><li>Cada actualización gasta peticiones de API-Football (plan gratis: 100 al día).</li><li>\"Solo con cuotas\" deja los partidos para los que hay cuotas cargadas.</li></ul>", "lineups": "<b>Qué es:</b> alineaciones y formaciones de los partidos, con la ficha de cada jugador al tocarlo. Debajo, los líderes de la liga.\n<ul><li>Las alineaciones solo están disponibles poco antes del partido (normalmente 1 hora).</li><li>Elige liga y día arriba. Los datos vienen de API-Football.</li></ul>", "arbitrage": "<b>Qué es:</b> busca combinaciones entre casas donde, apostando a todos los resultados, ganarías algo seguro (surebet).\n<ul><li><b>Margen:</b> el beneficio garantizado sobre lo apostado. Si ves más de un 3-5%, desconfía: suele ser una cuota errónea o desfasada que la casa corregirá o anulará.</li><li>Revisa siempre las cuotas en la casa antes de nada; cambian en segundos.</li></ul>", "calendar": "<b>Qué es:</b> los próximos partidos de tus equipos favoritos (márcalos con la ⭐ en Partidos y valor).\n<ul><li>Sirve para planificar la semana sin buscar liga por liga.</li></ul>", "hist": "<b>Qué es:</b> una simulación con el formato de BetPractice: arriba el informe del sistema (con periodos de 7 días, 30 días o última temporada), debajo la tabla de resultados por liga (toca una fila para ver sus partidos) y la descripción del sistema. El botón <b>Filtros</b> abre el panel con pestañas: Básicos (modo liga/equipo, ligas, temporadas, unidad en €), Avanzados (cuota, valor), Equipos (incluir equipos o excluir rivales) y Estadísticas (posición en la liga, media de goles y rachas).<br><br><b>Cómo funciona:</b>  La app toma todos los partidos pasados que cumplen tus filtros, supone que apostaste 1 unidad a cada uno y compara con el resultado real.\n<ul><li><b>Yield:</b> ganancia por cada unidad apostada, en %. +5% significa 5 céntimos de beneficio por euro.</li><li><b>Unidades:</b> beneficio total (cada acierto suma cuota − 1, cada fallo resta 1).</li>\n<li><b>Fiabilidad:</b> \"señal sólida\" = yield positivo, muestra grande y positivo en las dos mitades del periodo. \"Probable azar\" = positivo pero poco convincente. En el ranking se exige más evidencia porque se prueban muchas combinaciones.</li>\n<li><b>1ª / 2ª mitad:</b> yield en la primera y segunda mitad de los partidos. Si el signo cambia, desconfía.</li>\n<li><b>Drawdown máx.:</b> la peor caída seguida de unidades. Indica cuánto habrías sufrido.</li>\n<li><b>CLV medio</b> (con \"Apertura\"): cuánto mejor era tu cuota que la probabilidad justa del cierre. Positivo y sostenido = ventaja real.</li>\n<li><b>Mercados \"sin cuota\":</b> el archivo no trae cuotas, así que se mide la frecuencia y la <b>cuota mínima</b>: si tu casa paga más que esa cuota, el mercado habría dado beneficio.</li></ul>", "sistema": "<b>Qué es:</b> tus apuestas reales. Aquí solo cuentan las que marcas tú como ganada o perdida en la lista de más abajo; la app no sabe si apostaste.\n<ul><li>Stake fijo de 1 unidad. Puedes filtrar por liga, mercado, casa, cuota y valor, y guardar combinaciones como \"sistema\".</li><li>Las pestañas Liga / Equipo / Mercado / Casa agrupan los resultados para ver dónde ganas o pierdes.</li></ul>", "historial": "<b>Qué es:</b> las apuestas que registras, con su cuota y el <b>CLV</b>: compara tu cuota con la cuota justo antes del partido.\n<ul><li>CLV positivo y sostenido en muchas apuestas = ventaja real, aunque algunas pierdan.</li><li>CLV negativo continuado = tus cuotas son peores que las del cierre.</li></ul>", "explore": "<b>Qué es:</b> frecuencias históricas de mercados concretos (goles, ambos marcan, hándicap, mitades…) para contrastar con las cuotas.\n<ul><li>Modo liga: cuántas veces ocurrió en la liga. Modo partido: se centra en un partido y sus equipos.</li><li>Una frecuencia alta no es valor por sí sola: compárala con la cuota (cuota mínima = 1 ÷ frecuencia).</li></ul>", "alarms": "<b>Qué es:</b> avisos que saltan cuando se cumple lo que pones.\n<ul><li><b>Pregame:</b> avisa cuando aparece valor o una cuota que cumple tus condiciones.</li><li><b>En vivo:</b> marcador, minuto o conteos dentro de un tramo (por ejemplo 3 tiros a puerta entre el 60' y el 75').</li><li>Todas las condiciones que rellenes deben cumplirse a la vez. Solo funcionan con la app abierta y gastan peticiones de API-Football.</li></ul>", "trends": "<b>Qué es:</b> tendencias recientes de los equipos de una liga: rachas, goles y resultados.\n<ul><li>Son datos pasados; úsalos para contrastar, no como predicción segura.</li><li>La temporada actual necesita el token de football-data.org.</li></ul>", "widgets": "<b>Qué es:</b> clasificación, máximos goleadores y tarjetas de la temporada para contrastar con lo que dicen las cuotas.\n<ul><li>Con API-Football gratis solo llega a la temporada 2024; con el token de football-data.org se carga la actual.</li></ul>", "profile": "<b>Qué es:</b> tu perfil de apostador: ligas y casas que sigues y ajustes que se aplican al resto de la app (por ejemplo, el orden de las ligas).\n<ul><li>Puedes tener varios perfiles y cambiar de uno a otro.</li></ul>"};
@@ -1725,7 +1733,7 @@ function switchView(v) {
   document.querySelectorAll(".side-btn").forEach(b => b.classList.toggle("active", b.dataset.v === v));
   if (v === "home") hmRender();
   if (v === "historial") renderHistorial();
-  if (v === "stats") renderStats();
+  if (v === "stats") { renderStats(); if (!hbReady) { const mm = document.getElementById("hbMsg"); if (Object.keys(hbData).length && mm) mm.textContent = "Preparando los datos históricos…"; setTimeout(() => { try { hbInit(); } catch (e) { } if (mm && mm.textContent.startsWith("Preparando")) mm.textContent = ""; }, 30); } }
   if (v === "lineups") { renderFormationStats(); luRenderChips(); if (!document.querySelector("#lineup-picker .lv-row")) loadTodayForLineups(); }
   if (v === "alarms") renderAlarms();
   if (v === "habit") habRender();
@@ -2008,7 +2016,7 @@ async function loadAllLeagues() {
   try { renderDdChips(); pvChips(); } catch (e) {}
   if (st.textContent.startsWith("Error")) return;
   st.textContent = `Listo: ${ok} ligas cargadas${fail ? `, ${fail} sin datos (fuera de temporada)` : ""}${left ? `. Te quedan ${left} consultas este mes` : ""}.`;
-  try { hbInit(); } catch (e) {}
+  try { if (hbReady) hbInit(); } catch (e) {}
 }
 window.addEventListener("load", () => {
   try { movAutoInit(); } catch (e) {}
@@ -2186,7 +2194,16 @@ function logValueBet(entry, kind) {
   saveValueLog(log.slice(0, 400));
 }
 
-function getLineHistory() { try { return JSON.parse(localStorage.getItem("radar-valor-line-history") || "{}"); } catch(e) { return {}; } }
+let lhMem = null, lhT = null;
+const LH_KEY = "radar-valor-line-history";
+function getLineHistory() { if (!lhMem) { try { lhMem = JSON.parse(localStorage.getItem(LH_KEY) || "{}") || {}; } catch (e) { lhMem = {}; } } return lhMem; }
+function lhFlush() {
+  clearTimeout(lhT); lhT = null; if (!lhMem) return;
+  const now = Date.now(), old = 3 * 864e5; let ks = Object.keys(lhMem);
+  ks.forEach(k => { const h = lhMem[k]; if (!h || !h.length || now - h[h.length - 1].t > old) delete lhMem[k]; });
+  ks = Object.keys(lhMem); if (ks.length > 4000) ks.sort((x, y) => lhMem[x][lhMem[x].length - 1].t - lhMem[y][lhMem[y].length - 1].t).slice(0, ks.length - 4000).forEach(k => delete lhMem[k]);
+  try { localStorage.setItem(LH_KEY, JSON.stringify(lhMem)); } catch (e) { try { localStorage.removeItem(LH_KEY); lhMem = {}; } catch (e2) { } }
+}
 function recordLineMovement(key, odds) {
   const hist = getLineHistory();
   if (!hist[key]) hist[key] = [];
@@ -2194,10 +2211,11 @@ function recordLineMovement(key, odds) {
   if (!last || last.odds !== odds) {
     hist[key].push({ odds, t: Date.now() });
     if (hist[key].length > 8) hist[key].shift();
-    localStorage.setItem("radar-valor-line-history", JSON.stringify(hist));
+    if (!lhT) lhT = setTimeout(lhFlush, 2000);
   }
   return hist[key];
 }
+try { window.addEventListener("pagehide", () => { if (lhT) lhFlush(); }); document.addEventListener("visibilitychange", () => { if (document.hidden && lhT) lhFlush(); }); } catch (e) { }
 function lineTrendArrow(key, currentOdds) {
   const hist = getLineHistory()[key];
   if (!hist || hist.length < 2) return "";
@@ -2634,7 +2652,10 @@ async function loadBet365(idx) {
 }
 function pvStats(idx) { const it = pvItems[idx]; if (!it) return; if (lastSport === "mov") { showToast("Esta liga solo tiene cuotas de Bet365: no hay ficha con estadísticas."); return; } const l = DD_LEAGUES.find(x => x.odds === lastSport) || DD_LEAGUES[0]; closePv(); openMatchSheet(it.m.home_team, it.m.away_team, l.id, l.nm); }
 
-function renderMatches(matches, sport, isFiltered) {
+let pvLim = 100, pvLastArgs = null;
+function pvMore() { pvLim += 100; if (pvLastArgs) renderMatches(pvLastArgs[0], pvLastArgs[1], true, true); }
+function renderMatches(matches, sport, isFiltered, keepLim) {
+  if (!keepLim) pvLim = 100; pvLastArgs = [matches, sport];
   if (sport !== "mov") pvAllMode = false;
   if (!isFiltered) { lastMatches = matches; lastSport = sport; setTimeout(() => { try { runAlarms(matches, sport); } catch (e) {} }, 300); }
   pvChips();
@@ -2646,7 +2667,14 @@ function renderMatches(matches, sport, isFiltered) {
   let errorCount = 0, valueCount = 0;
   pvItems = {};
   const q = n => n.replace(/'/g, "\\'");
-  let items = matches.map((m, idx) => {
+  const needAll = pv.onlyValue || (pv.sort === "ev" && !pvAllMode), dayOf0 = m => new Date(m.commence_time).toLocaleDateString("sv-SE");
+  let order = matches.map((m, i) => i);
+  if (!needAll && matches.length > pvLim) {
+    if (pvAllMode) order.sort((a, b) => dayOf0(matches[a]).localeCompare(dayOf0(matches[b])) || String(matches[a].mov_league).localeCompare(String(matches[b].mov_league)) || matches[a].commence_time.localeCompare(matches[b].commence_time));
+    else order.sort((a, b) => matches[a].commence_time.localeCompare(matches[b].commence_time));
+    order = order.slice(0, pvLim);
+  }
+  let items = order.map(idx => { const m = matches[idx];
     const matchMeta = { matchId: m.id, home: m.home_team, away: m.away_team, sport, eventId: m.id };
     movInject(m); let byMarket = extractFeaturedMarkets(m);
     lastFullMarketsByMatch[m.id] = { matchMeta, byMarket };
@@ -2711,9 +2739,10 @@ function renderMatches(matches, sport, isFiltered) {
   const dayOf = m => new Date(m.commence_time).toLocaleDateString("sv-SE");
   if (pvAllMode) items.sort((a, b) => dayOf(a.m).localeCompare(dayOf(b.m)) || String(a.m.mov_league).localeCompare(String(b.m.mov_league)) || a.m.commence_time.localeCompare(b.m.commence_time));
   else items.sort((a, b) => pv.sort === "ev" ? (b.best ? b.best.ev : -9) - (a.best ? a.best.ev : -9) : a.m.commence_time.localeCompare(b.m.commence_time));
-  const dayCnt = {}, lgCnt = {}; if (pvAllMode) items.forEach(i => { const d = dayOf(i.m); (dayCnt[d] = dayCnt[d] || { n: 0, l: new Set() }); dayCnt[d].n++; dayCnt[d].l.add(i.m.mov_league); lgCnt[d + "|" + i.m.mov_league] = (lgCnt[d + "|" + i.m.mov_league] || 0) + 1; });
+  const dayCnt = {}, lgCnt = {}; if (pvAllMode) matches.forEach(m0 => { const i = { m: m0 }; const d = dayOf(i.m); (dayCnt[d] = dayCnt[d] || { n: 0, l: new Set() }); dayCnt[d].n++; dayCnt[d].l.add(i.m.mov_league); lgCnt[d + "|" + i.m.mov_league] = (lgCnt[d + "|" + i.m.mov_league] || 0) + 1; });
   let day = "", lgPrev = "";
-  const html = items.map(({ m, idx, cardFlag, best, cells, date }) => {
+  const totalShown = items.length, shownItems = items.slice(0, pvLim);
+  const html = shownItems.map(({ m, idx, cardFlag, best, cells, date }) => {
     const dk = date.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
     let head = "";
     if (pvAllMode) { const dd = dayOf(m); if (dk !== day) { day = dk; lgPrev = ""; head += `<div class="pv-day" style="font-size:14px; color:#E8ECF1; padding-top:14px;">📅 ${dk} <span class="muted" style="font-weight:400;">· ${dayCnt[dd].n} partidos · ${dayCnt[dd].l.size} ligas</span></div>`; } if (m.mov_league !== lgPrev) { lgPrev = m.mov_league; head += `<div class="pv-day" style="padding:8px 4px 2px 10px; color:#3ECF8E;">${(movCountry(m.mov_league) || {}).fl || "🌍"} ${m.mov_league} <span class="muted" style="font-weight:400;">(${lgCnt[dd + "|" + m.mov_league]})</span></div>`; } }
@@ -2727,8 +2756,9 @@ function renderMatches(matches, sport, isFiltered) {
       <div class="pv-best">${pill}</div></div>`;
   }).join("");
   document.getElementById("alert-summary").innerHTML = (errorCount + valueCount) ? `<div style="display:flex; gap:14px; justify-content:center; margin-bottom:12px;">${errorCount ? `<span class="tag-error">${errorCount} posible(s) error(es)</span>` : ""}${valueCount ? `<span class="tag-value">${valueCount} selección(es) con valor</span>` : ""}</div>` : "";
-  contentEl.innerHTML = html || `<div class="muted" style="padding:24px; text-align:center;">Ningún partido con valor en estos filtros.</div>`;
-  items.forEach(({ m, idx }) => {
+  const hidden = (needAll ? totalShown : matches.length) - shownItems.length;
+  contentEl.innerHTML = (html || `<div class="muted" style="padding:24px; text-align:center;">Ningún partido con valor en estos filtros.</div>`) + (hidden > 0 ? `<div style="text-align:center; margin:16px 0;"><button onclick="pvMore()" style="font-weight:700;">Mostrar ${Math.min(100, hidden)} más <span class="muted">(quedan ${hidden})</span></button><div class="muted" style="font-size:12px; margin-top:6px;">Para ir más rápido solo se dibujan los primeros partidos. Usa Hoy / Mañana o el buscador para acotar.</div></div>` : "");
+  shownItems.forEach(({ m, idx }) => {
     getTeamBadge(m.home_team).then(u => { const e = document.getElementById(`pvb-h${idx}`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
     getTeamBadge(m.away_team).then(u => { const e = document.getElementById(`pvb-a${idx}`); if (u && e) { e.src = u; e.style.display = "inline-block"; } });
   });
@@ -3364,8 +3394,10 @@ async function hbImport(ev) {
   hbInit();
 }
 function hbClear() { if (!confirm("¿Borrar todos los datos históricos importados?")) return; hbData = {}; hbSave(); document.getElementById("hbMsg").textContent = "Datos borrados."; hbInit(); }
-function hbSeasonsAll() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => set.add(r[5]))); return [...set].sort(); }
-function hbBooksAvail() { const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => Object.keys(r[6]).forEach(b => set.add(b)))); return Object.keys(HB_BOOKN).filter(b => set.has(b)); }
+let hbSeasMemo = { v: "", r: null };
+function hbSeasonsAll() { const v = hbVer(); if (hbSeasMemo.v === v) return hbSeasMemo.r; const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => set.add(r[5]))); const r = [...set].sort(); hbSeasMemo = { v, r }; return r; }
+let hbBkMemo = { v: "", r: null };
+function hbBooksAvail() { const v = hbVer(); if (hbBkMemo.v === v) return hbBkMemo.r; const set = new Set(); Object.values(hbData).forEach(a => a.forEach(r => Object.keys(r[6]).forEach(b => set.add(b)))); const r = Object.keys(HB_BOOKN).filter(b => set.has(b)); hbBkMemo = { v, r }; return r; }
 let hbSeasSel = null; /* null = todas; Set = solo esas */
 function hbSeasDraw(ss) {
   ss = ss || hbSeasonsAll(); const L = document.getElementById("hbSeasL"); if (!L) return;
@@ -3376,8 +3408,11 @@ function hbSeasTog(x, on) { const ss = hbSeasonsAll(); if (hbSeasSel === null) h
 function hbSeasAll(on) { hbSeasSel = on ? null : new Set(); hbSeasDraw(); hbRender(); }
 function hbSeasLast(n) { hbSeasSel = new Set(hbSeasonsAll().slice(-n)); hbSeasDraw(); hbRender(); }
 const hbMet = new WeakMap(), hbEnr = {}, hbNow = {}; let hbLastSeas = {}, hbMaxD = 0, hbLgSel = null, hbInc = [], hbExc = [], hbPer = "all", hbMode = "league", hbOpenG = new Set(), hbPg = {}, hbGroups = [];
-function hbEnrich(l) {
-  const rows = hbData[l]; if (!rows || hbEnr[l] === rows) return; hbEnr[l] = rows;
+const hbEnrF = {};
+function hbEnrich(l) { const rows = hbData[l]; if (!rows || hbEnr[l] === rows) return; hbEnr[l] = rows; for (let i = 0; i < rows.length; i++) hbMet.set(rows[i], { l }); }
+function hbEnsureFull() { Object.keys(hbData).forEach(hbEnrichFull); }
+function hbEnrichFull(l) {
+  const rows = hbData[l]; if (!rows || hbEnrF[l] === rows) return; hbEnrF[l] = rows; hbEnrich(l);
   const bySeason = {}; rows.forEach(r => (bySeason[r[5]] = bySeason[r[5]] || []).push(r));
   const strk = (res, f) => { let n = 0; for (let i = res.length - 1; i >= 0 && f(res[i]); i--) n++; return n; };
   Object.keys(bySeason).forEach(sn => {
@@ -3387,8 +3422,8 @@ function hbEnrich(l) {
     rs.forEach(r => {
       const h = T[r[1]], a = T[r[2]], m = { l };
       if (h.pj >= 3 && a.pj >= 3) {
-        const order = names.slice().sort((x, y) => T[y].pts - T[x].pts || (T[y].gf - T[y].ga) - (T[x].gf - T[x].ga) || T[y].gf - T[x].gf || x.localeCompare(y));
-        m.ok = true; m.hp = order.indexOf(r[1]) + 1; m.ap = order.indexOf(r[2]) + 1; m.hav = (h.gf + h.ga) / h.pj; m.aav = (a.gf + a.ga) / a.pj;
+        const rk = x => { const X = T[x], xd = X.gf - X.ga; let k = 1; for (let i = 0; i < names.length; i++) { const y = names[i]; if (y === x) continue; const Y = T[y]; if (Y.pts > X.pts || (Y.pts === X.pts && ((Y.gf - Y.ga) > xd || ((Y.gf - Y.ga) === xd && (Y.gf > X.gf || (Y.gf === X.gf && y < x)))))) k++; } return k; };
+        m.ok = true; m.hp = rk(r[1]); m.ap = rk(r[2]); m.hav = (h.gf + h.ga) / h.pj; m.aav = (a.gf + a.ga) / a.pj;
         m.hw = strk(h.res, x => x === "W"); m.aw = strk(a.res, x => x === "W"); m.hu = strk(h.res, x => x !== "L"); m.au = strk(a.res, x => x !== "L");
       }
       hbMet.set(r, m);
@@ -3399,6 +3434,9 @@ function hbEnrich(l) {
   });
 }
 function hbRowOk(r, f) {
+  if (f._p === undefined) f._p = !f.seas && f.since == null && !f.lastSeas && !f.inc.length && !f.exc.length && !f.st;
+  if (f._p) return true;
+  if (f.st && !f._full) { f._full = 1; hbEnsureFull(); }
   const m = hbMet.get(r) || {};
   if (f.seas && !f.seas.has(r[5])) return false;
   if (f.since != null && r[0] < f.since) return false;
@@ -3414,13 +3452,18 @@ function hbStOk(m, S) {
   if ((S.wh != null && m.hw < S.wh) || (S.wa != null && m.aw < S.wa) || (S.uh != null && m.hu < S.uh) || (S.ua != null && m.au < S.ua)) return false;
   return true;
 }
+const hbSortMemo = new WeakMap();
+function hbSortedL(l) { const a = hbData[l]; let s = hbSortMemo.get(a); if (!s) { let ok = true; for (let i = 1; i < a.length; i++) if (a[i][0] < a[i - 1][0]) { ok = false; break; } s = ok ? a : a.slice().sort((x, y) => x[0] - y[0]); hbSortMemo.set(a, s); } return s; }
+function hbVer() { let n = 0; const ks = Object.keys(hbData); ks.forEach(l => n += hbData[l].length); return ks.length + "|" + n; }
 let hbSelMemo = { k: "", v: null };
 function hbSelRows(f) {
   const ls = Object.keys(hbData).filter(l => !f.leagues || f.leagues.has(l)), tot = ls.reduce((n, l) => n + hbData[l].length, 0), k = ls.join("\u0001") + "|" + tot + "|" + Object.keys(hbData).length;
   if (hbSelMemo.k === k && hbSelMemo.v) return hbSelMemo.v;
   const v = ls.flatMap(l => hbData[l]).sort((a, b) => a[0] - b[0]); hbSelMemo = { k, v }; return v;
 }
+let hbReady = false;
 function hbInit() {
+  hbReady = true;
   try { hbwInit(); } catch (e) {}
   const lgs = Object.keys(hbData).sort(), body = document.getElementById("hbBody"); if (!body) return;
   if (!lgs.length) { const dw = document.getElementById("hbw-data"); if (dw && !(hbwStore().off && "data" in hbwStore().off)) { dw.classList.remove("off"); hbwSync(); } body.style.display = "none"; if (!document.getElementById("hbMsg").textContent) document.getElementById("hbMsg").textContent = "Aún no hay datos. Descarga CSV de football-data.co.uk (por ejemplo NOR.csv de Noruega, o un E0.csv por temporada) e impórtalos aquí."; return; }
@@ -3468,31 +3511,33 @@ function hbClearF() {
 }
 function hbSetModeUi() { document.querySelectorAll("#hbModeSeg .seg-b").forEach(b => b.classList.toggle("active", b.dataset.m === hbMode)); }
 function hbBets(rows, sel, bk, f) {
+  if (f.st) hbEnsureFull();
   const si = HB_SELS.indexOf(sel), out = [], X = HB_X[sel];
   if (X) { rows.forEach(r => { if (!hbRowOk(r, f) || (X.ht && !r[7])) return; const xs = r[6].x, price = xs && xs[bk] && xs[bk][X.key]; if (!price) return; if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
       const fb = ["pin", "avg"].find(b => xs[b] && xs[b][X.key] && xs[b][X.opp]); let ev = null; if (fb) { const a = 1 / xs[fb][X.key], c = 1 / xs[fb][X.opp]; ev = price * (a / (a + c)) - 1; } if (f.ev != null && (ev == null || ev * 100 < f.ev)) return;
-      const tot = X.ht ? r[7][0] + r[7][1] : r[3] + r[4], win = X.s === "O" ? tot > X.l : tot < X.l; out.push({ r, d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev, t: `${r[1]} - ${r[2]}` }); }); return out; }
+      const tot = X.ht ? r[7][0] + r[7][1] : r[3] + r[4], win = X.s === "O" ? tot > X.l : tot < X.l; out.push({ r, d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev }); }); return out; }
+  const IDX0 = sel === "X" || sel === "Y" ? [5, 6] : sel === "O" || sel === "U" ? [3, 4] : [0, 1, 2];
   rows.forEach(r => {
     if (!hbRowOk(r, f)) return;
     const o = f.open ? (r[6].op && r[6].op[bk] && r[6].op[bk].concat([0, 0, null])) : r[6][bk]; if (!o || !o[si]) return; const price = o[si];
     if (f.omin && price < f.omin) return; if (f.omax && price > f.omax) return;
     const isAH = sel === "X" || sel === "Y", ln = isAH ? o[7] : null; if (isAH && ln == null) return;
     let ev = null; const fo = r[6].pin || r[6].avg;
-    if (fo) { const idx = isAH ? [5, 6] : sel === "O" || sel === "U" ? [3, 4] : [0, 1, 2]; if (idx.every(i => fo[i]) && (!isAH || fo[7] === ln)) { const inv = idx.map(i => 1 / fo[i]), sum = inv.reduce((a, b) => a + b, 0); ev = price * (inv[idx.indexOf(si)] / sum) - 1; } }
+    if (fo) { let ok = !isAH || fo[7] === ln, sum = 0; for (let k = 0; ok && k < IDX0.length; k++) { const v = fo[IDX0[k]]; if (!v) ok = false; else sum += 1 / v; } if (ok) ev = price * ((1 / fo[si]) / sum) - 1; }
     if (f.ev != null) { if (ev == null || ev * 100 < f.ev) return; }
-    if (isAH) { const p = sel === "X" ? hbAhSettle(ln, price, r[3] - r[4]) : hbAhSettle(-ln, price, r[4] - r[3]); out.push({ r, d: r[0], s: r[5], p, win: p > 0, price, ev, t: `${r[1]} - ${r[2]}` }); return; }
+    if (isAH) { const p = sel === "X" ? hbAhSettle(ln, price, r[3] - r[4]) : hbAhSettle(-ln, price, r[4] - r[3]); out.push({ r, d: r[0], s: r[5], p, win: p > 0, price, ev }); return; }
     const win = sel === "H" ? r[3] > r[4] : sel === "A" ? r[3] < r[4] : sel === "D" ? r[3] === r[4] : sel === "O" ? r[3] + r[4] > 2.5 : r[3] + r[4] < 2.5;
-    out.push({ r, d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev, t: `${r[1]} - ${r[2]}` });
+    out.push({ r, d: r[0], s: r[5], p: win ? price - 1 : -1, win, price, ev });
   });
   return out;
 }
 function hbStats(b) {
   const n = b.length; if (!n) return { n: 0 };
-  const u = b.reduce((a, x) => a + x.p, 0), mean = u / n, sd = Math.sqrt(b.reduce((a, x) => a + (x.p - mean) ** 2, 0) / Math.max(1, n - 1)), t = sd ? mean / (sd / Math.sqrt(n)) : 0;
-  const half = Math.floor(n / 2), y1 = half ? b.slice(0, half).reduce((a, x) => a + x.p, 0) / half : 0, y2 = (n - half) ? b.slice(half).reduce((a, x) => a + x.p, 0) / (n - half) : 0;
-  let pk = 0, cu = 0, dd = 0; b.forEach(x => { cu += x.p; pk = Math.max(pk, cu); dd = Math.max(dd, pk - cu); });
-  const evs = b.filter(x => x.ev != null), clv = evs.length >= Math.max(10, n * 0.5) ? evs.reduce((a, x) => a + x.ev, 0) / evs.length * 100 : null;
-  return { clv, n, u, y: mean * 100, wins: b.filter(x => x.win).length, t, y1: y1 * 100, y2: y2 * 100, dd, odds: b.reduce((a, x) => a + x.price, 0) / n };
+  const half = Math.floor(n / 2); let u = 0, sq = 0, wins = 0, po = 0, s1 = 0, pk = 0, cu = 0, dd = 0, ne = 0, se = 0;
+  for (let i = 0; i < n; i++) { const x = b[i], p = x.p; u += p; sq += p * p; if (x.win) wins++; po += x.price; if (i < half) s1 += p; cu += p; if (cu > pk) pk = cu; if (pk - cu > dd) dd = pk - cu; if (x.ev != null) { ne++; se += x.ev; } }
+  const mean = u / n, varr = n > 1 ? Math.max(0, (sq - n * mean * mean) / (n - 1)) : 0, sd = Math.sqrt(varr), t = sd ? mean / (sd / Math.sqrt(n)) : 0;
+  const y1 = half ? s1 / half : 0, y2 = (n - half) ? (u - s1) / (n - half) : 0, clv = ne >= Math.max(10, n * 0.5) ? se / ne * 100 : null;
+  return { clv, n, u, y: mean * 100, wins, t, y1: y1 * 100, y2: y2 * 100, dd, odds: po / n };
 }
 function hbFilters() {
   const g = id => document.getElementById(id).value, num = id => { const v = parseFloat(g(id)); return isNaN(v) ? null : v; };
@@ -3534,7 +3579,7 @@ function hbRenderFreq(rows, sel, lg) {
     rk.slice(0, 40).map(r => `<tr style="border-top:1px solid #1A212B; ${hbGrp === "team" ? "cursor:pointer;" : ""}" ${hbGrp === "team" ? `onclick="hbTeamF={t:'${r.name.replace(/'/g, "\\'")}',k:'f'};hbRender();"` : ""}><td style="padding:7px 6px;">${r.name}</td><td style="text-align:right;">${r.x.n}</td><td style="text-align:right; font-weight:600;">${(r.x.p * 100).toFixed(1)}%</td><td style="text-align:right;">${r.x.be.toFixed(2)}</td>${fix ? `<td style="text-align:right; color:${col(r.x.y)};">${r.x.y >= 0 ? "+" : ""}${r.x.y.toFixed(1)}%</td>` : ""}</tr>`).join("") + `</table><div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Compara la "cuota mínima" con la cuota real que ofrece tu casa: si te pagan más que esa cuota, a largo plazo ese mercado habría dado beneficio en esa liga o equipo. Cuidado: es el pasado y con pocas muestras puede ser azar.</div>` : `<div class="muted" style="text-align:center;">Ningún grupo llega a ${minN} partidos (baja la muestra mínima).</div>`;
 }
 function hbNowMetrics(l, home, away) {
-  const n = hbNow[l]; if (!n) return null; const h = n.T[home], a = n.T[away]; if (!h || !a || h.pj < 3 || a.pj < 3) return null;
+  hbEnrichFull(l); const n = hbNow[l]; if (!n) return null; const h = n.T[home], a = n.T[away]; if (!h || !a || h.pj < 3 || a.pj < 3) return null;
   const T = n.T, order = n.names.slice().sort((x, y) => T[y].pts - T[x].pts || (T[y].gf - T[y].ga) - (T[x].gf - T[x].ga) || T[y].gf - T[x].gf || x.localeCompare(y));
   const strk = (res, f) => { let k = 0; for (let i = res.length - 1; i >= 0 && f(res[i]); i--) k++; return k; };
   return { ok: true, l, hp: order.indexOf(home) + 1, ap: order.indexOf(away) + 1, hav: (h.gf + h.ga) / h.pj, aav: (a.gf + a.ga) / a.pj, hw: strk(h.res, x => x === "W"), aw: strk(a.res, x => x === "W"), hu: strk(h.res, x => x !== "L"), au: strk(a.res, x => x !== "L") };
@@ -3741,19 +3786,24 @@ function hbPickPrice(m, sel, bk) {
   return price ? { price, fair, ev: fair ? price * fair - 1 : null } : null;
 }
 let hbPickCache = null;
+let hbPkMemo = { v: "", names: {}, res: {} }, hbPkT = null;
+function hbPicksDefer() { const w = document.getElementById("hbw-pk"); if (w && w.classList.contains("off")) return; clearTimeout(hbPkT); hbPkT = setTimeout(hbPicksRender, 40); }
 function hbPicksRender() {
   const el = document.getElementById("hbPicks"); if (!el || !Object.keys(hbData).length) return;
   const sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters();
   if (HB_FREQ[sel] || sel === "X" || sel === "Y") { el.innerHTML = `<div class="muted" style="text-align:center; padding:10px; font-size:12px;">Este mercado no tiene cuotas en las casas cargadas, así que no hay picks.</div>`; return; }
   const q = (document.getElementById("hbPQ").value || "").trim().toLowerCase(), now = Date.now(), lgs = Object.keys(hbData), names = {};
-  lgs.forEach(l => { names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]; });
+  const ver = hbVer(); if (hbPkMemo.v !== ver) hbPkMemo = { v: ver, names: {}, res: {} };
+  lgs.forEach(l => { names[l] = hbPkMemo.names[l] || (hbPkMemo.names[l] = [...new Set(hbData[l].flatMap(r => [r[1], r[2]]))]); });
   const out = []; let seen = 0;
   cpAll().forEach(({ m }) => {
     if (m.mov_live) return;
     const t = Date.parse(m.commence_time); if (t < now - 3600000 || t > now + 8 * 86400000) return; seen++;
     let lg = null, hn = null, an = null;
     const same = (x, y) => { const a = msNorm(x), b = msNorm(y); return a && b && (a === b || a.includes(b) || b.includes(a)); };
-    for (const l of lgs) { const h = msFind(m.home_team, names[l]), a = msFind(m.away_team, names[l]); if (h && a && h !== a && same(h, m.home_team) && same(a, m.away_team)) { lg = l; hn = h; an = a; break; } }
+    const rk = m.home_team + "|" + m.away_team; let hit = hbPkMemo.res[rk];
+    if (hit === undefined) { hit = null; for (const l of lgs) { const h = msFind(m.home_team, names[l]), a = msFind(m.away_team, names[l]); if (h && a && h !== a && same(h, m.home_team) && same(a, m.away_team)) { hit = [l, h, a]; break; } } hbPkMemo.res[rk] = hit; }
+    if (hit) { lg = hit[0]; hn = hit[1]; an = hit[2]; }
     if (!lg) return;
     if (f.leagues && !f.leagues.has(lg)) return;
     if (f.inc.length && !f.inc.some(e => (!e.l || e.l === lg) && (((e.side === "h" || e.side === "b") && hn === e.t) || ((e.side === "a" || e.side === "b") && an === e.t)))) return;
@@ -3780,7 +3830,7 @@ function hbwSync() { const o = hbwStore(); document.querySelectorAll("#hbTools .
 function hbwToggle(k) {
   const el = document.getElementById(HBW_MAP[k]); if (!el) return; const o = hbwStore(); o.off = o.off || {};
   el.classList.toggle("off"); o.off[k] = el.classList.contains("off"); hbwSave(o); hbwSync();
-  if (!el.classList.contains("off")) { if (k === "sys") hbSysTable(); if (k === "rank") hbRender(); if (k === "data" || k === "sys") { el.style.zIndex = 260; } }
+  if (!el.classList.contains("off")) { if (k === "sys") hbSysTable(); if (k === "rank" || k === "pk") hbRender(); if (k === "data" || k === "sys") { el.style.zIndex = 260; } }
 }
 function hbwInit() {
   const o = hbwStore(), off = o.off || {}, pos = o.pos || {};
@@ -3844,7 +3894,7 @@ function hbRender() {
   clearTimeout(hbRT);
   const sel = document.getElementById("hbSel").value, bk = document.getElementById("hbBook").value, f = hbFilters();
   if (!Object.keys(hbData).length) return;
-  const rows = hbSelRows(f); hbDescRender(f, sel, bk); hbPicksRender();
+  const rows = hbSelRows(f); hbDescRender(f, sel, bk); hbPicksDefer();
   if (HB_FREQ[sel]) { hbRenderFreq(rows, sel, null); return; }
   if (hbTeamF && hbTeamF.k === "f") hbTeamF = null;
   document.getElementById("hbDetail").innerHTML = "";
@@ -3858,12 +3908,12 @@ function hbRender() {
     `<div class="bt-kpi"><div class="l">Cuota media</div><div class="n">${st.odds.toFixed(2)}</div>${st.clv != null && f.open ? `<div class="sm">CLV medio <b style="color:${col(st.clv)}">${st.clv >= 0 ? "+" : ""}${st.clv.toFixed(1)}%</b></div>` : ""}</div>`;
   document.getElementById("hbDD").innerHTML = st.n ? `Drawdown máximo del sistema (unidades): <b style="color:#E5484D;">-${st.dd.toFixed(1)}</b> · 1ª mitad ${st.y1 >= 0 ? "+" : ""}${st.y1.toFixed(0)}% · 2ª mitad ${st.y2 >= 0 ? "+" : ""}${st.y2.toFixed(0)}%` : "";
   const ch = document.getElementById("hbChart");
-  if (st.n > 1) { const W = 640, H = 170, P = 8; let c = 0; const pts = bets.map(x => (c += x.p)), mn = Math.min(0, ...pts), mx = Math.max(0, ...pts), rg = (mx - mn) || 1; const X = i => P + i / (pts.length - 1) * (W - 2 * P), Y = v => H - P - (v - mn) / rg * (H - 2 * P);
-    ch.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; margin-top:6px;"><line x1="${P}" x2="${W - P}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2A3340" stroke-dasharray="4 4"/><polyline fill="none" stroke="${col(st.u)}" stroke-width="2" points="${pts.map((v, i) => X(i).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")}"/></svg>`; } else ch.innerHTML = "";
+  if (st.n > 1) { const W = 640, H = 170, P = 8; let c = 0; const pts = bets.map(x => (c += x.p)); let mn = 0, mx = 0; for (let i = 0; i < pts.length; i++) { if (pts[i] < mn) mn = pts[i]; if (pts[i] > mx) mx = pts[i]; } const rg = (mx - mn) || 1; let sp = pts; if (pts.length > 900) { sp = []; const kk = (pts.length - 1) / 899; for (let i = 0; i < 900; i++) sp.push(pts[Math.round(i * kk)]); } const X = i => P + i / (sp.length - 1) * (W - 2 * P), Y = v => H - P - (v - mn) / rg * (H - 2 * P);
+    ch.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto; margin-top:6px;"><line x1="${P}" x2="${W - P}" y1="${Y(0)}" y2="${Y(0)}" stroke="#2A3340" stroke-dasharray="4 4"/><polyline fill="none" stroke="${col(st.u)}" stroke-width="2" points="${sp.map((v, i) => X(i).toFixed(1) + "," + Y(v).toFixed(1)).join(" ")}"/></svg>`; } else ch.innerHTML = "";
   const bs = {}; bets.forEach(x => (bs[x.s] = bs[x.s] || []).push(x));
   document.getElementById("hbSeasons").innerHTML = Object.keys(bs).sort().map(k => { const s2 = hbStats(bs[k]); return `<div style="display:inline-block; margin:3px; background:#141A23; border:1px solid #1A212B; border-radius:10px; padding:6px 10px; font-size:12px; text-align:center;"><div class="muted">${k}</div><b style="color:${col(s2.y)}">${s2.y >= 0 ? "+" : ""}${s2.y.toFixed(0)}%</b> <span class="muted">· ${s2.n}</span></div>`; }).join("");
   hbResultsRender(bets, f);
-  if (!document.getElementById("hbw-rank").classList.contains("off")) hbRankRender(sel, bk, f, rows);
+  if (!document.getElementById("hbw-rank").classList.contains("off")) { clearTimeout(hbRkT); const rb = document.getElementById("hbRank"); if (rb) rb.style.opacity = ".55"; hbRkT = setTimeout(() => { try { hbRankRender(sel, bk, f, rows); } finally { if (rb) rb.style.opacity = ""; } }, 60); }
 }
 function hbResultsRender(bets, f) {
   const el = document.getElementById("hbResults"), q = (document.getElementById("hbQ").value || "").trim().toLowerCase(), col = v => v >= 0 ? "#3ECF8E" : "#E5484D", u = f.unit;
@@ -3877,7 +3927,7 @@ function hbResultsRender(bets, f) {
   el.innerHTML = `<table style="width:100%; border-collapse:collapse; font-size:13px; min-width:560px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">${hbMode === "team" ? "Equipo" : "Liga"}</th><th style="text-align:right;">Muestra</th><th style="text-align:right;">Ratio de acierto</th><th style="text-align:right;">Unidad</th><th style="text-align:right;">Ganancias</th><th style="text-align:right;">Yield</th><th style="text-align:right;">Cuota media</th></tr>` +
     hbGroups.map((x, i) => { const open = hbOpenG.has(x.k), s2 = x.st; return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbTogG('${x.k.replace(/'/g, "\\'")}')"><td style="padding:8px 6px;">${open ? "▾" : "▸"} ${x.k}</td><td style="text-align:right;">${s2.n}</td><td style="text-align:right;">${Math.round(s2.wins / s2.n * 100)}%</td><td style="text-align:right;">${(s2.n * u).toFixed(0)}€</td><td style="text-align:right; color:${col(s2.u)};">${hbEur(s2.u * u)}</td><td style="text-align:right; color:${col(s2.y)}; font-weight:600;">${s2.y >= 0 ? "+" : ""}${s2.y.toFixed(2)}%</td><td style="text-align:right;">${s2.odds.toFixed(2)}</td></tr>` +
       (open ? `<tr><td colspan="7" style="padding:0 0 10px;"><table style="width:100%; border-collapse:collapse; font-size:12px; background:#0D1117;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Fecha</th><th>Partido</th><th>Marcador</th><th style="text-align:right;">Cuota</th><th style="text-align:right;">Dinero ganado</th><th style="text-align:right;">Yield</th></tr>` +
-        x.b.slice().reverse().slice(0, hbPg[x.k] || 10).map(b => `<tr style="border-top:1px solid #1A212B;"><td style="padding:5px 6px;">${hbFmtD(b.d)}</td><td>${b.t}</td><td>${b.r[3]}-${b.r[4]}</td><td style="text-align:right;">${b.price.toFixed(2)}</td><td style="text-align:right; color:${col(b.p)};">${hbEur(b.p * u)}</td><td style="text-align:right; color:${col(b.p)};">${(b.p * 100).toFixed(0)}%</td></tr>`).join("") +
+        x.b.slice().reverse().slice(0, hbPg[x.k] || 10).map(b => `<tr style="border-top:1px solid #1A212B;"><td style="padding:5px 6px;">${hbFmtD(b.d)}</td><td>${b.r[1]} - ${b.r[2]}</td><td>${b.r[3]}-${b.r[4]}</td><td style="text-align:right;">${b.price.toFixed(2)}</td><td style="text-align:right; color:${col(b.p)};">${hbEur(b.p * u)}</td><td style="text-align:right; color:${col(b.p)};">${(b.p * 100).toFixed(0)}%</td></tr>`).join("") +
         `</table>${x.b.length > (hbPg[x.k] || 10) ? `<div style="text-align:center; margin-top:6px;"><button class="small ghost" onclick="event.stopPropagation(); hbPg['${x.k.replace(/'/g, "\\'")}'] = (hbPg['${x.k.replace(/'/g, "\\'")}'] || 10) + 20; hbRender();">Ver más (${x.b.length - (hbPg[x.k] || 10)} restantes)</button></div>` : ""}</td></tr>` : ""); }).join("") + `</table>`;
 }
 function hbTogG(k) { hbOpenG.has(k) ? hbOpenG.delete(k) : hbOpenG.add(k); hbRender(); }
@@ -3897,11 +3947,15 @@ let hbGrp = "league", hbTeamF = null;
 const HB_TK = { hl: ["Gana de local", "h", "H"], aw: ["Gana de visitante", "a", "A"], ch: ["Rival gana cuando juega de local", "h", "A"], ca: ["Rival gana cuando juega de visitante", "a", "H"], dr: ["Empate", "any", "D"], ov: ["Más de 2.5 goles", "any", "O"], un: ["Menos de 2.5 goles", "any", "U"], ahl: ["Hándicap asiático a favor (local)", "h", "X"], aha: ["Hándicap asiático a favor (visitante)", "a", "Y"] };
 function hbTeamRows(rows, t, side) { return rows.filter(r => side === "h" ? r[1] === t : side === "a" ? r[2] === t : (r[1] === t || r[2] === t)); }
 function hbGroup(g) { hbGrp = g; hbTeamF = null; document.getElementById("hbGL").classList.toggle("active", g === "league"); document.getElementById("hbGT").classList.toggle("active", g === "team"); document.getElementById("hbMinN").value = g === "team" ? 30 : 60; hbRender(); }
+let hbRkKey = "", hbRkT = null;
 function hbRankRender(sel, bk, f, rows) {
-  const minN = parseInt(document.getElementById("hbMinN").value) || 0, col = v => v >= 0 ? "#3ECF8E" : "#E5484D", rk = []; let combos = 0;
+  const minN = parseInt(document.getElementById("hbMinN").value) || 0;
+  const key = JSON.stringify([hbGrp, bk, minN, document.getElementById("hbTeamQ").value, f.open, f.seas ? [...f.seas].sort() : null, f.leagues ? [...f.leagues].sort() : null, f.omin, f.omax, f.ev, f.since, f.lastSeas, f.exc, f.st, hbVer()]);
+  if (key === hbRkKey && document.getElementById("hbRank").innerHTML) return; hbRkKey = key;
+  const col = v => v >= 0 ? "#3ECF8E" : "#E5484D", rk = []; let combos = 0;
   document.getElementById("hbTeamQ").style.display = hbGrp === "team" ? "block" : "none";
   document.getElementById("hbRankT").textContent = hbGrp === "team" ? "Ranking por equipo: qué apostar a cada equipo (con tus filtros de casa, cuota y valor)" : "Ranking: ligas y selecciones más rentables (con tus filtros de casa, cuota y valor)";
-  const fr = Object.assign({}, f, { inc: [], exc: f.exc });
+  const fr = Object.assign({}, f, { inc: [], exc: f.exc }); delete fr._p;
   if (hbGrp === "team") {
     const q = (document.getElementById("hbTeamQ").value || "").trim().toLowerCase(), by = {}; const all = hbSelRows(Object.assign({}, f, { leagues: f.leagues })); all.forEach(r => { [r[1], r[2]].forEach(t => (by[t] = by[t] || []).push(r)); });
     Object.keys(by).forEach(t => { if (q && !t.toLowerCase().includes(q)) return; Object.keys(HB_TK).forEach(k => { const b = hbBets(hbTeamRows(by[t], t, HB_TK[k][1]), HB_TK[k][2], bk, fr); combos++; if (b.length >= Math.max(1, minN)) rk.push({ t, k, s: hbStats(b) }); }); });
@@ -3911,7 +3965,7 @@ function hbRankRender(sel, bk, f, rows) {
       <div class="muted" style="font-size:11px; margin-top:8px; line-height:1.6;">Se han probado ${combos} combinaciones de equipo y apuesta: con tantas, muchas salen rentables solo por azar (un equipo tiene pocos partidos). Desconfía de lo que no sea "señal sólida". Toca una fila para cargarla en el informe.</div>` : `<div class="muted" style="text-align:center;">Ningún equipo llega a ${minN} apuestas con estos filtros (baja la muestra mínima o importa más temporadas).</div>`;
     return;
   }
-  Object.keys(hbData).forEach(l => HB_SELS.forEach(sl => { const b = hbBets(hbData[l].slice().sort((a, c) => a[0] - c[0]), sl, bk, fr); combos++; if (b.length >= Math.max(1, minN)) rk.push({ l, sl, s: hbStats(b) }); }));
+  Object.keys(hbData).forEach(l => HB_SELS.forEach(sl => { const b = hbBets(hbSortedL(l), sl, bk, fr); combos++; if (b.length >= Math.max(1, minN)) rk.push({ l, sl, s: hbStats(b) }); }));
   rk.sort((a, b) => b.s.y - a.s.y);
   document.getElementById("hbRank").innerHTML = rk.length ? `<table style="width:100%; border-collapse:collapse; font-size:13px; min-width:520px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:6px;">Liga</th><th>Selección</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Yield</th><th style="text-align:right;">1ª / 2ª mitad</th><th style="text-align:right;">Fiabilidad</th></tr>` +
     rk.slice(0, 25).map(x => { const v = hbVerdict(x.s, true); return `<tr style="border-top:1px solid #1A212B; cursor:pointer;" onclick="hbPick('${x.l.replace(/'/g, "\\'")}','${x.sl}')"><td style="padding:7px 6px;">${x.l}</td><td>${HB_SELN[x.sl]}</td><td style="text-align:right;">${x.s.n}</td><td style="text-align:right; color:${col(x.s.y)}; font-weight:600;">${x.s.y >= 0 ? "+" : ""}${x.s.y.toFixed(1)}%</td><td style="text-align:right;" class="muted">${x.s.y1 >= 0 ? "+" : ""}${x.s.y1.toFixed(0)} / ${x.s.y2 >= 0 ? "+" : ""}${x.s.y2.toFixed(0)}</td><td style="text-align:right; color:${v[1]};">${v[0]}</td></tr>`; }).join("") + `</table>
@@ -3920,7 +3974,7 @@ function hbRankRender(sel, bk, f, rows) {
 function hbPick(l, sl) { hbLgSel = new Set([l]); hbInc = []; hbMode = "league"; hbSetModeUi(); document.getElementById("hbSel").value = sl; hbLgDraw(); hbListDraw(); hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
 function hbPickTeam(t, k) { const side = HB_TK[k][1] === "any" ? "b" : HB_TK[k][1]; hbInc = [{ l: null, t, side }]; hbMode = "team"; hbSetModeUi(); document.getElementById("hbSel").value = HB_TK[k][2]; hbLgSel = null; hbLgDraw(); hbListDraw(); hbRender(); document.getElementById("hbKpis").scrollIntoView({ behavior: "smooth", block: "center" }); }
 function hbClearTeam() { hbTeamF = null; hbRender(); }
-hbLoad().then(() => { hbInit(); try { hmCache = null; hmRender(); } catch (e) {} });
+setTimeout(() => hbLoad().then(() => { try { if (hbReady || document.getElementById("view-stats").classList.contains("active")) hbInit(); } catch (e) { } try { hmCache = null; hmRender(); } catch (e) {} }), 1200);
 function renderBacktestSystem() {
   const root = document.getElementById("bt-system"); if (!root) return;
   if (!document.getElementById("btSystem").options.length || document.getElementById("btSystem").options.length === 1) btFillSystems(document.getElementById("btSystem").value);
@@ -6507,7 +6561,7 @@ function renderCoupon() {
     if (cp.sort === "time" && dk !== day) { day = dk; html += `<tr class="cpday"><td colspan="${nc + 1 + (cp.stat.g ? 1 : 0) + (cp.stat.r ? 1 : 0) + (cp.stat.t ? 1 : 0)}">${dk}</td></tr>`; }
     const hm = d.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), safe = r.m.home_team.replace(/'/g, "\\'");
     const cs = cpState(r.m, hm), mt = cpMetrics(r.m), L = r.l.nm.length > 22 ? r.l.nm.slice(0, 21) + "…" : r.l.nm, hq = r.m.home_team.replace(/'/g, "\\'"), aq = r.m.away_team.replace(/'/g, "\\'");
-    const nT = mt ? (hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
+    const nT = mt ? (hbEnrichFull(mt.l), hbNow[mt.l] ? hbNow[mt.l].names.length : 0) : 0;
     html += `<tr><td class="cm" onclick="openMatchSheet('${hq}', '${aq}', '${r.l.id}', '${r.l.nm}')" title="Ver ficha del partido"><div class="pgc"><div class="pgc-top"><span class="lg">${r.l.fl} ${L}</span>${cs.chip}</div><div class="pgc-row"><span class="nmt">${r.m.home_team}</span>${cs.hg != null ? `<b class="gsc ${cs.st}">${cs.hg}</b>` : ""}${mt && cp.stat.p ? cpBadge(mt.hp, nT) : ""}</div><div class="pgc-vs">vs</div><div class="pgc-row"><span class="nmt">${r.m.away_team}</span>${cs.ag != null ? `<b class="gsc ${cs.st}">${cs.ag}</b>` : ""}${mt && cp.stat.p ? cpBadge(mt.ap, nT) : ""}</div><div class="pgc-act"><button class="small ghost" onclick="event.stopPropagation(); cpExpand(this)" title="Cuotas de todas las casas">▾ casas</button><button class="small ghost" onclick="event.stopPropagation(); alQuick('${r.m.id}', '${hq}', '${aq}', '${r.l.id}')" title="Crear alarma para este partido">🔔</button><button class="small ghost" onclick="event.stopPropagation(); aiMatchBy('${hq}', '${aq}')" title="Analizar con IA">🤖</button></div></div></td>` +
       r.cells.map(c => { if (!c.r) return '<td class="muted">–</td>'; const cls = c.r.ev != null && c.r.ev >= 0.15 ? "e" : c.r.ev != null && c.r.ev >= 0.02 ? "v" : "", bn = c.r.shown || "", fo = c.r.fair ? 1 / c.r.fair : null, pc = c.r.ev != null ? c.r.ev * 100 : null;
         return `<td><div class="cod2 ${cls}" title="${c.r.ev != null ? "Valor (EV) " + (c.r.ev * 100).toFixed(1) + "% · cuota justa " + fo.toFixed(2) : "sin probabilidad justa (una sola casa)"}">${fo ? `<div class="cf"><i class="ic">B</i>${fo.toFixed(2)}</div>` : ""}<div class="cb"><i class="ic b3">${/bet365/.test(bn) ? "365" : (bn || "·").slice(0, 3).toUpperCase()}</i>${c.r.price.toFixed(2)}${pc != null ? ` <span class="pc ${pc >= 0 ? "pos" : "neg"}">${pc >= 0 ? "+" : ""}${pc.toFixed(0)}%</span>` : ""}</div></div></td>`; }).join("") +
