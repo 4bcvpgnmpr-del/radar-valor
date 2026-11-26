@@ -927,22 +927,23 @@
     <div class="dd-title" style="margin-top:26px;">Rachas de la liga</div>
     <div id="dd-streak-status" class="muted" style="text-align:center; margin-bottom:12px; font-size:12px;"></div>
     <div id="dd-streaks" class="streak-grid dd-grid"></div>
-    <details class="panel" style="margin-top:22px;"><summary style="cursor:pointer; font-weight:600; text-align:center;">Próximos partidos y estadísticas de sus equipos</summary>
+    <details class="panel" style="margin-top:22px;" ontoggle="if (this.open && !document.getElementById('daydash-content').innerHTML) loadDayDashboard()"><summary style="cursor:pointer; font-weight:600; text-align:center;">Próximos partidos y estadísticas de sus equipos</summary>
     <div style="margin-top:14px;">
       <div class="row" style="margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <div></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <select id="dayDashLeague">
+          <select id="dayDashLeague" onchange="ddFromSel()">
             <option value="39">🏴󠁧󠁢󠁥󠁮󠁧󠁿 Premier League</option>
             <option value="140">🇪🇸 La Liga</option>
             <option value="135">🇮🇹 Serie A</option>
             <option value="78">🇩🇪 Bundesliga</option>
             <option value="2">🇪🇺 Champions League</option>
           </select>
+          <select id="ddDays" onchange="loadDayDashboard()"><option value="0">Hoy</option><option value="1">Mañana</option><option value="3" selected>Próximos 3 días</option><option value="7">Próximos 7 días</option></select>
           <button class="small ghost" onclick="loadDayDashboard()">Cargar</button>
         </div>
       </div>
-      <div class="muted" style="margin-bottom:10px;">Ranking de los equipos que juegan hoy en esta liga, por goles anotados y tarjetas recibidas en la temporada (2024, límite del plan gratuito). Esto consume varias peticiones de API-Football (2 por equipo), úsalo con moderación si te queda poca cuota diaria.</div>
+            <div class="muted" style="margin-bottom:10px;">Elige liga (puedes usar las fichas de arriba o «Más ligas») y el día. Verás los partidos y, de cada equipo, sus goles, % de +2.5 y ambos marcan, y su forma reciente. No necesita claves si la liga viene de ESPN.</div>
       <div id="daydash-status" class="muted"></div>
       <div id="daydash-content"></div>
     </div>
@@ -5130,16 +5131,19 @@ function ddMoreDraw() {
     let opts = ""; try { ESPN_EXTRA.forEach(g => { const it = g[1].filter(x => !have.has(x[0])); if (it.length) opts += `<optgroup label="${g[0]}">${it.map(x => `<option value="espn:${x[0]}">${x[1]}</option>`).join("")}</optgroup>`; }); } catch (e) { }
     el.innerHTML = `<select id="ddMore" onchange="pickDdMore(this.value)" style="max-width:100%;"><option value="">➕ Más ligas (rachas)…</option>${opts}</select>`; }
   const sel = document.getElementById("ddMore"); if (sel) sel.value = String(cur).startsWith("espn:") ? cur : "";
+  const dd = document.getElementById("dayDashLeague"); if (dd && sel && !dd.querySelector("optgroup")) { dd.insertAdjacentHTML("beforeend", [...sel.querySelectorAll("optgroup")].map(g => g.outerHTML).join("")); if (cur && dd.querySelector(`option[value="${cur}"]`)) dd.value = cur; }
 }
 function pickDdMore(v) {
   if (!v) return; const lab = (document.querySelector(`#ddMore option[value="${v}"]`) || {}).textContent || v;
   ["trLeague", "dayDashLeague"].forEach(id => { const e = document.getElementById(id); if (e && !e.querySelector(`option[value="${v}"]`)) e.insertAdjacentHTML("beforeend", `<option value="${v}">${lab}</option>`); });
-  document.getElementById("trLeague").value = v; trData = null; renderDdChips(); loadTrends();
+  document.getElementById("trLeague").value = v; document.getElementById("dayDashLeague").value = v; trData = null; renderDdChips(); loadTrends(); ddAuto();
 }
+function ddAuto() { const d = document.querySelector("#view-daydash details"); if (d && d.open) loadDayDashboard(); else { const c = document.getElementById("daydash-content"); if (c) c.innerHTML = ""; const st = document.getElementById("daydash-status"); if (st) st.textContent = ""; } }
 function pickDdLeague(id) {
   document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
-  trData = null; renderDdChips(); loadTrends();
+  trData = null; renderDdChips(); loadTrends(); ddAuto();
 }
+function ddFromSel() { const v = document.getElementById("dayDashLeague").value, t = document.getElementById("trLeague"); if (!t.querySelector(`option[value="${v}"]`)) t.insertAdjacentHTML("beforeend", `<option value="${v}">${v}</option>`); t.value = v; trData = null; renderDdChips(); loadTrends(); loadDayDashboard(); }
 const CP_COLS = [["h2h","home","1"],["h2h","Draw","X"],["h2h","away","2"],["totals","Over +2.5","+2.5"],["totals","Under +2.5","-2.5"],["btts","Yes","BTTS+"],["btts","No","BTTS-"],["totals","Over +0.5","+0.5"],["totals","Under +0.5","-0.5"],["totals","Over +1.5","+1.5"],["totals","Under +1.5","-1.5"],["totals_ht","Over +0.5","+0.5 HT"],["totals_ht","Under +0.5","-0.5 HT"],["totals_ht","Over +1.5","+1.5 HT"],["totals_ht","Under +1.5","-1.5 HT"]];
 const CP_LAB = { "1": "1", X: "X", "2": "2", "+2.5": "Más 2.5", "-2.5": "Menos 2.5", "BTTS+": "Ambos Sí", "BTTS-": "Ambos No", "+0.5": "Más 0.5", "-0.5": "Menos 0.5", "+1.5": "Más 1.5", "-1.5": "Menos 1.5", "+0.5 HT": "Más 0.5 HT", "-0.5 HT": "Menos 0.5 HT", "+1.5 HT": "Más 1.5 HT", "-1.5 HT": "Menos 1.5 HT" };
 const CP_LABF = { "1": "Cuota 1 (local)", X: "Cuota X (empate)", "2": "Cuota 2 (visitante)", "+2.5": "Más de 2.5 goles", "-2.5": "Menos de 2.5 goles", "BTTS+": "Ambos marcan: Sí", "BTTS-": "Ambos marcan: No", "+0.5": "Más de 0.5 goles", "-0.5": "Menos de 0.5 goles", "+1.5": "Más de 1.5 goles", "-1.5": "Menos de 1.5 goles", "+0.5 HT": "Más de 0.5 goles 1ª parte", "-0.5 HT": "Menos de 0.5 goles 1ª parte", "+1.5 HT": "Más de 1.5 goles 1ª parte", "-1.5 HT": "Menos de 1.5 goles 1ª parte" };
@@ -6544,17 +6548,21 @@ function pfApply() {
 }
 function sortTrends(k) { trSort = { k, d: trSort.k === k ? -trSort.d : (k === "n" ? 1 : -1) }; renderTrends(); }
 
+function ddRange() { const n = Number((document.getElementById("ddDays") || {}).value || 3), d0 = new Date(); d0.setHours(0, 0, 0, 0); const day = 864e5, st = d0.getTime(); if (n === 0) return [Date.now() - 3 * 3600000, st + day - 1]; if (n === 1) return [st + day, st + 2 * day - 1]; return [Date.now() - 3 * 3600000, Date.now() + n * day]; }
 async function ddTodayMatches(league) {
   const code = FD_CODES[String(league)], lg = DD_LEAGUES.find(x => x.id === String(league)), out = [];
-  const d0 = new Date(), iso = d => d.toISOString().slice(0, 10);
+  const rg = ddRange(), d0 = new Date(rg[0]), iso = d => d.toISOString().slice(0, 10), inR = t => { const x = Date.parse(t); return x >= rg[0] && x <= rg[1]; };
   if (code && getFdKey()) {
-    const res = await fetch(`${fdBase()}/v4/competitions/${code}/matches?dateFrom=${iso(d0)}&dateTo=${iso(new Date(Date.now() + 3 * 86400000))}`, { headers: fdHeaders() });
+    const res = await fetch(`${fdBase()}/v4/competitions/${code}/matches?dateFrom=${iso(d0)}&dateTo=${iso(new Date(rg[1] + 864e5))}`, { headers: fdHeaders() });
     if (res.status === 429) throw new Error("football-data.org: límite de 10 peticiones por minuto, espera un momento");
     if (!res.ok) throw new Error(`football-data.org ${res.status}`);
-    const j = await res.json(); (j.matches || []).filter(x => !["FINISHED", "CANCELLED", "POSTPONED"].includes(x.status)).forEach(x => out.push({ t: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name }));
-    return out;
+    const j = await res.json(); (j.matches || []).filter(x => !["FINISHED", "CANCELLED", "POSTPONED"].includes(x.status)).filter(x => inR(x.utcDate)).forEach(x => out.push({ t: x.utcDate, h: x.homeTeam.name, a: x.awayTeam.name }));
+    if (out.length) return out;
   }
-  if (lg) { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${lg.odds}`) || "null"); if (c) c.data.forEach(m => { const t = Date.parse(m.commence_time); if (t >= Date.now() - 3 * 3600000 && t <= Date.now() + 3 * 86400000) out.push({ t: m.commence_time, h: m.home_team, a: m.away_team }); }); } catch (e) {} }
+  if (lg) { try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${lg.odds}`) || "null"); if (c) c.data.forEach(m => { const t = Date.parse(m.commence_time); if (inR(m.commence_time)) out.push({ t: m.commence_time, h: m.home_team, a: m.away_team }); }); } catch (e) {} }
+  const slug = out.length ? null : espnSlugOf(league);
+  if (slug) { try { const f = d => d.toISOString().slice(0, 10).replace(/-/g, ""), j = await espnGet(`${slug}/scoreboard?dates=${f(d0)}-${f(new Date(rg[1] + 864e5))}&limit=300`);
+    (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const st = (c.status || e.status || {}).type || {}; if (st.completed || !inR(e.date)) return; const h = c.competitors.find(x => x.homeAway === "home"), a = c.competitors.find(x => x.homeAway === "away"); if (h && a) out.push({ t: e.date, h: h.team.displayName || h.team.name, a: a.team.displayName || a.team.name }); }); } catch (e) { } }
   return out;
 }
 function ddTeamStats(rows, team) {
@@ -6566,13 +6574,13 @@ function ddTeamStats(rows, team) {
 }
 async function loadDayDashboard() {
   const statusEl = document.getElementById("daydash-status"), contentEl = document.getElementById("daydash-content");
-  const league = document.getElementById("dayDashLeague").value, season = defaultSeason();
-  if (!getFdKey() && !getFootballKey()) { statusEl.innerHTML = `Añade el token de football-data.org (o la key de API-Football) en ⚙️ Configuración.`; return; }
+  const league = document.getElementById("dayDashLeague").value, season = espnSlugOf(league) ? currentSeason() : defaultSeason(), dsel = document.getElementById("ddDays"), dtxt = dsel ? dsel.options[dsel.selectedIndex].text.toLowerCase() : "los próximos 3 días";
+  if (!getFdKey() && !getFootballKey() && !espnSlugOf(league)) { statusEl.innerHTML = `Añade el token de football-data.org (o la key de API-Football) en ⚙️ Configuración.`; return; }
   statusEl.textContent = "Buscando próximos partidos y calculando estadísticas..."; contentEl.innerHTML = "";
   try {
     const games = await ddTodayMatches(league); let rows = [];
     try { rows = await msLeagueData(league, season); } catch (e) { statusEl.textContent = "No se pudieron cargar los resultados de la liga: " + e.message; }
-    if (!games.length) { statusEl.innerHTML = `<span class="muted">No hay partidos de esta liga en los próximos 3 días${getFdKey() ? "" : " (con cuotas cargadas). Añade el token de football-data.org para ver el calendario completo"}.</span>`; return; }
+    if (!games.length) { statusEl.innerHTML = `<span class="muted">No hay partidos de esta liga (${dtxt}). Prueba con «Próximos 7 días» u otra liga.</span>`; return; }
     if (!rows.length) { statusEl.innerHTML = `<span class="muted">Sin resultados de la temporada ${season} para calcular estadísticas.</span>`; return; }
     const names = [...new Set(rows.flatMap(r => [r.h, r.a]))], fn = n => names.includes(n) ? n : msFind(n, names);
     const cards = games.sort((a, b) => a.t.localeCompare(b.t)).map(g => {
@@ -6582,9 +6590,10 @@ async function loadDayDashboard() {
     const fm = f => f.map(c => `<span style="display:inline-block; width:18px; height:18px; line-height:18px; border-radius:5px; text-align:center; font-size:11px; font-weight:700; margin-right:2px; background:${c === "W" ? "#1F6F4A" : c === "L" ? "#7A2E31" : "#3A4250"}; color:#fff;">${c === "W" ? "G" : c === "L" ? "P" : "E"}</span>`).join("");
     const row = (nm, st) => st ? `<tr><td style="padding:5px 4px;">${nm}</td><td style="text-align:center;">${st.n}</td><td style="text-align:center;">${st.gf.toFixed(2)}</td><td style="text-align:center;">${st.ga.toFixed(2)}</td><td style="text-align:center;">${st.o25}%</td><td style="text-align:center;">${st.btts}%</td><td>${fm(st.form)}</td></tr>` : `<tr><td style="padding:5px 4px;">${nm}</td><td colspan="6" class="muted">sin datos</td></tr>`;
     const top = cards.filter(c => c.exp != null).sort((a, b) => b.exp - a.exp).slice(0, 5);
-    statusEl.textContent = `${games.length} partidos en los próximos 3 días · estadísticas de la temporada ${season} (${rows.length} partidos jugados).`;
+    statusEl.textContent = `${games.length} partidos (${dtxt}) · estadísticas de la temporada ${season} (${rows.length} partidos jugados).`;
     contentEl.innerHTML = (top.length ? `<div class="panel" style="margin-bottom:14px;"><div style="font-weight:600; margin-bottom:8px;">⚽ Partidos con más goles esperados</div>${top.map(c => `<div class="row" style="margin-bottom:6px;"><span>${c.g.h} <span class="muted">vs</span> ${c.g.a}</span><b style="color:#3ECF8E;">${c.exp.toFixed(2)}</b></div>`).join("")}<div class="muted" style="font-size:11px; margin-top:6px;">Media de lo que marca un equipo y lo que encaja el rival, sumando ambos. Es una referencia rápida, no un cálculo de probabilidad.</div></div>` : "") +
       cards.map(c => `<div class="panel" style="margin-bottom:12px;"><div class="row" style="margin-bottom:8px;"><b>${c.g.h} <span class="muted">vs</span> ${c.g.a}</b><span class="muted" style="font-size:12px;">${new Date(c.g.t).toLocaleString("es-ES", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
+        ${c.sh && c.sa ? `<div class="muted" style="font-size:12px; margin-bottom:6px;">Goles esperados ≈ <b>${c.exp.toFixed(2)}</b> · +2.5 ≈ <b>${Math.round((c.sh.o25 + c.sa.o25) / 2)}%</b> · Ambos marcan ≈ <b>${Math.round((c.sh.btts + c.sa.btts) / 2)}%</b></div>` : ""}
         <div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:13px; min-width:420px;"><tr class="muted" style="font-size:11px; text-align:left;"><th style="padding:4px;">Equipo</th><th>PJ</th><th>GF</th><th>GC</th><th>+2.5</th><th>Ambos</th><th>Últimos 5</th></tr>${row(c.g.h, c.sh)}${row(c.g.a, c.sa)}</table></div></div>`).join("") +
       `<div class="muted" style="font-size:11px; text-align:center; line-height:1.6;">PJ: partidos jugados · GF/GC: goles a favor y en contra por partido · +2.5 y Ambos: % de sus partidos con más de 2.5 goles y con ambos marcando · Últimos 5: G ganó, E empató, P perdió. Las tarjetas por equipo ya no se muestran (requieren el plan de pago de API-Football).</div>`;
   } catch (e) { statusEl.innerHTML = ""; contentEl.innerHTML = `<div class="alert-box" style="border-left-color:#7C8797;">No se pudo cargar el dashboard: ${e.message}</div>`; }
