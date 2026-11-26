@@ -813,6 +813,8 @@
         <div style="border-top:1px solid #232A33; padding-top:10px;"><div class="muted" style="margin-bottom:4px;"><b>📲 Pasar mi configuración a otro dispositivo</b> <span class="tooltip" title="Crea un código cifrado con una contraseña tuya. En el otro dispositivo (móvil u ordenador) lo pegas con la misma contraseña y se copian las claves, ajustes, apuestas, favoritos y presets.">ⓘ</span></div>
           <input id="cfgPass" type="password" placeholder="Contraseña del código (mín. 8 caracteres)" style="width:100%; margin-bottom:6px;" autocomplete="off" />
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;"><button class="small ghost" type="button" onclick="cfgExport()">Crear código y copiar</button><button class="small ghost" type="button" onclick="cfgImport()">Importar código</button></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;"><button class="small" type="button" onclick="cfgCloud('up')">☁️ Subir a mi Worker</button><button class="small" type="button" onclick="cfgCloud('down')">☁️ Traer de mi Worker</button></div>
+          <div class="muted" style="font-size:11.5px; margin-bottom:6px;">Sin copiar ni pegar: en el ordenador pulsa «Subir»; en el móvil pon solo la URL del Worker (arriba) y la misma contraseña y pulsa «Traer».</div>
           <textarea id="cfgCode" rows="3" placeholder="Aquí aparece el código; en el otro dispositivo pégalo aquí y pulsa Importar" style="width:100%; font-size:11px;"></textarea>
           <div id="cfgMsg" class="muted" style="font-size:11.5px; margin-top:6px; line-height:1.5;"></div></div>
         <div><button class="small ghost" type="button" onclick="listBookmakers()">Ver casas disponibles en API-Football</button><div id="bkList" class="muted" style="font-size:12px; margin-top:6px; line-height:1.6;"></div></div>
@@ -3528,25 +3530,38 @@ function hbNowMetrics(l, home, away) {
 const MOV_KEY = "radar-valor-mov-cache";
 
 
-const CFG_SKIP = /^(radar-valor-mov-cache|radar-mov-pp|radar-ai-hist|radar-bsd-lg-|radar-bsd-pl|radar-bsd-refs|radar-pl-cache|radar-photo-cache|radar-live-snap|radar-live-reqs|radar-home-streaks|radar-fd-sched|radar-alarm-log|radar-alarm-fired|radar-valor-line-history|radar-valor-formation-stats|radar-ai-jug|radar-ai-morning|radar-sync-on|radar-theme|radar-mov-auto)/;
+const CFG_SKIP = /^(radar-valor-odds-cache-|radar-trends-|radar-bsd-ta|radar-valor-value-log|radar-valor-clv-log|radar-valor-mov-cache|radar-mov-pp|radar-ai-hist|radar-bsd-lg-|radar-bsd-pl|radar-bsd-refs|radar-pl-cache|radar-photo-cache|radar-live-snap|radar-live-reqs|radar-home-streaks|radar-fd-sched|radar-alarm-log|radar-alarm-fired|radar-valor-line-history|radar-valor-formation-stats|radar-ai-jug|radar-ai-morning|radar-sync-on|radar-theme|radar-mov-auto)/;
 async function cfgKey(pass, salt) { const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]); return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" }, km, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]); }
 const cfgB64 = u => { let s = ""; u.forEach(b => s += String.fromCharCode(b)); return btoa(s); }, cfgUnB64 = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
 function cfgMsg(t, bad) { const m = document.getElementById("cfgMsg"); if (m) { m.style.color = bad ? "#E5484D" : ""; m.textContent = t; } }
-async function cfgExport() {
-  const pass = document.getElementById("cfgPass").value; if (pass.length < 8) { cfgMsg("Pon una contraseña de al menos 8 caracteres (la necesitarás para importar).", true); return; }
-  try { const d = {}; Object.keys(localStorage).filter(k => /^radar/.test(k) && !CFG_SKIP.test(k)).forEach(k => { const v = localStorage.getItem(k); if (v != null && v.length < 150000) d[k] = v; });
+async function cfgExport(cloud) {
+  const pass = document.getElementById("cfgPass").value; if (pass.length < 8) { cfgMsg("Pon una contraseña de al menos 8 caracteres (la necesitarás para importar).", true); return null; }
+  try { const d = {}; const big = []; Object.keys(localStorage).filter(k => /^radar/.test(k) && !CFG_SKIP.test(k)).forEach(k => { const v = localStorage.getItem(k); if (v == null) return; if (v.length < 40000) d[k] = v; else big.push(k.replace(/^radar-?(valor-)?/, "") + " (" + Math.round(v.length / 1024) + " KB)"); });
     const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), key = await cfgKey(pass, salt), ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify({ v: 1, d }))));
     const out = new Uint8Array(28 + ct.length); out.set(salt, 0); out.set(iv, 16); out.set(ct, 28); const code = "RV1." + cfgB64(out); document.getElementById("cfgCode").value = code;
+    if (cloud) return { code, n: Object.keys(d).length, big };
     let copied = false; try { await navigator.clipboard.writeText(code); copied = true; } catch (e) { }
-    cfgMsg(`Código creado con ${Object.keys(d).length} ajustes${copied ? " y copiado al portapapeles" : ". Cópialo a mano"}. Pégalo en el otro dispositivo y usa la misma contraseña. Está cifrado, pero no lo publiques.`);
-  } catch (e) { cfgMsg("No se pudo crear el código: " + e.message, true); }
+    cfgMsg(`Código creado con ${Object.keys(d).length} ajustes (${Math.round(code.length / 1024)} KB)${copied ? " y copiado al portapapeles" : ". Cópialo a mano"}. Pégalo en el otro dispositivo y usa la misma contraseña. Está cifrado, pero no lo publiques.${big.length ? " No se incluyeron por ser muy pesados (se recalculan solos): " + big.join(", ") + "." : ""}${code.length > 400000 ? " Aun así el código es muy largo; si falla al pegarlo en el móvil, avísame." : ""}`);
+  } catch (e) { cfgMsg("No se pudo crear el código: " + e.message, true); return null; }
 }
-async function cfgImport() {
-  const pass = document.getElementById("cfgPass").value, code = document.getElementById("cfgCode").value.trim(); if (!code.startsWith("RV1.")) { cfgMsg("Pega primero el código (empieza por RV1.).", true); return; } if (!pass) { cfgMsg("Escribe la contraseña con la que se creó el código.", true); return; }
+async function cfgImport(codeIn) {
+  const pass = document.getElementById("cfgPass").value, code = (typeof codeIn === "string" ? codeIn : document.getElementById("cfgCode").value).trim(); if (!code.startsWith("RV1.")) { cfgMsg("Pega primero el código (empieza por RV1.).", true); return; } if (!pass) { cfgMsg("Escribe la contraseña con la que se creó el código.", true); return; }
   try { const raw = cfgUnB64(code.slice(4)), key = await cfgKey(pass, raw.slice(0, 16)); let pt; try { pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: raw.slice(16, 28) }, key, raw.slice(28)); } catch (e) { cfgMsg("Contraseña incorrecta o código incompleto.", true); return; }
     const o = JSON.parse(new TextDecoder().decode(pt)); let n = 0; Object.keys(o.d || {}).forEach(k => { if (/^radar/.test(k) && !CFG_SKIP.test(k)) { try { localStorage.setItem(k, o.d[k]); n++; } catch (e) { } } });
     cfgMsg(`Importados ${n} ajustes. Recargando…`); setTimeout(() => location.reload(), 1200);
   } catch (e) { cfgMsg("No se pudo importar: " + e.message, true); }
+}
+async function cfgCloudId(pass) { const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveBits"]); const b = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: new TextEncoder().encode("radar-cfg-id-v1"), iterations: 200000, hash: "SHA-256" }, km, 256); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join(""); }
+async function cfgCloud(dir) {
+  const pass = document.getElementById("cfgPass").value; if (pass.length < 8) { cfgMsg("Pon una contraseña de al menos 8 caracteres (es la misma en los dos dispositivos).", true); return; }
+  const inp = document.getElementById("fdProxy"), base = ((inp && inp.value.trim()) || getFdProxy()).replace(/\/+$/, ""); if (!/^https?:\/\//.test(base)) { cfgMsg("Falta la URL de tu Worker (campo «Proxy football-data», más arriba). Pégala y vuelve a pulsar.", true); return; }
+  try { cfgMsg(dir === "up" ? "Subiendo…" : "Buscando tu configuración…"); const id = await cfgCloudId(pass);
+    if (dir === "up") { const r = await cfgExport(true); if (!r) return; const res = await fetch(base + "/cfg/put", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, code: r.code }) }); const j = await res.json().catch(() => ({})); if (!res.ok || !j.ok) { cfgMsg("No se pudo subir: " + (j.error || ("HTTP " + res.status)) + (res.status === 404 ? " (publica la última versión de worker.js en Cloudflare)" : ""), true); return; }
+      cfgMsg(`Subida ${r.n} ajustes (${Math.round(r.code.length / 1024)} KB) al Worker, cifrados con tu contraseña. En el móvil: pon la URL del Worker, la misma contraseña y pulsa «Traer de mi Worker».${r.big.length ? " Sin incluir por pesados: " + r.big.join(", ") + "." : ""}`); return; }
+    const res = await fetch(base + "/cfg/get?id=" + id); if (res.status === 404) { cfgMsg("No hay nada guardado con esa contraseña. Comprueba la contraseña o pulsa «Subir» en el otro dispositivo.", true); return; }
+    const j = await res.json().catch(() => ({})); if (!res.ok || !j.code) { cfgMsg("No se pudo traer: " + (j.error || ("HTTP " + res.status)), true); return; }
+    await cfgImport(j.code);
+  } catch (e) { cfgMsg("Error de red: " + e.message + ". Revisa la URL del Worker.", true); }
 }
 function movSaveFit(out, st) {
   const tryPut = d => { try { localStorage.setItem(MOV_KEY, JSON.stringify({ data: d, timestamp: Date.now(), st })); return true; } catch (e) { return false; } };
