@@ -1388,7 +1388,10 @@
   <div id="view-alarms" class="view">
     <div data-help="alarms"></div>
     <div class="alp">
-      <div class="alp-top">
+      <div class="alp-t" style="margin-bottom:6px;">¿Para qué partidos quieres la alarma?<small>(elige el alcance y luego pon las condiciones de abajo)</small></div>
+      <div id="alScope" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;"></div>
+      <div id="alScopeTxt" class="muted" style="font-size:12.5px; line-height:1.5; margin-bottom:10px;"></div>
+      <div class="alp-top" id="alTopLg">
         <div class="alp-dd"><button class="alp-pill" onclick="alDd('alDdL')">Ligas ▾</button><div class="alp-panel" id="alDdL"><div class="chip-row mini" id="alLeagues"></div></div></div>
         <div class="alp-dd"><button class="alp-pill" onclick="alDd('alDdS')">Ligas seleccionadas <b id="alLgN">(todas)</b> ▾</button><div class="alp-panel" id="alDdS"><div id="alLgSel" class="muted" style="font-size:12px; line-height:1.7;"></div></div></div>
       </div>
@@ -5623,6 +5626,19 @@ function alLgNorm(x) { return String(x || "").toLowerCase().normalize("NFD").rep
 function alLgAll() { const out = DD_LEAGUES.map(l => ({ id: l.id, fl: l.fl, nm: l.nm })), seen = new Set(out.map(l => alLgNorm(l.nm))); try { const c = movGet(); const names = new Set(); (c ? c.data : []).forEach(m => { if (m.mov_league) names.add(m.mov_league); }); alLeaguesSel.forEach(k => { if (String(k).startsWith("n:")) names.add(k.slice(2)); }); [...names].sort().forEach(n => { const k = "n:" + alLgNorm(n); if (!seen.has(alLgNorm(n)) && !out.some(o => o.id === k)) out.push({ id: k, fl: "⚽", nm: n }); }); } catch (e) {} return out; }
 function alLgOK(a, id, nameStr) { if (!a.leagues || !a.leagues.length) return true; const nn = alLgNorm(nameStr); return a.leagues.some(l => l === id || (String(l).startsWith("n:") && nn && (nn.includes(l.slice(2)) || l.slice(2).includes(nn)))); }
 function renderAlarmsLg() { renderAlarms(); }
+
+let alScope = "all";
+function alScopeSet(k) {
+  alScope = k; if (k === "all") alLeaguesSel.length = 0; if (k === "match") { switchView("partidos"); showToast("Abre un partido y pulsa 🔔 Alarma para poner una solo de ese partido."); return; }
+  renderAlarms(); if (k === "leagues") { try { document.getElementById("alDdL").classList.add("open"); } catch (e) { } }
+}
+function alScopeDraw() {
+  const box = document.getElementById("alScope"); if (!box) return; if (alLeaguesSel.length && alScope === "all") alScope = "leagues";
+  const b = (k, t) => `<button class="small ${alScope === k ? "" : "ghost"}" style="font-weight:700;" onclick="alScopeSet('${k}')">${t}</button>`;
+  box.innerHTML = b("all", "🌍 Todas las ligas") + b("leagues", "📋 Solo algunas ligas") + b("match", "🎯 Un partido concreto");
+  const t = document.getElementById("alScopeTxt"), top = document.getElementById("alTopLg"); if (top) top.style.display = alScope === "leagues" ? "" : "none";
+  if (t) t.innerHTML = alScope === "all" ? "Avisará de <b>cualquier partido</b> de cualquier liga (las de Bet365 también, unas 160) que cumpla las condiciones. Cada partido avisa una sola vez." : alScope === "leagues" ? (alLeaguesSel.length ? `Solo ligas elegidas (<b>${alLeaguesSel.length}</b>). Cámbialas en «Ligas ▾».` : "Elige las ligas en «Ligas ▾». Si no eliges ninguna, vale para todas.") : "";
+}
 function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) alLeaguesSel.splice(i, 1); else alLeaguesSel.push(id); renderAlarms(); }
 function alSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
@@ -5661,6 +5677,7 @@ function alDelete(id) { saveAlarms(getAlarms().filter(x => x.id !== id)); render
 function alClearLog() { try { localStorage.removeItem("radar-alarm-log"); } catch (e) {} renderAlarms(); }
 function renderAlarms() {
   const el = document.getElementById("alList"); if (!el) return;
+  try { alScopeDraw(); } catch (e) { }
   try { alWatchRender(); } catch (e) {}
   { const q = ((document.getElementById("alLgQ") || {}).value || "").toLowerCase(), all = alLgAll(), vis = all.filter(l => !q || l.nm.toLowerCase().includes(q) || alLeaguesSel.includes(l.id));
     document.getElementById("alLeagues").innerHTML = `<input id="alLgQ" placeholder="Buscar liga o país..." value="${q.replace(/"/g, "")}" oninput="renderAlarmsLg()" style="width:100%; margin-bottom:6px;">` + vis.map(l => `<div class="chip ${alLeaguesSel.includes(l.id) ? "active" : ""}" data-k="${encodeURIComponent(l.id)}" onclick="alToggleLeague(decodeURIComponent(this.dataset.k))"><span class="fl">${l.fl}</span><span class="nm">${l.nm}</span></div>`).join("");
