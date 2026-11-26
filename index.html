@@ -923,6 +923,7 @@
     <div data-help="daydash"></div>
     <div class="dd-title">Partidos por liga</div>
     <div class="chip-row" id="dd-chips"></div>
+    <div id="dd-more" style="text-align:center; margin-top:10px;"></div>
     <div class="dd-title" style="margin-top:26px;">Rachas de la liga</div>
     <div id="dd-streak-status" class="muted" style="text-align:center; margin-bottom:12px; font-size:12px;"></div>
     <div id="dd-streaks" class="streak-grid dd-grid"></div>
@@ -5049,6 +5050,7 @@ async function loadTrends() {
   st.textContent = "Cargando partidos de la temporada...";
   try {
     const r = await fetchLeagueResults(league, season);
+    if (document.getElementById("trLeague").value !== league) return;
     trData = r.f;
     try { localStorage.setItem(ck, JSON.stringify({ t: Date.now(), f: trData })); } catch (e) {}
     st.textContent = trData.length ? `${trData.length} partidos analizados (temporada ${season}, vía ${r.src}).` : "Sin partidos terminados para esta liga/temporada.";
@@ -5120,6 +5122,19 @@ function renderDdChips() {
     try { const c = JSON.parse(localStorage.getItem(`${ODDS_CACHE_PREFIX}${l.odds}`) || "null"); if (c) n = c.data.filter(m => { const t = Date.parse(m.commence_time); return t >= now - 3 * 3600000 && t <= lim; }).length; } catch (e) {}
     return `<div class="chip ${l.id === cur ? "active" : ""}" onclick="pickDdLeague('${l.id}')"><div class="fl">${l.fl}</div><div class="nm">${l.nm}</div><div class="ct ${n ? "" : fdSched && fdSched[l.id] ? "sched" : "zero"}" title="Partidos en los próximos días (cuotas cargadas o calendario de football-data.org)">${n || (fdSched && fdSched[l.id]) || 0}</div></div>`;
   }).join("");
+  try { ddMoreDraw(); } catch (e) { }
+}
+function ddMoreDraw() {
+  const el = document.getElementById("dd-more"); if (!el) return; const cur = document.getElementById("trLeague").value;
+  if (!el.dataset.x) { el.dataset.x = 1; const have = new Set(DD_LEAGUES.map(l => FD_ESPN[l.id]).filter(Boolean));
+    let opts = ""; try { ESPN_EXTRA.forEach(g => { const it = g[1].filter(x => !have.has(x[0])); if (it.length) opts += `<optgroup label="${g[0]}">${it.map(x => `<option value="espn:${x[0]}">${x[1]}</option>`).join("")}</optgroup>`; }); } catch (e) { }
+    el.innerHTML = `<select id="ddMore" onchange="pickDdMore(this.value)" style="max-width:100%;"><option value="">➕ Más ligas (rachas)…</option>${opts}</select>`; }
+  const sel = document.getElementById("ddMore"); if (sel) sel.value = String(cur).startsWith("espn:") ? cur : "";
+}
+function pickDdMore(v) {
+  if (!v) return; const lab = (document.querySelector(`#ddMore option[value="${v}"]`) || {}).textContent || v;
+  ["trLeague", "dayDashLeague"].forEach(id => { const e = document.getElementById(id); if (e && !e.querySelector(`option[value="${v}"]`)) e.insertAdjacentHTML("beforeend", `<option value="${v}">${lab}</option>`); });
+  document.getElementById("trLeague").value = v; trData = null; renderDdChips(); loadTrends();
 }
 function pickDdLeague(id) {
   document.getElementById("trLeague").value = id; document.getElementById("dayDashLeague").value = id;
