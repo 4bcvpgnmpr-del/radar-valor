@@ -944,6 +944,18 @@
     </div>
     <div id="pkStatus" class="muted" style="text-align:center; font-size:12px; margin-bottom:10px;"></div>
     <div id="pkOut"></div>
+    <div class="dd-title" style="margin-top:22px;">Jugadores y porteros con historial real</div>
+    <div class="panel">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">Mira los últimos partidos de cada jugador (datos de ESPN) y muestra los que han superado la línea en al menos la probabilidad mínima de arriba. Elige una liga y el día de arriba.</div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:end; justify-content:center;">
+        <label class="muted" style="font-size:12px;">Liga<br/><select id="pkPlLg"></select></label>
+        <label class="muted" style="font-size:12px;">Partidos a mirar<br/><select id="pkPlN"><option>8</option><option selected>10</option><option>15</option></select></label>
+        <label class="muted" style="font-size:12px;"><input type="checkbox" id="pkPlSt" checked /> Solo titulares del último partido</label>
+        <button id="pkPlBtn" onclick="pkPlayers()" style="font-weight:700;">Buscar jugadores</button>
+      </div>
+      <div id="pkPlMsg" class="muted" style="text-align:center; font-size:12px; margin:8px 0;"></div>
+      <div id="pkPlOut"></div>
+    </div>
   </div>
   <div id="view-daydash" class="view">
     <div data-help="daydash"></div>
@@ -1775,7 +1787,7 @@ function switchView(v) {
   if (v === "coupon") { cpFillPresets(document.getElementById("cpPreset").value); renderCoupon(); }
   if (v === "explore") { exFillLeagues(); document.getElementById("exLeague").value = exEspn ? "espn:" + exEspn : document.getElementById("trLeague").value; if (!trData && !exEspn) loadTrends(); else renderExplore(); }
   if (v === "daydash") { renderDdChips(); if (!trData) loadTrends(); }
-  if (v === "picks") setTimeout(pkRun, 20);
+  if (v === "picks") { const a = document.getElementById("pkPlLg"), b = document.getElementById("plsLeague"); if (a && !a.options.length) { try { plsInit(); } catch (e) { } if (b) a.innerHTML = b.innerHTML; } setTimeout(pkRun, 20); }
   if (v === "trends" && !trData) loadTrends();
   renderDashboard();
 }
@@ -5352,15 +5364,49 @@ function pkRun() {
   if (r.matches.length > 60) h += `<div class="muted" style="text-align:center; font-size:12px;">Se muestran los 60 partidos con mayor probabilidad. Acota por día o liga para ver el resto.</div>`;
   if (document.getElementById("pkPl").checked) {
     h += `<div class="dd-title" style="margin-top:22px;">Jugadores y porteros <span class="muted" style="font-size:12px; font-weight:400;">(probabilidad según Bet365)</span></div>`;
-    h += r.players.length ? `<div class="panel"><div style="overflow-x:auto;"><table style="width:100%; font-size:13px;"><tr class="muted" style="font-size:11px; text-align:left;"><th>Jugador</th><th>Mercado</th><th>Partido</th><th>Prob.</th><th>Cuota</th></tr>${r.players.slice(0, 40).map(p => `<tr><td>${p.name}</td><td>${p.N}+ ${PK_PL[p.kind]}</td><td class="muted" style="font-size:12px;">${p.match}<br/>${tm(p.t)}</td><td>${pill(p.p)}</td><td>${p.odds.toFixed(2)}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:11px; margin-top:6px;">Es la probabilidad implícita de la cuota (con un margen estimado de la casa), no el historial del jugador. Para ver su historial usa Jugadores o Tendencias de jugadores.</div></div>`
+    h += r.players.length ? `<div class="panel"><div style="overflow-x:auto;"><table style="width:100%; font-size:13px;"><tr class="muted" style="font-size:11px; text-align:left;"><th>Jugador</th><th>Mercado</th><th>Partido</th><th>Prob.</th><th>Cuota</th></tr>${r.players.slice(0, 40).map(p => `<tr><td>${p.name}</td><td>${p.N}+ ${PK_PL[p.kind]}</td><td class="muted" style="font-size:12px;">${p.match}<br/>${tm(p.t)}</td><td>${pill(p.p)}</td><td>${p.odds.toFixed(2)}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:11px; margin-top:6px;">Esta tabla usa solo la cuota de Bet365. Para el historial real de cada jugador usa el bloque de debajo.</div></div>`
       : `<div class="muted" style="text-align:center; padding:14px;">Sin mercados de jugadores o porteros que lleguen a ${r.thr}% con cuota ≥ ${document.getElementById("pkOdd").value}. Suelen existir solo en ligas grandes y partidos cercanos; pulsa «Cuotas Bet365» para actualizarlos.</div>`; }
   h += `<div class="muted" style="text-align:center; font-size:11px; margin-top:16px;">Estimaciones estadísticas informativas. Una probabilidad alta no garantiza el resultado y suele venir con cuotas bajas: comprueba siempre el valor.</div>`;
   out.innerHTML = h;
 }
+
+let pkPlBusy = false;
+async function pkPlayers() {
+  if (pkPlBusy) return; pkPlBusy = true; prCacheLoad();
+  const $ = id => document.getElementById(id), msg = $("pkPlMsg"), out = $("pkPlOut"), btn = $("pkPlBtn"), slug = $("pkPlLg").value, thr = +$("pkMin").value, L = +$("pkPlN").value, onlyS = $("pkPlSt").checked, dv = $("pkDay").value;
+  const offs = dv === "0" ? [0] : dv === "1" ? [1] : dv === "01" ? [0, 1] : [0, 1, 2]; btn.disabled = true; out.innerHTML = "";
+  try {
+    const evs = []; for (const o of offs) { const d = new Date(Date.now() + o * 864e5), ds = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`; msg.textContent = "Buscando partidos…";
+      try { const sb = await espnGet(`${slug}/scoreboard?dates=${ds}`); (sb.events || []).filter(e => !(e.status && e.status.type && e.status.type.completed)).forEach(e => evs.push(e)); } catch (e) { } }
+    if (!evs.length) { msg.textContent = "No hay partidos pendientes en esa liga y día."; return; }
+    const teams = new Map(); evs.forEach(e => (((e.competitions || [])[0] || {}).competitors || []).forEach(c => teams.set(String(c.team.id), c.team.displayName || c.team.name)));
+    const sched = {}; let n = 0;
+    await prPool([...teams.keys()], 5, async id => { try { const sc = await espnGet(`${slug}/teams/${id}/schedule`); sched[id] = (sc.events || []).filter(vsDone).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, L).map(e => String(e.id)); } catch (e) { sched[id] = []; } msg.textContent = `Calendarios ${++n}/${teams.size}`; });
+    const need = [...new Set(Object.values(sched).flat())].filter(id => !prCache.has(slug + "|" + id)); let m = 0;
+    await prPool(need, 6, async id => { try { prCache.set(slug + "|" + id, prCompact(await espnGet(`${slug}/summary?event=${id}`))); } catch (e) { } m++; if (m % 3 === 0 || m === need.length) msg.textContent = `Descargando partidos ${m}/${need.length} (los ya vistos se guardan)`; });
+    prCacheSave();
+    const res = [];
+    evs.forEach(e => { const c = e.competitions[0], hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return;
+      [[hc, ac], [ac, hc]].forEach(([me, rv]) => { const tid = String(me.team.id), ms = (sched[tid] || []).map(id => prCache.get(slug + "|" + id)).filter(Boolean), by = new Map();
+        ms.forEach(mt => mt.pl.filter(x => x.t === tid).forEach(x => { if (!by.has(x.i)) by.set(x.i, { n: x.n, p: x.p, rows: [] }); by.get(x.i).rows.push({ k: x.k, s: x.s }); }));
+        const last = ms[0]; if (!last) return;
+        by.forEach((o, pid) => { const lp = last.pl.find(x => x.i === pid && x.t === tid); if (!lp || (onlyS && !lp.s) || o.rows.length < 6) return; const isGK = /^G/i.test(o.p || "");
+          Object.keys(PL_MK).forEach(k => { const [lab, stat, lines] = PL_MK[k]; if (stat === "saves" ? !isGK : isGK && stat !== "saves") return; let best = null;
+            lines.forEach(line => { const hits = o.rows.filter(r => (r.k[stat] || 0) > line).length, pct = hits * 100 / o.rows.length; if (pct >= thr && (!best || line > best.line)) best = { line, hits, pct }; });
+            if (best) { const avg = o.rows.reduce((a, r) => a + (r.k[stat] || 0), 0) / o.rows.length; res.push({ name: o.n, pos: o.p, team: me.team.displayName || me.team.name, rival: rv.team.displayName || rv.team.name, time: e.date, lab, line: best.line, hits: best.hits, n: o.rows.length, pct: best.pct, avg, gk: isGK }); } }); }); }); });
+    res.sort((a, b) => b.pct - a.pct || b.n - a.n || b.line - a.line); pkPlLast = res;
+    msg.textContent = res.length ? `${res.length} selecciones de jugadores ≥${thr}%` : "";
+    const tm = x => new Date(x).toLocaleString("es-ES", { weekday: "short", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+    out.innerHTML = res.length ? `<div style="overflow-x:auto;"><table style="width:100%; font-size:13px;"><tr class="muted" style="font-size:11px; text-align:left;"><th>Jugador</th><th>Mercado</th><th>Acierto</th><th>Media</th><th>Partido</th></tr>${res.slice(0, 80).map(p => `<tr><td>${p.name}${p.gk ? " 🧤" : ""}<br/><span class="muted" style="font-size:11px;">${p.team}</span></td><td>Más de ${p.line} ${p.lab.toLowerCase()}</td><td><b style="color:${p.pct >= 80 ? "#3ECF8E" : "#8FD694"};">${p.pct.toFixed(0)}%</b> <span class="muted" style="font-size:11px;">(${p.hits}/${p.n})</span></td><td>${p.avg.toFixed(1)}</td><td class="muted" style="font-size:12px;">vs ${p.rival}<br/>${tm(p.time)}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:11px; margin-top:6px;">Es el historial real de cada jugador, no una predicción: puede cambiar si no juega o cambia su rol. Compáralo con la cuota de Bet365 antes de decidir.</div>` : `<div class="muted" style="text-align:center; padding:12px;">Ningún jugador llega a ${thr}% en esos partidos. Baja la probabilidad mínima o quita «Solo titulares».</div>`;
+  } catch (e) { msg.textContent = "Error: " + e.message; }
+  finally { pkPlBusy = false; btn.disabled = false; }
+}
+let pkPlLast = [];
 function pkCopy() {
   const r = pkLast; if (!r || !r.matches) return; const L = [`Selección del día (≥${r.thr}%)`];
   r.matches.forEach(x => { L.push(`${x.m.home_team} vs ${x.m.away_team} · ${x.lg}`); x.picks.forEach(p => L.push(`  ${p.label}: ${p.p.toFixed(0)}%${p.price ? " @" + p.price.toFixed(2) : ""} (${p.cf[0]})`)); });
   if (r.players && r.players.length) { L.push("Jugadores/porteros (prob. Bet365)"); r.players.slice(0, 40).forEach(p => L.push(`  ${p.name} ${p.N}+ ${PK_PL[p.kind]} @${p.odds.toFixed(2)} ${p.p.toFixed(0)}% · ${p.match}`)); }
+  if (pkPlLast.length) { L.push("Jugadores (historial)"); pkPlLast.slice(0, 40).forEach(p => L.push(`  ${p.name} más de ${p.line} ${p.lab.toLowerCase()}: ${p.pct.toFixed(0)}% (${p.hits}/${p.n}) · vs ${p.rival}`)); }
   const txt = L.join("\n"); try { navigator.clipboard.writeText(txt); showToast("Lista copiada"); } catch (e) { showToast("No se pudo copiar"); }
 }
 function cpBadge(pos, n) { if (!pos) return `<span class="bdg n">–</span>`; const c = n ? (pos <= n / 3 ? "g" : pos <= 2 * n / 3 ? "y" : "r") : "n"; return `<span class="bdg ${c}" title="Posición en la liga">${pos}º</span>`; }
