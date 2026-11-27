@@ -1773,7 +1773,7 @@ function switchView(v) {
   if (v === "lineups") { renderFormationStats(); luRenderChips(); if (!document.querySelector("#lineup-picker .lv-row")) loadTodayForLineups(); }
   if (v === "alarms") renderAlarms();
   if (v === "habit") habRender();
-  if (v === "bets") betsRender();
+  if (v === "bets") { betsRender(); setTimeout(() => betAutoGrade(true), 400); }
   if (v === "ai" && !aiNoShow) { aiShow(); aiMorFetch(); }
   if (v === "players") prInit();
   if (v === "cardsw") apInit();
@@ -6048,6 +6048,9 @@ function betsRender() { const pg = document.getElementById("betsPage"); if (!pg)
   const mkRows = MK_CATS.map(c => [c[1], stat(L.filter(b => b.kind !== "combo" && (b.legs && b.legs[0] ? mkCat(b.legs[0].mercado) : mkCat(b.desc)) === c[0]))]).filter(x => x[1].n);
   const draft = betDraft, tot = (() => { const cs = draft.legs.map(l => parseFloat(String(l.c).replace(",", "."))); return cs.every(c => c > 1) ? cs.reduce((a, c) => a * c, 1) : null; })();
   pg.innerHTML = `<div style="font-weight:800; font-size:18px; text-align:center; margin-bottom:8px;">💼 Mis apuestas</div>
+  <div class="card" style="margin:10px 0; padding:12px 14px;"><b>⚡ Apuesta rápida</b> <span class="muted">(escríbela como la dirías; la app la guarda y la valida sola al acabar el partido)</span>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"><input id="bqTx" type="text" placeholder="Real Madrid vs Barcelona, más de 2.5 goles, cuota 1.85, 10€" style="flex:1; min-width:220px;" onkeydown="if(event.key==='Enter')betQuick()" /><button class="small" onclick="betQuick()">Guardar</button></div>
+    <div id="bqMsg" class="muted" style="margin-top:6px; font-size:11.5px; line-height:1.5;">Valida sola: resultado 1X2, doble oportunidad, más/menos goles (del partido o de un equipo), ambos marcan, 1ª y 2ª parte, y jugadores (tiros, a puerta, faltas, paradas, tarjetas, goles). Las combinadas se crean abajo y se validan selección a selección. Corners y otros mercados los marcas tú.</div></div>
   <div class="card" style="margin:10px 0; padding:12px 14px;"><b>➕ Crear apuesta</b> <span class="muted">(pon lo que apostaste; con 2 o más selecciones es una combinada)</span>
     ${draft.legs.map((l, i) => `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; align-items:center;"><input id="bdP${i}" type="text" placeholder="Partido" value="${esc(l.p)}" oninput="betDraftUpd()" style="flex:2; min-width:130px;" /><input id="bdM${i}" type="text" placeholder="Mercado (ej. Más de 2.5)" value="${esc(l.m)}" oninput="betDraftUpd()" style="flex:2; min-width:130px;" /><input id="bdC${i}" type="number" step="0.01" min="1.01" placeholder="Cuota" value="${esc(l.c)}" oninput="betDraftUpd()" style="flex:1; min-width:80px;" />${draft.legs.length > 1 ? `<button class="small ghost" onclick="betLegDel(${i})">✕</button>` : ""}</div>`).join("")}
     <div style="margin-top:8px;"><button class="small ghost" onclick="betLegAdd()">+ Añadir selección</button></div>
@@ -6058,8 +6061,8 @@ function betsRender() { const pg = document.getElementById("betsPage"); if (!pg)
   <div class="card" style="margin:6px 0; padding:12px 14px;"><div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:10px; text-align:center;"><div><div class="muted">Apuestas</div><b style="font-size:18px;">${S.n}</b><div class="muted">${S.pend} pendientes</div></div><div><div class="muted">Apostado</div><b style="font-size:18px;">${f2(S.staked)} €</b></div><div><div class="muted">Beneficio</div><b style="font-size:18px; color:${col(S.pn)};">${(S.pn > 0 ? "+" : "") + f2(S.pn)} €</b></div><div><div class="muted">ROI</div><b style="font-size:18px; color:${S.roi == null ? "inherit" : col(S.roi)};">${S.roi == null ? "—" : (S.roi > 0 ? "+" : "") + S.roi.toFixed(1) + "%"}</b></div><div><div class="muted">Acierto</div><b style="font-size:18px;">${S.hit == null ? "—" : S.hit.toFixed(0) + "%"}</b><div class="muted">${S.nres} resueltas</div></div></div>
     ${grp.length ? `<table style="width:100%; border-collapse:collapse; font-size:12.5px; margin-top:10px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:3px 0;">Tipo</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Apostado</th><th style="text-align:right;">Beneficio</th><th style="text-align:right;">ROI</th></tr>${grp.map(([n, g]) => `<tr style="border-top:1px solid #1A212B;"><td style="padding:4px 0;">${n}</td><td style="text-align:right;">${g.n}</td><td style="text-align:right;">${f2(g.staked)} €</td><td style="text-align:right; color:${col(g.pn)};">${(g.pn > 0 ? "+" : "") + f2(g.pn)} €</td><td style="text-align:right;">${g.roi == null ? "—" : g.roi.toFixed(0) + "%"}</td></tr>`).join("")}</table><div class="muted" style="margin-top:6px;">Con pocas apuestas resueltas estos números son ruido: no saques conclusiones hasta tener muchas.</div>` : ""}${mkRows.length ? `<div style="font-weight:700; margin:12px 0 4px;">Por mercado <span class="muted" style="font-weight:400;">(solo apuestas simples)</span></div><table style="width:100%; border-collapse:collapse; font-size:12.5px;"><tr class="muted" style="text-align:left; font-size:11px;"><th style="padding:3px 0;">Mercado</th><th style="text-align:right;">Apuestas</th><th style="text-align:right;">Beneficio</th><th style="text-align:right;">ROI</th><th style="text-align:right;">Acierto</th></tr>${mkRows.map(([n, g]) => `<tr style="border-top:1px solid #1A212B;"><td style="padding:4px 0;">${n}</td><td style="text-align:right;">${g.n}</td><td style="text-align:right; color:${col(g.pn)};">${(g.pn > 0 ? "+" : "") + f2(g.pn)} €</td><td style="text-align:right;">${g.roi == null ? "—" : g.roi.toFixed(0) + "%"}</td><td style="text-align:right;">${g.hit == null ? "—" : g.hit.toFixed(0) + "%"}</td></tr>`).join("")}</table>` : ""}</div>
   ${L.length ? L.map(b => `<div style="border:1px solid #232A33; border-left:4px solid ${b.res === "w" ? "#3ECF8E" : b.res === "l" ? "#E5484D" : b.res === "c" ? "#F0B429" : "#5B8DEF"}; border-radius:12px; padding:10px 14px; margin:10px 0;"><div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><b>${esc(b.desc)}</b><span class="muted">${new Date(b.t).toLocaleDateString("es-ES", { day: "numeric", month: "short" })} · ${betSrcLabel(b)}</span></div>
-    <div style="margin:4px 0;">${f2(b.stake)} € a cuota <b>${Number(b.odds).toFixed(2)}</b> · ${b.res === "w" ? `<b style="color:#3ECF8E;">Ganada ${habEur(habPnl(b))}</b>` : b.res === "l" ? `<b style="color:#E5484D;">Perdida ${habEur(habPnl(b))}</b>` : b.res === "c" ? `<b style="color:${habPnl(b) >= 0 ? "#3ECF8E" : "#E5484D"};">Cerrada antes: cobrado ${f2(+b.cash || 0)} € (${habEur(habPnl(b))})</b>` : b.res === "v" ? "Nula" : `Pendiente · si sale: ${habEur(b.stake * (b.odds - 1))}`}</div>
-    ${(b.legs || []).length > 1 || (b.legs || [])[0] && b.kind === "combo" ? `<div style="margin-top:4px;">${b.legs.map((l, i) => `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:4px 0; border-top:1px solid #1A212B; font-size:12.5px;"><span>${esc(l.partido)} · ${esc(l.mercado)} <span class="muted">@${Number(l.cuota).toFixed(2)}</span></span><span style="display:flex; gap:4px;"><button class="small ${l.res === "w" ? "" : "ghost"}" onclick="betLegRes('${b.id}',${i},'w')">✓</button><button class="small ${l.res === "l" ? "" : "ghost"}" onclick="betLegRes('${b.id}',${i},'l')">✗</button></span></div>`).join("")}</div>` : ""}
+    <div style="margin:4px 0;">${f2(b.stake)} € a cuota <b>${Number(b.odds).toFixed(2)}</b> · ${b.res === "w" ? `<b style="color:#3ECF8E;">Ganada ${habEur(habPnl(b))}</b>` : b.res === "l" ? `<b style="color:#E5484D;">Perdida ${habEur(habPnl(b))}</b>` : b.res === "c" ? `<b style="color:${habPnl(b) >= 0 ? "#3ECF8E" : "#E5484D"};">Cerrada antes: cobrado ${f2(+b.cash || 0)} € (${habEur(habPnl(b))})</b>` : b.res === "v" ? "Nula" : `Pendiente · si sale: ${habEur(b.stake * (b.odds - 1))}`}${b.auto && b.res ? ` <span class="muted" style="font-size:11px;">🤖 validada sola</span>` : ""}${!b.res && b.noauto ? ` <span class="muted" style="font-size:11px; color:#F0B429;">· no puedo comprobar este mercado: márcala tú</span>` : ""}${!b.res && !b.noauto ? ` <span class="muted" style="font-size:11px;">· 🤖 se validará sola</span>` : ""}</div>
+    ${(b.legs || []).length > 1 || (b.legs || [])[0] && b.kind === "combo" ? `<div style="margin-top:4px;">${b.legs.map((l, i) => `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:4px 0; border-top:1px solid #1A212B; font-size:12.5px;"><span>${esc(l.partido)} · ${esc(l.mercado)} <span class="muted">@${Number(l.cuota).toFixed(2)}</span>${l.auto ? " 🤖" : ""}</span><span style="display:flex; gap:4px;"><button class="small ${l.res === "w" ? "" : "ghost"}" onclick="betLegRes('${b.id}',${i},'w')">✓</button><button class="small ${l.res === "l" ? "" : "ghost"}" onclick="betLegRes('${b.id}',${i},'l')">✗</button></span></div>`).join("")}</div>` : ""}
     <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;"><button class="small ${b.res === "w" ? "" : "ghost"}" onclick="habRes('${b.id}','w');betsRender()">✅ Ganada</button><button class="small ${b.res === "l" ? "" : "ghost"}" onclick="habRes('${b.id}','l');betsRender()">❌ Perdida</button><button class="small ${b.res === "v" ? "" : "ghost"}" onclick="habRes('${b.id}','v');betsRender()">↩ Nula</button><button class="small ${b.res === "c" ? "" : "ghost"}" onclick="betCash('${b.id}')" title="La cerraste antes de que acabara y cobraste una cantidad">💸 ${b.res === "c" ? "Quitar cierre" : "Cerrada antes"}</button><button class="small ghost" onclick="habDel('${b.id}');betsRender()">🗑</button></div></div>`).join("") : '<div class="muted" style="text-align:center; padding:16px;">Todavía no hay apuestas en este periodo. Crea una arriba, o guárdalas desde «Ideas de la IA» con el botón 💾.</div>'}
   <div class="muted" style="font-size:11px; text-align:center; line-height:1.5; margin-top:10px;">Registro personal, solo informativo. La app no sabe lo que apuestas en la casa: lo apuntas tú. Apuesta solo lo que puedas perder.</div>`; }
 let preSnapT = 0, preSnapSig = "";
@@ -6306,11 +6309,11 @@ function aiParseGrade(o, r) {
   const g = /(?:gana|victoria de|1x2:?)\s+(.+)$/.exec(m); if (g && !/ o /.test(g[1])) { const t = nm(g[1]); if (near(nm(o.h), t)) return res === "H" ? "w" : "l"; if (near(nm(o.a), t)) return res === "A" ? "w" : "l"; }
   return null;
 }
-async function aiResults(t0) {
-  const day = d => { const x = new Date(d); return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, "0")}${String(x.getUTCDate()).padStart(2, "0")}`; }, rng = day(t0 - 86400000) + "-" + day(t0 + 86400000);
+async function aiResults(t0, t1) {
+  if (t1 == null) t1 = t0; const day = d => { const x = new Date(d); return `${x.getUTCFullYear()}${String(x.getUTCMonth() + 1).padStart(2, "0")}${String(x.getUTCDate()).padStart(2, "0")}`; }, rng = day(t0 - 86400000) + "-" + day(t1 + 86400000);
   if (aiResMemo[rng] && Date.now() - aiResMemo[rng].t < 600000) return aiResMemo[rng].list;
   prInit(); const slugs = [...document.querySelectorAll("#plLeague option")].map(o => o.value), list = [], nm = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase());
-  await prPool(slugs, 8, async sl => { try { const j = await espnGet(`${sl}/scoreboard?dates=${rng}`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const t = (c.status || e.status || {}).type || {}; if (!t.completed) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return; list.push({ h: nm(hc.team.displayName || hc.team.name), a: nm(ac.team.displayName || ac.team.name), hg: +hc.score, ag: +ac.score, t: Date.parse(e.date) }); }); } catch (e) { } });
+  await prPool(slugs, 8, async sl => { try { const j = await espnGet(`${sl}/scoreboard?dates=${rng}&limit=300`); (j.events || []).forEach(e => { const c = (e.competitions || [])[0]; if (!c) return; const t = (c.status || e.status || {}).type || {}; if (!t.completed) return; const hc = c.competitors.find(x => x.homeAway === "home"), ac = c.competitors.find(x => x.homeAway === "away"); if (!hc || !ac) return; list.push({ h: nm(hc.team.displayName || hc.team.name), a: nm(ac.team.displayName || ac.team.name), hg: +hc.score, ag: +ac.score, t: Date.parse(e.date), hh: (hc.linescores || []).length > 1 ? +hc.linescores[0].value : null, ha: (ac.linescores || []).length > 1 ? +ac.linescores[0].value : null, id: String(e.id), sl }); }); } catch (e) { } });
   aiResMemo[rng] = { t: Date.now(), list }; return list;
 }
 async function aiAutoGrade(silent) {
@@ -6326,6 +6329,72 @@ async function aiAutoGrade(silent) {
   if (changed) { if (document.getElementById("view-ai").classList.contains("active")) aiShow(); if (!silent) showToast(`🤖 ${changed} idea${changed > 1 ? "s" : ""} marcada${changed > 1 ? "s" : ""} automáticamente`); }
 }
 setInterval(() => { try { if (aiHist().length) aiAutoGrade(true); } catch (e) { } }, 900000);
+
+/* ===== Validación automática de Mis apuestas ===== */
+let betGradeBusy = false;
+const betN = x => (typeof msNorm === "function" ? msNorm(x) : String(x).toLowerCase()), betNear = (a, b) => !!(a && b && (a === b || a.includes(b) || b.includes(a)));
+const BET_ST = [[/a puerta|a porteria|\bsot\b/, "shotsOnTarget"], [/\btiros?\b|remates?|disparos?/, "totalShots"], [/faltas? (?:recibidas?|sufridas?)|recibe faltas?|faltas? al rival/, "foulsSuffered"], [/\bfaltas?\b/, "foulsCommitted"], [/paradas?|salvadas?/, "saves"], [/amarilla|tarjeta/, "yellowCards"], [/asistencias?/, "goalAssists"], [/\bgol(?:es)?\b|\bmarca\b/, "totalGoals"]];
+function betTeams(p) { const s = String(p || "").trim(), x = s.split(/\s+(?:vs\.?|v\.?|contra|-|–|—)\s+/i); return x.length >= 2 ? [x[0].trim(), x[1].trim()] : [s, ""]; }
+function betPlain(t) { return String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim(); }
+function betGradeText(mer, z) {
+  const m = betPlain(mer); if (!m || / y |&/.test(m)) return null;
+  const HT = /\b(?:1t|ht)\b|\b1\s*[ªa°º]?\s*(?:parte|mitad|tiempo)\b|primer[a]?\s*(?:parte|mitad|tiempo)|1er tiempo|descanso/g, H2 = /\b2t\b|\b2\s*[ªa°º]?\s*(?:parte|mitad|tiempo)\b|segund[ao]\s*(?:parte|mitad|tiempo)/g;
+  let r = { hg: z.hg, ag: z.ag }, txt = m;
+  if (HT.test(m)) { if (z.hh == null) return null; r = { hg: z.hh, ag: z.ha }; txt = m.replace(HT, " "); } else if (H2.test(m)) { if (z.hh == null) return null; r = { hg: z.hg - z.hh, ag: z.ag - z.ha }; txt = m.replace(H2, " "); }
+  txt = txt.replace(/doble oportunidad:?/g, " ").replace(/\s+/g, " ").trim().replace(/^(.+?)\s+(?:gana|ganador|gana el partido)$/, "gana $1"); const res = r.hg > r.ag ? "H" : r.hg < r.ag ? "A" : "D";
+  if (/\b1x\b/.test(txt)) return res !== "A" ? "w" : "l"; if (/\bx2\b/.test(txt)) return res !== "H" ? "w" : "l"; if (/\b12\b/.test(txt)) return res !== "D" ? "w" : "l";
+  let dc = /^(?:gana\s+)?(.+?)\s+o\s+empate$/.exec(txt) || /^empate\s+o\s+(.+)$/.exec(txt);
+  if (dc) { const t = dc[1].trim(); if (t === "local" || betNear(z.h, t)) return res !== "A" ? "w" : "l"; if (t === "visitante" || betNear(z.a, t)) return res !== "H" ? "w" : "l"; return null; }
+  const tt = /(mas|menos|over|under)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)/.exec(txt);
+  if (tt && !/ambos/.test(txt)) { const tok = n => n.split(" ").filter(w => w.length >= 5), has = n => txt.includes(n) || tok(n).some(w => txt.includes(w)), hh = has(z.h), aa = has(z.a);
+    if (hh !== aa) { const g = hh ? r.hg : r.ag, L = parseFloat(tt[2].replace(",", ".")), over = /mas|over/.test(tt[1]); return g === L ? "v" : (over ? g > L : g < L) ? "w" : "l"; } if (hh && aa) return null; }
+  return aiParseGrade({ mercado: txt, h: z.h, a: z.a }, r);
+}
+async function betGradePlayer(mer, z) {
+  const m = betPlain(mer); let st = null; for (const [re, k] of BET_ST) if (re.test(m)) { st = k; break; } if (!st) return undefined;
+  const ln = /(\d+)\s*\+/.exec(m), ov = /(?:mas|over)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)/.exec(m), un = /(?:menos|under)\s*(?:de\s*)?(\d+(?:[.,]\d+)?)/.exec(m);
+  if (/ambos|empate|\bgana\b|\b1x\b|\bx2\b|\b12\b|doble/.test(m)) return undefined;
+  let nameStr = m.replace(/(?:mas|menos|over|under)\s*(?:de\s*)?\d+(?:[.,]\d+)?/g, " ").replace(/\d+\s*\+/g, " ").replace(/\b(?:1t|2t|ht)\b|\b[12]\s*[ªa°º]?\s*(?:parte|mitad|tiempo)\b|primer[a]?\s*(?:parte|mitad|tiempo)|segund[ao]\s*(?:parte|mitad|tiempo)/g, " ");
+  nameStr = nameStr.replace(/\b(tiros?|a puerta|a porteria|remates?|disparos?|faltas?|recibidas?|cometidas?|paradas?|goles?|gol|marca|asistencias?|amarilla|tarjeta|de|del|la|el|los|totales?|partido|equipo|en|al|sot)\b/g, " ").replace(/[:\-–]/g, " ").replace(/\s+/g, " ").trim();
+  if (nameStr.length < 3 || betNear(betN(nameStr), z.h) || betNear(betN(nameStr), z.a)) return undefined;
+  if (!ln && !ov && !un && !(st === "totalGoals" || st === "yellowCards" || st === "goalAssists")) return null;
+  prCacheLoad(); let su = prCache.get(z.sl + "|" + z.id); if (!su) { try { su = prCompact(await espnGet(`${z.sl}/summary?event=${z.id}`)); prCache.set(z.sl + "|" + z.id, su); prCacheSave(); } catch (e) { return null; } }
+  const qt = nameStr.split(" ").filter(w => w.length >= 3), c = (su.pl || []).filter(x => { const n = betPlain(x.n); return qt.length && qt.every(w => n.includes(w)); }); if (c.length !== 1) return null;
+  const v = c[0].k[st] || 0; if (ln) return v >= +ln[1] ? "w" : "l"; if (ov) { const L = parseFloat(ov[1].replace(",", ".")); return v === L ? "v" : v > L ? "w" : "l"; } if (un) { const L = parseFloat(un[1].replace(",", ".")); return v === L ? "v" : v < L ? "w" : "l"; }
+  return v >= 1 ? "w" : "l";
+}
+async function betAutoGrade(silent) {
+  if (betGradeBusy) return; let d; try { d = habGet(); } catch (e) { return; } const now = Date.now(), todo = d.bets.filter(b => !b.res && !b.noauto && b.legs && b.legs.length && b.t > now - 9 * 864e5 && b.t < now - 30 * 60000);
+  if (!todo.length) return; betGradeBusy = true; let changed = 0;
+  try {
+    const t0 = Math.min(...todo.map(b => b.t)), lists = await aiResults(t0 - 12 * 36e5, Math.min(now, Math.max(...todo.map(b => b.t)) + 6 * 864e5));
+    for (const b of todo) { let pend = 0;
+      for (const l of b.legs) { if (l.res || l.noauto) continue; const [h, a] = betTeams(l.partido), hn = betN(h), an = betN(a);
+        const cands = lists.filter(z => z.t >= b.t - 12 * 36e5 && z.t <= b.t + 6 * 864e5 && (an ? ((betNear(z.h, hn) && betNear(z.a, an)) || (betNear(z.h, an) && betNear(z.a, hn))) : (betNear(z.h, hn) || betNear(z.a, hn)))).sort((x, y) => x.t - y.t), z = cands[0];
+        if (!z) { if (now - b.t > 5 * 864e5) l.noauto = 1; else pend++; continue; }
+        let g = null; try { const gp = await betGradePlayer(l.mercado, z); g = gp === undefined ? betGradeText(l.mercado, z) : gp; } catch (e) { g = null; }
+        if (g === "w" || g === "l") { l.res = g; l.auto = 1; changed++; } else if (g === "v" && b.legs.length === 1) { l.res = "v"; l.auto = 1; changed++; } else l.noauto = 1; }
+      if (b.legs.length === 1) { const r = b.legs[0].res; if (r === "w" || r === "l" || r === "v") { b.res = r; b.auto = 1; } }
+      else { betResolve(b); if (b.res) b.auto = 1; }
+      if (!b.res && !pend && b.legs.every(l => l.res || l.noauto)) b.noauto = 1; }
+    if (changed || todo.some(b => b.noauto)) habSave(d);
+  } catch (e) { } finally { betGradeBusy = false; }
+  if (changed) { if (document.getElementById("view-bets").classList.contains("active")) betsRender(); if (!silent) showToast(`🤖 ${changed} selección${changed > 1 ? "es" : ""} validada${changed > 1 ? "s" : ""} automáticamente`); }
+}
+function betQuick() {
+  const el = document.getElementById("bqTx"), msg = document.getElementById("bqMsg"); if (!el) return; let t = el.value.trim(); if (!t) { msg.textContent = "Escribe la apuesta, por ejemplo: Real Madrid vs Barcelona, más de 2.5 goles, cuota 1.85, 10€"; return; }
+  const num = x => parseFloat(String(x).replace(",", ".")); let stake = null, odds = null, mm;
+  if ((mm = /(\d+(?:[.,]\d+)?)\s*(?:€|eur\b|euros?)/i.exec(t)) || (mm = /(?:€)\s*(\d+(?:[.,]\d+)?)/.exec(t)) || (mm = /(?:apuesto|aposte|apostado|puse|stake)\s*(\d+(?:[.,]\d+)?)/i.exec(t))) { stake = num(mm[1]); t = t.replace(mm[0], " "); }
+  if ((mm = /(?:cuota|@)\s*(\d+(?:[.,]\d+)?)/i.exec(t))) { odds = num(mm[1]); t = t.replace(mm[0], " "); }
+  const segs = t.split(/[,;|·\n]+/).map(x => x.trim()).filter(Boolean); let partido = "", mer = [];
+  const MK = /\b(mas|más|menos|over|under|ambos|gana|empate|1x|x2|doble|handicap|1t|primera|segunda|marca|tiros?|faltas?|paradas?)\b|\+\s*\d/i;
+  segs.forEach(sg => { if (!partido && /\s(?:vs\.?|v|contra)\s|\s[-–—]\s/i.test(sg)) { const k = sg.search(MK); if (k > 0) { partido = sg.slice(0, k).trim(); const rest = sg.slice(k).trim(); if (rest) mer.push(rest); } else partido = sg; } else mer.push(sg); });
+  if (!odds && mer.length) { const last = mer[mer.length - 1]; if (/^\d+[.,]\d+$/.test(last)) { odds = num(last); mer.pop(); } }
+  const merS = mer.join(" · "), miss = []; if (!partido) miss.push("el partido (ej. «Real Madrid vs Barcelona»)"); if (!merS) miss.push("el mercado"); if (!(odds > 1)) miss.push("la cuota (ej. «cuota 1.85»)"); if (!(stake > 0)) miss.push("lo apostado (ej. «10€»)");
+  if (miss.length) { betDraft = { legs: [{ p: partido, m: merS, c: odds > 1 ? String(odds) : "" }], stake: stake > 0 ? String(stake) : "", fin: "" }; betsRender(); const m2 = document.getElementById("bdMsg"); if (m2) m2.textContent = "Rellené lo que entendí. Falta: " + miss.join(", ") + "."; return; }
+  const d = habGet(); d.bets.unshift({ id: "b" + Date.now(), t: Date.now(), date: habDay(), desc: `${partido} · ${merS}`, stake, odds, res: "", kind: "simple", src: "manual", legs: [{ partido, mercado: merS, cuota: odds, res: "" }] }); habSave(d); showToast("💾 Apuesta guardada: se validará sola al terminar el partido"); betsRender(); setTimeout(() => betAutoGrade(true), 500);
+}
+setInterval(() => { try { betAutoGrade(true); } catch (e) { } }, 600000); setTimeout(() => { try { betAutoGrade(true); } catch (e) { } }, 6000);
 /* JSON tolerante: si la IA se corta a mitad, recupera las ideas completas */
 function aiJson(txt) { const i = txt.indexOf("{"); if (i < 0) throw new Error("La IA no devolvió una lista legible."); let t = txt.slice(i); const j = t.lastIndexOf("}"); if (j >= 0) t = t.slice(0, j + 1);
   try { return JSON.parse(t); } catch (e) { }
