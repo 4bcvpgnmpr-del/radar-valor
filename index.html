@@ -5339,8 +5339,8 @@ function pkCompute() {
   res.matches.sort((x, y) => y.top - x.top);
   if (document.getElementById("pkPl").checked) { try { movPPRestore(); } catch (e) { }
     Object.keys(MOV_PP).forEach(k => { const e = MOV_PP[k]; if (!e || e.t < W[0] || e.t > W[1]) return; if (lgSel) return;
-      (e.rows || []).forEach(r => { const [kind, name, line, N, odds] = r; if (!PK_PL[kind] || !odds || odds < minO) return; const p = 100 / odds * 0.93; if (p < thr) return;
-        res.players.push({ match: `${e.h} vs ${e.a}`, t: e.t, name: name || "(equipo)", kind, N, odds, p }); }); });
+      (e.rows || []).forEach(r => { const [kind, team, name, N, odds] = r; if (!PK_PL[kind] || !odds || odds < minO) return; const p = 100 / odds * 0.93; if (p < thr) return;
+        if (!name) return; res.players.push({ match: `${e.h} vs ${e.a}`, t: e.t, name, team, kind, N, odds, p }); }); });
     res.players.sort((x, y) => y.p - x.p); }
   return res;
 }
@@ -5364,7 +5364,7 @@ function pkRun() {
   if (r.matches.length > 60) h += `<div class="muted" style="text-align:center; font-size:12px;">Se muestran los 60 partidos con mayor probabilidad. Acota por día o liga para ver el resto.</div>`;
   if (document.getElementById("pkPl").checked) {
     h += `<div class="dd-title" style="margin-top:22px;">Jugadores y porteros <span class="muted" style="font-size:12px; font-weight:400;">(probabilidad según Bet365)</span></div>`;
-    h += r.players.length ? `<div class="panel"><div style="overflow-x:auto;"><table style="width:100%; font-size:13px;"><tr class="muted" style="font-size:11px; text-align:left;"><th>Jugador</th><th>Mercado</th><th>Partido</th><th>Prob.</th><th>Cuota</th></tr>${r.players.slice(0, 40).map(p => `<tr><td>${p.name}</td><td>${p.N}+ ${PK_PL[p.kind]}</td><td class="muted" style="font-size:12px;">${p.match}<br/>${tm(p.t)}</td><td>${pill(p.p)}</td><td>${p.odds.toFixed(2)}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:11px; margin-top:6px;">Esta tabla usa solo la cuota de Bet365. Para el historial real de cada jugador usa el bloque de debajo.</div></div>`
+    h += r.players.length ? `<div class="panel"><div style="overflow-x:auto;"><table style="width:100%; font-size:13px;"><tr class="muted" style="font-size:11px; text-align:left;"><th>Jugador</th><th>Mercado</th><th>Partido</th><th>Prob.</th><th>Cuota</th></tr>${r.players.slice(0, 40).map(p => `<tr><td><b>${p.name}</b>${p.kind === "saves" ? " 🧤" : ""}<br/><span class="muted" style="font-size:11px;">${p.team || ""}</span></td><td>${p.N}+ ${PK_PL[p.kind]}</td><td class="muted" style="font-size:12px;">${p.match}<br/>${tm(p.t)}</td><td>${pill(p.p)}</td><td>${p.odds.toFixed(2)}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:11px; margin-top:6px;">Esta tabla usa solo la cuota de Bet365. Para el historial real de cada jugador usa el bloque de debajo.</div></div>`
       : `<div class="muted" style="text-align:center; padding:14px;">Sin mercados de jugadores o porteros que lleguen a ${r.thr}% con cuota ≥ ${document.getElementById("pkOdd").value}. Suelen existir solo en ligas grandes y partidos cercanos; pulsa «Cuotas Bet365» para actualizarlos.</div>`; }
   h += `<div class="muted" style="text-align:center; font-size:11px; margin-top:16px;">Estimaciones estadísticas informativas. Una probabilidad alta no garantiza el resultado y suele venir con cuotas bajas: comprueba siempre el valor.</div>`;
   out.innerHTML = h;
@@ -5405,7 +5405,7 @@ let pkPlLast = [];
 function pkCopy() {
   const r = pkLast; if (!r || !r.matches) return; const L = [`Selección del día (≥${r.thr}%)`];
   r.matches.forEach(x => { L.push(`${x.m.home_team} vs ${x.m.away_team} · ${x.lg}`); x.picks.forEach(p => L.push(`  ${p.label}: ${p.p.toFixed(0)}%${p.price ? " @" + p.price.toFixed(2) : ""} (${p.cf[0]})`)); });
-  if (r.players && r.players.length) { L.push("Jugadores/porteros (prob. Bet365)"); r.players.slice(0, 40).forEach(p => L.push(`  ${p.name} ${p.N}+ ${PK_PL[p.kind]} @${p.odds.toFixed(2)} ${p.p.toFixed(0)}% · ${p.match}`)); }
+  if (r.players && r.players.length) { L.push("Jugadores/porteros (prob. Bet365)"); r.players.slice(0, 40).forEach(p => L.push(`  ${p.name}${p.team ? " (" + p.team + ")" : ""} ${p.N}+ ${PK_PL[p.kind]} @${p.odds.toFixed(2)} ${p.p.toFixed(0)}% · ${p.match}`)); }
   if (pkPlLast.length) { L.push("Jugadores (historial)"); pkPlLast.slice(0, 40).forEach(p => L.push(`  ${p.name} más de ${p.line} ${p.lab.toLowerCase()}: ${p.pct.toFixed(0)}% (${p.hits}/${p.n}) · vs ${p.rival}`)); }
   const txt = L.join("\n"); try { navigator.clipboard.writeText(txt); showToast("Lista copiada"); } catch (e) { showToast("No se pudo copiar"); }
 }
