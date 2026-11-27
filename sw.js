@@ -1,4 +1,4 @@
-const CACHE_NAME = "radar-valor-v63";
+const CACHE_NAME = "radar-valor-v64";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

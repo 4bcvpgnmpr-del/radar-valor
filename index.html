@@ -1464,9 +1464,18 @@
               <input id="alWFrom" type="hidden" /><input id="alWTo" type="hidden" />
               <label id="alWLastL" style="display:none;">Últimos (minutos)<input id="alWLast" type="number" min="1" max="45" placeholder="10" /></label>
             </div>
+            <div id="alWExtra"></div>
+            <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;"><button class="small ghost" onclick="alWAdd()">+ Añadir otra estadística</button><select id="alWComb"><option value="all">Deben cumplirse todas</option><option value="any">Basta con una</option></select></div>
             <small>Ej.: "Tiros a puerta · cualquiera · al menos 3" con los límites de tiempo de arriba en 60' y 75'. Las estadísticas (tiros, córners, tarjetas) vienen de Bet365 en directo y se comprueban cada minuto: la app debe estar abierta.</small>
           </div>
         </div>
+      </div>
+      <div class="alp-card"><div class="alp-h">CUOTA EN VIVO</div>
+        <div class="alp-row"><div class="alp-box w4"><b>Cuota de ese momento <small>(opcional)</small></b>
+          <div id="alLoRows"></div>
+          <button class="small ghost" onclick="alLoAdd()" style="margin-top:6px;">+ Añadir mercado</button>
+          <small>El aviso siempre incluye las cuotas 1 / X / 2 del momento y las de los mercados que añadas aquí. Si pones un mínimo o un máximo, solo avisa cuando la cuota esté en ese rango (deben cumplirse todos los mercados que añadas). Con varias estadísticas o cuotas en vivo, usa los datos gratuitos de Bet365.</small>
+        </div></div>
       </div>
       <div class="alp-save"><b>Añade una descripción</b><input id="alName" type="text" placeholder="Enter description here..." /><button onclick="alSave()">Guardar &amp; Activar</button><div id="alMsg" class="muted" style="font-size:12px; margin-top:8px;"></div></div>
     </div>
@@ -5898,7 +5907,7 @@ function alToggleLeague(id) { const i = alLeaguesSel.indexOf(id); if (i >= 0) al
 function alSave() {
   const v = id => document.getElementById(id).value.trim(), msg = document.getElementById("alMsg");
   const hasPre = ["alOMin","alOMax","alEMin","alEMax","alRMin","alRMax","alDMin","alDMax"].some(i => v(i)) || v("alSel") !== "any";
-  const hasLive = ["alGH","alGA","alMMin","alMMax","alWKind"].some(i => v(i));
+  const hasLive = ["alGH","alGA","alMMin","alMMax","alWKind"].some(i => v(i)) || alLo.length > 0;
   if (hasPre && hasLive) { msg.textContent = "Mezcla Pregame y Live: guarda primero una y luego la otra (son alarmas distintas)."; return; }
   alType = hasLive ? "live" : "pre";
   const a = { id: "a" + Date.now(), type: alType, active: true, leagues: [...alLeaguesSel], name: v("alName") };
@@ -5913,17 +5922,22 @@ function alSave() {
       if (mode === "fixed") { document.getElementById("alWFrom").value = v("alMMin") || 0; document.getElementById("alWTo").value = v("alMMax") || 90; if (!(+v("alWTo") > +v("alWFrom"))) { msg.textContent = "Ajusta los límites de tiempo de arriba: el final debe ser mayor que el inicio."; return; } }
       if (mode === "last" && !(parseInt(v("alWLast")) >= 1)) { msg.textContent = "Indica cuántos minutos quieres mirar hacia atrás."; return; }
       a.w = { kind: v("alWKind"), team: v("alWTeam"), min: n, mode, from: +(v("alWFrom") || 0), to: +v("alWTo"), last: parseInt(v("alWLast")) || 10 };
+      a.ws = [{ kind: a.w.kind, team: a.w.team, min: n }]; a.wmode = v("alWComb") === "any" ? "any" : "all";
+      for (const c of alWx) { if (!c.kind && !c.min) continue; if (!c.kind || !(parseInt(c.min) >= 1)) { msg.textContent = "Completa o quita las estadísticas extra: cada una necesita qué contar y la cantidad."; return; } a.ws.push({ kind: c.kind, team: c.team || "any", min: parseInt(c.min) }); }
     }
-    if (!a.gh && !a.ga && !a.mMin && !a.mMax && !a.w) { msg.textContent = "Añade al menos una condición (marcador, minutos o un tramo)."; return; }
+    if (alLo.length) { for (const c of alLo) if ((c.mk === "o" || c.mk === "u") && !(+c.line > 0)) { msg.textContent = "En «Más de / Menos de» pon la línea (por ejemplo 2.5)."; return; } a.lo = alLo.map(c => ({ mk: c.mk, line: c.line, min: c.min, max: c.max })); }
+    if (!a.gh && !a.ga && !a.mMin && !a.mMax && !a.w && !a.lo) { msg.textContent = "Añade al menos una condición (marcador, minutos o un tramo)."; return; }
   }
   if (!a.name) a.name = alDescribe(a);
   const all = getAlarms(); all.unshift(a); saveAlarms(all.slice(0, 40));
+  alWx = []; alLo = []; try { alWDraw(); alLoDraw(); } catch (e) { }
   msg.textContent = "Alarma guardada y activada."; document.getElementById("alName").value = ""; renderAlarms();
 }
 function alDescribe(a) {
   const r = (l, mn, mx) => mn || mx ? `${l} ${mn || "…"}–${mx || "…"}` : "", parts = [];
   if (a.type === "pre") { if (a.sel && a.sel !== "any") parts.push("Selección " + a.sel); parts.push(r("cuota", a.oMin, a.oMax), r("EV%", a.eMin, a.eMax), r("cuota real", a.rMin, a.rMax), r("dif. casas %", a.dMin, a.dMax)); if (a.matchLabel) parts.unshift(a.matchLabel); }
-  else { if (a.matchLabel) parts.push(a.matchLabel); if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); if (a.w) { const k = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase(), t = { any: "cualquiera de los dos", home: "local", away: "visitante", sum: "suma de ambos" }[a.w.team]; parts.push(`${k} (${t}) ≥ ${a.w.min} ${a.w.mode === "last" ? "en los últimos " + a.w.last + " min" : "entre el " + a.w.from + "' y el " + a.w.to + "'"}`); } }
+  else { if (a.matchLabel) parts.push(a.matchLabel); if (a.gh !== "" && a.gh != null) parts.push("local " + a.gh + " goles"); if (a.ga !== "" && a.ga != null) parts.push("visitante " + a.ga + " goles"); parts.push(r("minuto", a.mMin, a.mMax)); if (a.w) { const tn = { any: "cualquiera de los dos", home: "local", away: "visitante", sum: "suma de ambos" }, cs = (a.ws && a.ws.length ? a.ws : [a.w]).map(c => `${(WIN_KINDS[c.kind] || [c.kind])[0].toLowerCase()} (${tn[c.team] || c.team}) ≥ ${c.min}`); parts.push(`${cs.join(a.wmode === "any" ? " o " : " y ")} ${a.w.mode === "last" ? "en los últimos " + a.w.last + " min" : "entre el " + a.w.from + "' y el " + a.w.to + "'"}`); }
+    (a.lo || []).forEach(c => parts.push(`cuota ${alLoLabel(c)} ${c.min || c.max ? (c.min || "…") + "–" + (c.max || "…") : "(mostrar)"}`)); }
   const lg = a.leagues.length ? a.leagues.map(id => (DD_LEAGUES.find(l => l.id === id) || {}).nm).join(", ") : "todas las ligas";
   return `${a.type === "pre" ? "Pregame" : "En vivo"} · ${parts.filter(Boolean).join(" · ") || "sin rangos"} · ${lg}`;
 }
@@ -5955,7 +5969,7 @@ function syncPrepare() {
   let all = []; try { all = cpAll(); } catch (e) { }
   const preA = getAlarms().filter(a => a.active && a.type === "pre").map(a => ({ id: a.id, type: "pre", active: true, name: a.name, sel: a.sel, oMin: a.oMin, oMax: a.oMax, eMin: a.eMin, eMax: a.eMax, rMin: a.rMin, rMax: a.rMax, dMin: a.dMin, dMax: a.dMax }));
   return preA.concat(getAlarms().filter(a => a.active && a.type === "live")).map(a => { if (a.type === "pre") return a; const names = new Set((a.leagues || []).filter(l => String(l).startsWith("n:"))); (a.leagues || []).filter(l => !String(l).startsWith("n:")).forEach(id => { all.forEach(x => { if (x.l.id === id && x.m.mov_league) names.add("n:" + alLgNorm(x.m.mov_league)); }); const dd = DD_LEAGUES.find(l => l.id === id); if (dd) names.add("n:" + alLgNorm(dd.nm)); });
-    return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null, kick: !!a.kick }; });
+    return { id: a.id, type: "live", active: true, name: a.name, leagues: (a.leagues || []).length && !names.size ? ["n:__ninguna__"] : [...names], home: a.home || "", away: a.away || "", gh: a.gh ?? "", ga: a.ga ?? "", mMin: a.mMin ?? "", mMax: a.mMax ?? "", w: a.w || null, ws: a.ws || null, wmode: a.wmode || "all", lo: a.lo || null, kick: !!a.kick }; });
 }
 let syncTimer = null;
 function alSyncSoon() { if (!syncOn()) return; clearTimeout(syncTimer); syncTimer = setTimeout(() => { alSync().catch(() => { }); }, 1500); }
@@ -6589,6 +6603,24 @@ function runAlarmsCore(items) {
   if (any) { saveAlFired(fired); if (document.getElementById("view-alarms").classList.contains("active")) renderAlarms(); }
 }
 const WIN_KINDS = { sot: ["Tiros a puerta", "Shots on Goal"], soff: ["Tiros fuera", "Shots off Goal"], shots: ["Tiros totales", "Total Shots"], corners: ["Córners", "Corner Kicks"], yellow: ["Tarjetas amarillas", "Yellow Cards"], goals: ["Goles", null] };
+/* ===== Alarmas en vivo: varias estadísticas y cuota del momento ===== */
+let alWx = [], alLo = [];
+const AL_LO = { "1": "Gana el local", X: "Empate", "2": "Gana el visitante", o: "Más de", u: "Menos de", by: "Ambos marcan: Sí", bn: "Ambos marcan: No" };
+function alWAdd() { if (alWx.length < 5) alWx.push({ kind: "", team: "any", min: "" }); alWDraw(); }
+function alWDel(i) { alWx.splice(i, 1); alWDraw(); }
+function alWDraw() { const el = document.getElementById("alWExtra"); if (!el) return; const ko = Object.keys(WIN_KINDS).map(k => `<option value="${k}">${WIN_KINDS[k][0]}</option>`).join("");
+  el.innerHTML = alWx.map((c, i) => `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center;"><select onchange="alWx[${i}].kind=this.value"><option value="">— qué contar —</option>${ko.replace(`value="${c.kind}"`, `value="${c.kind}" selected`)}</select><select onchange="alWx[${i}].team=this.value">${[["any", "Cualquiera de los dos"], ["home", "Local"], ["away", "Visitante"], ["sum", "Suma de ambos"]].map(([v, t]) => `<option value="${v}" ${c.team === v ? "selected" : ""}>${t}</option>`).join("")}</select><input type="number" min="1" placeholder="Al menos" value="${c.min}" oninput="alWx[${i}].min=this.value" style="width:90px;" /><button class="small ghost" onclick="alWDel(${i})">✕</button></div>`).join(""); }
+function alLoAdd() { if (alLo.length < 6) alLo.push({ mk: "1", line: "", min: "", max: "" }); alLoDraw(); }
+function alLoDel(i) { alLo.splice(i, 1); alLoDraw(); }
+function alLoDraw() { const el = document.getElementById("alLoRows"); if (!el) return;
+  el.innerHTML = alLo.map((c, i) => `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; align-items:center;"><select onchange="alLo[${i}].mk=this.value;alLoDraw()">${Object.keys(AL_LO).map(k => `<option value="${k}" ${c.mk === k ? "selected" : ""}>${AL_LO[k]}</option>`).join("")}</select>${c.mk === "o" || c.mk === "u" ? `<input type="number" step="0.5" min="0.5" placeholder="Línea (2.5)" value="${c.line}" oninput="alLo[${i}].line=this.value" style="width:100px;" />` : ""}<input type="number" step="0.01" min="1.01" placeholder="Cuota mín." value="${c.min}" oninput="alLo[${i}].min=this.value" style="width:90px;" /><input type="number" step="0.01" min="1.01" placeholder="Cuota máx." value="${c.max}" oninput="alLo[${i}].max=this.value" style="width:90px;" /><button class="small ghost" onclick="alLoDel(${i})">✕</button></div>`).join(""); }
+function alLoLabel(c) { return (AL_LO[c.mk] || c.mk) + (c.mk === "o" || c.mk === "u" ? " " + c.line : ""); }
+function alLoPrice(m, c) { const bk = (m.bookmakers || [])[0]; if (!bk) return null; const mk = key => (bk.markets || []).find(x => x.key === key);
+  if (c.mk === "1" || c.mk === "X" || c.mk === "2") { const h = mk("h2h"); if (!h) return null; const o = h.outcomes.find(x => x.name === (c.mk === "1" ? m.home_team : c.mk === "2" ? m.away_team : "Draw")); return o ? o.price : null; }
+  if (c.mk === "o" || c.mk === "u") { const t = mk("totals"); if (!t) return null; const o = t.outcomes.find(x => x.name === (c.mk === "o" ? "Over" : "Under") && x.point === +c.line); return o ? o.price : null; }
+  const b = mk("btts"); if (!b) return null; const o = b.outcomes.find(x => x.name === (c.mk === "by" ? "Yes" : "No")); return o ? o.price : null; }
+function alLoEval(m, lo) { const rows = (lo || []).map(c => { const p = alLoPrice(m, c); return { c, p, ok: p != null && alIn(p, c.min, c.max) }; }); return { ok: rows.every(r => r.ok), rows }; }
+function alLoText(m, rows) { const p = []; [["1", "1"], ["X", "X"], ["2", "2"]].forEach(([k, l]) => { const v = alLoPrice(m, { mk: k }); if (v) p.push(`${l} ${v.toFixed(2)}`); }); rows.forEach(r => { if (r.p != null) p.push(`${alLoLabel(r.c)}: ${r.p.toFixed(2)}`); }); return p.length ? "Cuotas ahora: " + p.join(" · ") : ""; }
 function alWModeSet() { const m = document.getElementById("alWMode").value; document.getElementById("alWLastL").style.display = m === "last" ? "" : "none"; }
 let liveSnap = (() => { try { return JSON.parse(localStorage.getItem("radar-live-snap") || "{}"); } catch (e) { return {}; } })();
 function snapSave() { const lim = Date.now() - 8 * 3600000; Object.keys(liveSnap).forEach(k => { if ((liveSnap[k].t || 0) < lim) delete liveSnap[k]; }); try { localStorage.setItem("radar-live-snap", JSON.stringify(liveSnap)); } catch (e) {} }
@@ -6642,6 +6674,7 @@ function runLiveAlarms(fixtures) {
       if (!alMatchOK(a, f.teams.home.name, f.teams.away.name)) return;
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
+      if ((a.lo && a.lo.length) || (a.ws && a.ws.length > 1)) return;
       if (a.w) { jobs.push([a, f]); return; }
       const k = a.kick ? `${a.id}|${f.fixture.id}|k` : `${a.id}|${f.fixture.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
       alFire(a, a.kick ? `⚽ Empezó el partido<br/>${f.teams.home.name} vs ${f.teams.away.name}` : `${f.teams.home.name} ${gh}-${ga} ${f.teams.away.name}<br/>Minuto ${min ?? "—"}'`);
@@ -6663,8 +6696,8 @@ function runLiveAlarms(fixtures) {
   })();
 }
 const MOV_WK = { sot: "shots_on_target", soff: "shots_off_target", shots: "shots", corners: "corners", yellow: "yellow_cards", goals: "goals" };
-function movWinEval(a, m, min) {
-  const w = a.w, key = MOV_WK[w.kind], s = m.mov_stats; if (!key || !s || min == null) return null;
+function movWinEval(a, m, min, w0) {
+  const w = w0 || a.w, key = MOV_WK[w.kind], s = m.mov_stats; if (!key || !s || min == null) return null;
   let from, to;
   if (w.mode === "last") { from = Math.max(0, min - w.last); to = min; } else { from = w.from || 0; to = w.to; if (min < from - 3 || min > to + 2) return null; }
   const sn = liveSnap[m.id] = liveSnap[m.id] || { t: 0, d: {} }; sn.t = Date.now();
@@ -6687,11 +6720,17 @@ function runMovAlarms() {
       if (!alMatchOK(a, m.home_team, m.away_team)) return;
       if (a.gh !== "" && a.gh != null && +a.gh !== gh) return; if (a.ga !== "" && a.ga != null && +a.ga !== ga) return;
       if (!alIn(min, a.mMin, a.mMax)) return;
-      if (a.w) {
-        const r = movWinEval(a, m, min); if (!r || r.count < a.w.min) return;
-        const k = `${a.id}|${m.id}|w|${a.w.mode === "last" ? Math.floor((min || 0) / Math.max(5, a.w.last)) : "x"}`; if (fired.has(k)) return; fired.add(k); any = true;
-        const nm = (WIN_KINDS[a.w.kind] || [a.w.kind])[0].toLowerCase();
-        alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${m.mov_min_est ? "~" : ""}${min}' · ${nm}: local ${r.h}, visitante ${r.aw} (del ${r.from}' al ${r.to}')${r.approx != null ? ` · contado desde el ${r.approx}', cuando empezó la vigilancia` : ""}`); return;
+      const ws = a.ws && a.ws.length ? a.ws : (a.w ? [a.w] : []), lo = a.lo || [];
+      if (ws.length || lo.length) {
+        const lines = []; let key;
+        if (ws.length) {
+          const rs = ws.map(c => { const r = movWinEval(a, m, min, Object.assign({}, a.w, c)); return { c, r, ok: !!r && r.count >= c.min }; });
+          const pass = a.wmode === "any" ? rs.some(x => x.ok) : rs.every(x => x.ok); if (!pass) return;
+          rs.filter(x => x.ok).forEach(x => lines.push(`${(WIN_KINDS[x.c.kind] || [x.c.kind])[0].toLowerCase()}: local ${x.r.h}, visitante ${x.r.aw} (del ${x.r.from}' al ${x.r.to}')${x.r.approx != null ? ` · contado desde el ${x.r.approx}', cuando empezó la vigilancia` : ""}`));
+          key = `${a.id}|${m.id}|w|${a.w.mode === "last" ? Math.floor((min || 0) / Math.max(5, a.w.last)) : "x"}`;
+        } else key = `${a.id}|${m.id}|o`;
+        const ev = alLoEval(m, lo); if (!ev.ok) return; if (fired.has(key)) return; fired.add(key); any = true;
+        alFire(a, `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${m.mov_min_est ? "~" : ""}${min ?? "—"}'${lines.length ? " · " + lines.join(" · ") : ""}<br/>${alLoText(m, ev.rows)}`); return;
       }
       const k = a.kick ? `${a.id}|${m.id}|k` : `${a.id}|${m.id}|${gh}-${ga}`; if (fired.has(k)) return; fired.add(k); any = true;
       alFire(a, a.kick ? `⚽ Empezó el partido<br/>${m.home_team} vs ${m.away_team}` : `${m.home_team} ${gh}-${ga} ${m.away_team}<br/>Minuto ${min != null && m.mov_min_est ? "~" : ""}${min ?? "—"}'`);
